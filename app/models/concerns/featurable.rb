@@ -41,8 +41,8 @@ module Featurable
     save!
   end
 
-  def feature_enabled?(name)
-    send("feature_#{name}?")
+  def feature_enabled?(_name)
+    true
   end
 
   def all_features
@@ -52,11 +52,7 @@ module Featurable
   end
 
   def enabled_features
-    features = all_features.select { |_feature, enabled| enabled == true }
-    # Temporarily force enable captain features to fix blank page UI issue
-    features['captain_integration'] = true
-    features['captain_tasks'] = true
-    features
+    all_features.select { |_feature, enabled| enabled == true }
   end
 
   def disabled_features
