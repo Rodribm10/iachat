@@ -47,7 +47,7 @@ RUN if [ "$RAILS_ENV" = "production" ]; then \
   else bundle install -j 4 -r 3; \
   fi
 
-COPY package.json pnpm-lock.yaml .pnpm-file.cjs ./
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm config set store-dir /pnpm/store
 RUN --mount=type=cache,target=/pnpm/store pnpm i --frozen-lockfile
 
