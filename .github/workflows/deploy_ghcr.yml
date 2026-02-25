@@ -36,9 +36,17 @@ jobs:
           echo "CACHE_SCOPE=${platform//\//-}-${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
           echo "CACHE_SCOPE_FALLBACK=${platform//\//-}-main" >> "$GITHUB_ENV"
 
+      # (Opcional) Se você quiser tags dinâmicas por branch/commit
+      - name: Set tag
+        run: |
+          echo "TAG=latest" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # QEMU só é necessário se você for cross-build.
+      # Como estamos usando runner arm nativo, não é obrigatório,
+      # mas deixar não costuma atrapalhar.
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -60,7 +68,13 @@ jobs:
           build-args: |
             RAILS_ENV=production
             NODE_ENV=production
+
+          # Publica por digest e deixa o merge job criar a tag multi-arch final
           outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+
+          # Cache em dois níveis:
+          # 1) GHA por branch+arquitetura (hit rápido no fluxo atual)
+          # 2) Registry cache por arquitetura (fallback estável entre runs/runners)
           cache-from: |
             type=gha,scope=${{ env.CACHE_SCOPE }}
             type=gha,scope=${{ env.CACHE_SCOPE_FALLBACK }}
