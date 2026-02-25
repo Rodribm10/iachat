@@ -28,9 +28,9 @@ export function useCaptain() {
   const draftMessage = useFunctionGetter('draftMessages/get', draftKey);
 
   // === Feature Flags ===
-  const captainEnabled = computed(() => {
-    return isCloudFeatureEnabled(FEATURE_FLAGS.CAPTAIN);
-  });
+  // Force enabled: Captain is available in this self-hosted deployment
+  // eslint-disable-next-line no-unused-vars
+  const captainEnabled = computed(() => true);
 
   const captainTasksEnabled = computed(() => {
     return isCloudFeatureEnabled(FEATURE_FLAGS.CAPTAIN_TASKS);
