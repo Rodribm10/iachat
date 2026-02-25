@@ -1,0 +1,81 @@
+{
+  "JASMINE": {
+    "HEADER": {
+      "TITLE": "Jasmine AI Agents",
+      "DESCRIPTION": "Manage your AI SDR agents. Select an inbox to configure your knowledge base.",
+      "EMPTY": "No inboxes found"
+    },
+    "CONFIG": {
+      "TITLE": "Jasmine AI Configuration",
+      "DESCRIPTION": "Configure the AI agent for this inbox.",
+      "ENABLE": "Enable Jasmine AI Agent",
+      "SYSTEM_PROMPT": "System Prompt",
+      "SYSTEM_PROMPT_HELP": "Define the persona and behavioral rules for the agent.",
+      "UPDATE_BUTTON": "Update Configuration"
+    },
+    "KNOWLEDGE_BASE": {
+      "TITLE": "Knowledge Base",
+      "DESCRIPTION": "Manage knowledge collections for this inbox",
+      "ADD_BUTTON": "+ New Collection",
+      "DOCUMENTS": "Documents",
+      "LOADING_DOCS": "Loading documents...",
+      "UNTITLED_DOC": "Untitled Document",
+      "NO_DOCS": "No documents yet. Add your first document below.",
+      "ADD_DOC_HEADER": "Add New Document",
+      "DOC_TITLE_PLACEHOLDER": "Document title (optional)",
+      "DOC_CONTENT_PLACEHOLDER": "Paste or type your knowledge content here...",
+      "ADD_DOC_BUTTON": "Add Document",
+      "NO_COLLECTIONS": "No collections yet. Create one to get started.",
+      "CREATE_MODAL": {
+        "TITLE": "Create Collection",
+        "NAME_PLACEHOLDER": "Collection name",
+        "VISIBILITY_PRIVATE": "Private (This inbox only)",
+        "VISIBILITY_SHARED": "Shared (All inboxes)",
+        "CANCEL": "Cancel",
+        "CREATE": "Create"
+      },
+      "DELETE_CONFIRM": "Are you sure you want to delete this document?",
+      "DOCUMENT_DELETE_SUCCESS": "Document deleted successfully",
+      "COLLECTION_DELETE_SUCCESS": "Collection deleted successfully",
+      "SAVE_SUCCESS": "Changes saved successfully",
+      "DOCUMENT_CREATE_SUCCESS": "Document created successfully",
+      "COLLECTION_CREATE_SUCCESS": "Collection created successfully"
+    },
+    "PLAYGROUND": {
+      "TITLE": "Jasmine AI Playground",
+      "DESCRIPTION": "Test Jasmine responses in real-time before enabling for customers.",
+      "SELECT_INBOX": "Select an Inbox to test",
+      "CHOOSE_INBOX": "Choose an inbox...",
+      "WARNING": "Make sure Jasmine is enabled and configured for this inbox",
+      "EMPTY_STATE_TITLE": "Send a message to test Jasmine",
+      "EMPTY_STATE_EXAMPLES": "Try: \"Hello\", \"How much does it cost?\", \"How does it work?\"",
+      "LOADING": "Jasmine is thinking...",
+      "INPUT_PLACEHOLDER": "Type a test message...",
+      "CLEAR_TOOLTIP": "Clear conversation",
+      "NO_INBOX_SELECTED": "Select an inbox above to start testing"
+    },
+    "INBOX_LIST": {
+      "ACTIVE": "Active",
+      "CONFIGURE": "Configure",
+      "DESCRIPTION": "Channel {channel} configured for Jasmine AI"
+    },
+    "WUZAPI": {
+      "STATUS": "Status: {status}",
+      "ACCOUNT_ERROR": "Error: Account ID not loaded. Please refresh the page.",
+      "CONNECT_FALLBACK": "Click to initiate connection",
+      "CONNECT_BUTTON_FALLBACK": "Connect WhatsApp",
+      "WEBHOOK_SECTION": "Webhook Configuration",
+      "GET_WEBHOOK_INFO": "Get Webhook Info",
+      "UPDATE_WEBHOOK": "Update Webhook Connection"
+    },
+    "EVOLUTION": {
+      "STATUS": "Status: {status}",
+      "ACCOUNT_ERROR": "Error: Instance ID not found. Please check your configuration.",
+      "CONNECT_FALLBACK": "Click to initiate connection",
+      "CONNECT_BUTTON_FALLBACK": "Connect WhatsApp",
+      "WEBHOOK_SECTION": "Webhook Configuration",
+      "GET_WEBHOOK_INFO": "Get Webhook Info",
+      "UPDATE_WEBHOOK": "Update Webhook Connection"
+    }
+  }
+}

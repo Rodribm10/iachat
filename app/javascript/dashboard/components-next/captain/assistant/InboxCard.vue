@@ -77,6 +77,13 @@ const handleAction = ({ action, value }) => {
         <span :class="icon" />
         {{ inboxName }}
       </span>
+      <div
+        v-if="inbox.captain_unit_name"
+        class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-n-blue-2 text-n-blue-11 text-xs font-medium border border-n-blue-4"
+      >
+        <span class="i-lucide-wallet h-3 w-3" />
+        {{ inbox.captain_unit_name }}
+      </div>
       <div class="flex items-center gap-2">
         <Policy
           v-on-clickaway="() => toggleDropdown(false)"

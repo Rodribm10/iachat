@@ -8,3 +8,5 @@ if conversation.account.feature_enabled?('sla')
     end
   end
 end
+
+json.reservation_marker conversation.reservation_marker_payload if defined?(Captain::Reservation)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
+ActiveRecord::Schema[7.1].define(version: 2026_02_26_002000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -22,8 +22,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "owner_type"
     t.bigint "owner_id"
     t.string "token"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["owner_type", "owner_id"], name: "index_access_tokens_on_owner_type_and_owner_id"
     t.index ["token"], name: "index_access_tokens_on_token", unique: true
   end
@@ -45,8 +45,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "user_id"
     t.integer "role", default: 0
     t.bigint "inviter_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.datetime "active_at", precision: nil
     t.integer "availability", default: 0, null: false
     t.boolean "auto_offline", default: true, null: false
@@ -80,8 +80,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "status", default: 0, null: false
     t.string "message_id", null: false
     t.string "message_checksum", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["message_id", "message_checksum"], name: "index_action_mailbox_inbound_emails_uniqueness", unique: true
   end
 
@@ -117,8 +117,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "inbox_id"
     t.integer "agent_bot_id"
     t.integer "status", default: 0
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.integer "account_id"
   end
 
@@ -126,8 +126,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "name"
     t.string "description"
     t.string "outgoing_url"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.bigint "account_id"
     t.integer "bot_type", default: 0
     t.jsonb "bot_config", default: {}
@@ -176,8 +176,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.text "content"
     t.integer "status"
     t.integer "views"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.bigint "author_id"
     t.bigint "associated_article_id"
     t.jsonb "meta", default: {}
@@ -254,8 +254,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "event_name", null: false
     t.jsonb "conditions", default: "{}", null: false
     t.jsonb "actions", default: "{}", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.boolean "active", default: true, null: false
     t.index ["account_id"], name: "index_automation_rules_on_account_id"
   end
@@ -270,14 +270,14 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "account_id", null: false
     t.bigint "inbox_id", null: false
     t.jsonb "trigger_rules", default: {}
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.integer "campaign_type", default: 0, null: false
     t.integer "campaign_status", default: 0, null: false
     t.jsonb "audience", default: []
     t.datetime "scheduled_at", precision: nil
     t.boolean "trigger_only_during_business_hours", default: false
-    t.jsonb "template_params", default: {}, null: false
+    t.jsonb "template_params"
     t.index ["account_id"], name: "index_campaigns_on_account_id"
     t.index ["campaign_status"], name: "index_campaigns_on_campaign_status"
     t.index ["campaign_type"], name: "index_campaigns_on_campaign_type"
@@ -291,6 +291,17 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.text "content"
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
+  end
+
+  create_table "captain_assets", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "captain_suite_id"
+    t.index ["account_id", "name"], name: "index_captain_assets_on_account_id_and_name", unique: true
+    t.index ["account_id"], name: "index_captain_assets_on_account_id"
+    t.index ["captain_suite_id"], name: "index_captain_assets_on_captain_suite_id"
   end
 
   create_table "captain_assistant_responses", force: :cascade do |t|
@@ -320,7 +331,39 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.jsonb "config", default: {}, null: false
     t.jsonb "response_guidelines", default: []
     t.jsonb "guardrails", default: []
+    t.string "llm_provider", default: "openai"
+    t.string "llm_model", default: "gpt-3.5-turbo"
+    t.text "api_key"
+    t.jsonb "handoff_webhook_config", default: {}
     t.index ["account_id"], name: "index_captain_assistants_on_account_id"
+  end
+
+  create_table "captain_brands", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.jsonb "suite_categories", default: [], null: false
+    t.jsonb "stay_durations", default: [], null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.jsonb "suite_images", default: {}, null: false
+    t.jsonb "suite_descriptions", default: {}, null: false
+    t.jsonb "pricing_page_config", default: {}, null: false
+    t.jsonb "suite_keywords"
+    t.index ["account_id"], name: "index_captain_brands_on_account_id"
+  end
+
+  create_table "captain_configurations", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "title", default: "Reserva Rápida"
+    t.string "subtitle", default: "Agende sua estadia com praticidade"
+    t.string "logo_url"
+    t.string "primary_color", default: "#1E90FF"
+    t.string "secondary_color", default: "#1B3B5F"
+    t.boolean "active", default: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "phone_number"
+    t.index ["account_id"], name: "index_captain_configurations_on_account_id"
   end
 
   create_table "captain_custom_tools", force: :cascade do |t|
@@ -358,14 +401,324 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.index ["status"], name: "index_captain_documents_on_status"
   end
 
+  create_table "captain_extras", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "title", null: false
+    t.text "description"
+    t.decimal "price", precision: 10, scale: 2, null: false
+    t.string "image_url"
+    t.string "category"
+    t.string "tag"
+    t.boolean "active", default: true
+    t.integer "order", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_captain_extras_on_account_id"
+  end
+
+  create_table "captain_feedback_logs", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.bigint "conversation_id", null: false
+    t.bigint "assistant_id", null: false
+    t.bigint "contact_id", null: false
+    t.string "sentiment", null: false
+    t.string "handoff_trigger"
+    t.text "original_message"
+    t.text "clarified_issue"
+    t.integer "clarification_rounds", default: 0
+    t.string "category"
+    t.jsonb "subcategories", default: []
+    t.jsonb "metadata", default: {}
+    t.boolean "resolved", default: false
+    t.datetime "resolved_at"
+    t.bigint "resolved_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "created_at"], name: "index_captain_feedback_logs_on_account_id_and_created_at"
+    t.index ["account_id"], name: "index_captain_feedback_logs_on_account_id"
+    t.index ["assistant_id"], name: "index_captain_feedback_logs_on_assistant_id"
+    t.index ["conversation_id"], name: "index_captain_feedback_logs_on_conversation_id"
+    t.index ["created_at"], name: "index_captain_feedback_logs_on_created_at"
+    t.index ["handoff_trigger"], name: "index_captain_feedback_logs_on_handoff_trigger"
+    t.index ["inbox_id"], name: "index_captain_feedback_logs_on_inbox_id"
+    t.index ["sentiment"], name: "index_captain_feedback_logs_on_sentiment"
+  end
+
+  create_table "captain_gallery_items", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "captain_unit_id"
+    t.bigint "created_by_id"
+    t.string "suite_category", null: false
+    t.string "suite_number", null: false
+    t.text "description", null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "scope", default: "inbox", null: false
+    t.bigint "inbox_id"
+    t.index ["account_id", "captain_unit_id"], name: "index_captain_gallery_items_on_account_and_unit"
+    t.index ["account_id", "inbox_id"], name: "index_captain_gallery_items_on_account_and_inbox"
+    t.index ["account_id", "scope", "inbox_id"], name: "index_captain_gallery_items_on_account_scope_and_inbox"
+    t.index ["account_id", "suite_category"], name: "index_captain_gallery_items_on_account_and_category"
+    t.index ["account_id", "suite_number"], name: "index_captain_gallery_items_on_account_and_suite_number"
+    t.index ["account_id"], name: "index_captain_gallery_items_on_account_id"
+    t.index ["captain_unit_id"], name: "index_captain_gallery_items_on_captain_unit_id"
+    t.index ["created_by_id"], name: "index_captain_gallery_items_on_created_by_id"
+    t.index ["inbox_id"], name: "index_captain_gallery_items_on_inbox_id"
+  end
+
+  create_table "captain_inbox_automations", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.string "title", null: false
+    t.text "message", null: false
+    t.integer "trigger_event", default: 0, null: false
+    t.integer "timing", default: 1, null: false
+    t.integer "offset_minutes", default: 0, null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "inbox_id"], name: "index_captain_inbox_automations_on_account_id_and_inbox_id"
+    t.index ["account_id"], name: "index_captain_inbox_automations_on_account_id"
+    t.index ["inbox_id"], name: "index_captain_inbox_automations_on_inbox_id"
+  end
+
+  create_table "captain_inbox_reminder_settings", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.boolean "enabled", default: true, null: false
+    t.text "menu_message"
+    t.integer "menu_delay_minutes", default: 15, null: false
+    t.text "feedback_message"
+    t.integer "feedback_delay_minutes", default: 30, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "inbox_id"], name: "index_captain_inbox_reminder_settings_on_account_inbox", unique: true
+    t.index ["account_id"], name: "index_captain_inbox_reminder_settings_on_account_id"
+    t.index ["inbox_id"], name: "index_captain_inbox_reminder_settings_on_inbox_id"
+  end
+
   create_table "captain_inboxes", force: :cascade do |t|
     t.bigint "captain_assistant_id", null: false
     t.bigint "inbox_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "always_use_reminder_tool", default: false, null: false
+    t.bigint "captain_unit_id"
     t.index ["captain_assistant_id", "inbox_id"], name: "index_captain_inboxes_on_captain_assistant_id_and_inbox_id", unique: true
     t.index ["captain_assistant_id"], name: "index_captain_inboxes_on_captain_assistant_id"
+    t.index ["captain_unit_id"], name: "index_captain_inboxes_on_captain_unit_id"
     t.index ["inbox_id"], name: "index_captain_inboxes_on_inbox_id"
+  end
+
+  create_table "captain_pix_charges", force: :cascade do |t|
+    t.bigint "reservation_id", null: false
+    t.bigint "unit_id", null: false
+    t.string "txid"
+    t.text "pix_copia_e_cola"
+    t.string "status"
+    t.string "e2eid"
+    t.datetime "paid_at"
+    t.jsonb "raw_webhook_payload"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["e2eid"], name: "idx_cp_charges_e2eid"
+    t.index ["e2eid"], name: "index_captain_pix_charges_on_e2eid"
+    t.index ["reservation_id"], name: "index_captain_pix_charges_on_reservation_id"
+    t.index ["txid"], name: "idx_cp_charges_txid", unique: true
+    t.index ["txid"], name: "index_captain_pix_charges_on_txid"
+    t.index ["unit_id"], name: "index_captain_pix_charges_on_unit_id"
+  end
+
+  create_table "captain_pricing_inboxes", force: :cascade do |t|
+    t.bigint "captain_pricing_id", null: false
+    t.bigint "inbox_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["captain_pricing_id", "inbox_id"], name: "index_captain_pricing_inboxes_on_pricing_and_inbox", unique: true
+    t.index ["inbox_id"], name: "index_captain_pricing_inboxes_on_inbox_id"
+  end
+
+  create_table "captain_pricings", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "captain_brand_id", null: false
+    t.string "day_range", null: false
+    t.string "suite_category", null: false
+    t.string "duration", null: false
+    t.decimal "price", precision: 10, scale: 2, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "inbox_id"
+    t.text "keywords"
+    t.index ["account_id"], name: "index_captain_pricings_on_account_id"
+    t.index ["captain_brand_id"], name: "index_captain_pricings_on_captain_brand_id"
+    t.index ["inbox_id"], name: "index_captain_pricings_on_inbox_id"
+  end
+
+  create_table "captain_prompt_audit_events", force: :cascade do |t|
+    t.bigint "prompt_profile_id", null: false
+    t.bigint "prompt_version_id"
+    t.string "event_type", null: false
+    t.jsonb "payload_json", default: {}, null: false
+    t.bigint "actor_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["actor_id"], name: "index_captain_prompt_audit_events_on_actor_id"
+    t.index ["created_at"], name: "index_captain_prompt_audit_events_on_created_at"
+    t.index ["event_type"], name: "index_captain_prompt_audit_events_on_event_type"
+    t.index ["prompt_profile_id"], name: "index_captain_prompt_audit_events_on_prompt_profile_id"
+    t.index ["prompt_version_id"], name: "index_captain_prompt_audit_events_on_prompt_version_id"
+  end
+
+  create_table "captain_prompt_block_versions", force: :cascade do |t|
+    t.bigint "prompt_block_id", null: false
+    t.integer "version_number", null: false
+    t.text "content", null: false
+    t.string "status", default: "draft", null: false
+    t.string "change_summary"
+    t.string "change_reason"
+    t.string "author_type"
+    t.bigint "author_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["prompt_block_id", "status"], name: "idx_cp_prompt_blk_vers_on_blk_id_and_status"
+    t.index ["prompt_block_id", "version_number"], name: "idx_cp_prompt_blk_vers_on_blk_id_and_ver_num", unique: true
+    t.index ["prompt_block_id"], name: "index_captain_prompt_block_versions_on_prompt_block_id"
+  end
+
+  create_table "captain_prompt_blocks", force: :cascade do |t|
+    t.bigint "prompt_profile_id", null: false
+    t.string "key", null: false
+    t.string "title"
+    t.text "description"
+    t.integer "order_index", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["prompt_profile_id", "key"], name: "index_captain_prompt_blocks_on_prompt_profile_id_and_key", unique: true
+    t.index ["prompt_profile_id"], name: "index_captain_prompt_blocks_on_prompt_profile_id"
+  end
+
+  create_table "captain_prompt_improvement_cases", force: :cascade do |t|
+    t.bigint "prompt_profile_id", null: false
+    t.text "customer_message", null: false
+    t.text "agent_actual_response"
+    t.text "expected_response", null: false
+    t.string "failure_type"
+    t.text "diagnosis"
+    t.text "proposed_patch"
+    t.decimal "confidence_score", precision: 5, scale: 4
+    t.string "decision"
+    t.bigint "decided_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_captain_prompt_improvement_cases_on_created_at"
+    t.index ["decided_by_id"], name: "index_captain_prompt_improvement_cases_on_decided_by_id"
+    t.index ["decision"], name: "index_captain_prompt_improvement_cases_on_decision"
+    t.index ["failure_type"], name: "index_captain_prompt_improvement_cases_on_failure_type"
+    t.index ["prompt_profile_id"], name: "index_captain_prompt_improvement_cases_on_prompt_profile_id"
+  end
+
+  create_table "captain_prompt_profiles", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "captain_assistant_id", null: false
+    t.string "name", null: false
+    t.bigint "active_version_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_captain_prompt_profiles_on_account_id"
+    t.index ["active_version_id"], name: "index_captain_prompt_profiles_on_active_version_id"
+    t.index ["captain_assistant_id"], name: "index_captain_prompt_profiles_on_captain_assistant_id", unique: true
+  end
+
+  create_table "captain_prompt_versions", force: :cascade do |t|
+    t.bigint "prompt_profile_id", null: false
+    t.integer "version_number", null: false
+    t.text "content", null: false
+    t.text "change_summary"
+    t.text "change_reason"
+    t.bigint "source_case_id"
+    t.string "created_by_type"
+    t.bigint "created_by_id"
+    t.string "status", default: "draft", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_captain_prompt_versions_on_created_at"
+    t.index ["created_by_id"], name: "index_captain_prompt_versions_on_created_by_id"
+    t.index ["prompt_profile_id", "version_number"], name: "idx_captain_prompt_versions_profile_version", unique: true
+    t.index ["prompt_profile_id"], name: "idx_captain_prompt_versions_single_active_per_profile", unique: true, where: "((status)::text = 'active'::text)"
+    t.index ["prompt_profile_id"], name: "index_captain_prompt_versions_on_prompt_profile_id"
+    t.index ["source_case_id"], name: "index_captain_prompt_versions_on_source_case_id"
+    t.index ["status"], name: "index_captain_prompt_versions_on_status"
+  end
+
+  create_table "captain_reminders", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.bigint "contact_id", null: false
+    t.bigint "contact_inbox_id", null: false
+    t.bigint "conversation_id"
+    t.integer "reminder_type", default: 0, null: false
+    t.integer "status", default: 0, null: false
+    t.text "message"
+    t.datetime "scheduled_at", null: false
+    t.datetime "sent_at"
+    t.integer "attempt_count", default: 0, null: false
+    t.text "error_message"
+    t.jsonb "metadata", default: {}, null: false
+    t.string "source_type"
+    t.bigint "source_id"
+    t.bigint "created_by_id"
+    t.string "created_by_type"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "inbox_id"], name: "index_captain_reminders_on_account_id_and_inbox_id"
+    t.index ["account_id"], name: "index_captain_reminders_on_account_id"
+    t.index ["contact_id", "inbox_id"], name: "index_captain_reminders_on_contact_id_and_inbox_id"
+    t.index ["contact_id"], name: "index_captain_reminders_on_contact_id"
+    t.index ["contact_inbox_id"], name: "index_captain_reminders_on_contact_inbox_id"
+    t.index ["conversation_id"], name: "index_captain_reminders_on_conversation_id"
+    t.index ["inbox_id"], name: "index_captain_reminders_on_inbox_id"
+    t.index ["scheduled_at", "status"], name: "index_captain_reminders_on_scheduled_at_and_status"
+    t.index ["source_type", "source_id"], name: "index_captain_reminders_on_source_type_and_source_id"
+  end
+
+  create_table "captain_reservations", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.bigint "contact_id", null: false
+    t.bigint "contact_inbox_id", null: false
+    t.bigint "conversation_id"
+    t.string "suite_identifier"
+    t.datetime "check_in_at", null: false
+    t.datetime "check_out_at", null: false
+    t.integer "status", default: 0, null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.bigint "created_by_id"
+    t.string "created_by_type"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "captain_brand_id"
+    t.bigint "captain_unit_id"
+    t.decimal "total_amount", precision: 10, scale: 2
+    t.string "payment_status", default: "pending"
+    t.string "integracao_id"
+    t.bigint "current_pix_charge_id"
+    t.index ["account_id", "inbox_id"], name: "index_captain_reservations_on_account_id_and_inbox_id"
+    t.index ["account_id", "payment_status"], name: "idx_reservations_account_payment_status"
+    t.index ["account_id", "status"], name: "idx_reservations_account_status"
+    t.index ["account_id"], name: "index_captain_reservations_on_account_id"
+    t.index ["captain_brand_id"], name: "index_captain_reservations_on_captain_brand_id"
+    t.index ["captain_unit_id", "check_in_at", "status"], name: "idx_reservations_board_unit_checkin_status"
+    t.index ["captain_unit_id", "check_out_at", "status"], name: "idx_reservations_board_unit_checkout_status"
+    t.index ["captain_unit_id"], name: "index_captain_reservations_on_captain_unit_id"
+    t.index ["contact_id", "inbox_id"], name: "index_captain_reservations_on_contact_id_and_inbox_id"
+    t.index ["contact_id"], name: "index_captain_reservations_on_contact_id"
+    t.index ["contact_inbox_id"], name: "index_captain_reservations_on_contact_inbox_id"
+    t.index ["conversation_id"], name: "index_captain_reservations_on_conversation_id"
+    t.index ["inbox_id"], name: "index_captain_reservations_on_inbox_id"
+    t.index ["integracao_id", "captain_unit_id"], name: "index_captain_reservations_on_integracao_id_and_unit_id", unique: true
+    t.index ["integracao_id"], name: "index_captain_reservations_on_integracao_id"
   end
 
   create_table "captain_scenarios", force: :cascade do |t|
@@ -378,10 +731,76 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "account_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.text "trigger_keywords"
+    t.text "fallback_message"
     t.index ["account_id"], name: "index_captain_scenarios_on_account_id"
     t.index ["assistant_id", "enabled"], name: "index_captain_scenarios_on_assistant_id_and_enabled"
     t.index ["assistant_id"], name: "index_captain_scenarios_on_assistant_id"
     t.index ["enabled"], name: "index_captain_scenarios_on_enabled"
+  end
+
+  create_table "captain_suites", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name"
+    t.string "category"
+    t.jsonb "unit_ids"
+    t.string "api_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_captain_suites_on_account_id"
+    t.index ["category"], name: "index_captain_suites_on_category"
+  end
+
+  create_table "captain_tool_configs", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id"
+    t.string "tool_key"
+    t.boolean "is_enabled"
+    t.string "plug_play_id"
+    t.string "plug_play_token"
+    t.string "webhook_url"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "captain_assistant_id"
+    t.text "fallback_message"
+    t.index ["account_id", "inbox_id", "tool_key"], name: "index_captain_tool_configs_on_context", unique: true
+    t.index ["account_id"], name: "index_captain_tool_configs_on_account_id"
+    t.index ["captain_assistant_id", "tool_key"], name: "index_captain_tool_configs_on_assistant_id_and_tool_key", unique: true
+    t.index ["captain_assistant_id"], name: "index_captain_tool_configs_on_captain_assistant_id"
+    t.index ["inbox_id"], name: "index_captain_tool_configs_on_inbox_id"
+  end
+
+  create_table "captain_units", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "captain_brand_id", null: false
+    t.string "name", null: false
+    t.jsonb "visible_suite_categories", default: [], null: false
+    t.jsonb "suite_category_images", default: [], null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "status"
+    t.string "inter_client_id"
+    t.string "inter_client_secret"
+    t.string "inter_pix_key"
+    t.string "inter_cert_path"
+    t.string "inter_key_path"
+    t.string "inter_account_number"
+    t.string "webhook_url"
+    t.bigint "inbox_id"
+    t.string "plug_play_id"
+    t.string "plug_play_token"
+    t.boolean "reservations_sync_enabled"
+    t.datetime "last_synced_at"
+    t.string "leader_whatsapp"
+    t.string "reservation_source_tag"
+    t.boolean "payment_receipt_review_enabled", default: false, null: false
+    t.text "inter_cert_content"
+    t.text "inter_key_content"
+    t.datetime "webhook_configured_at"
+    t.boolean "proactive_pix_polling_enabled", default: false, null: false
+    t.index ["account_id"], name: "index_captain_units_on_account_id"
+    t.index ["captain_brand_id"], name: "index_captain_units_on_captain_brand_id"
+    t.index ["inbox_id"], name: "index_captain_units_on_inbox_id"
   end
 
   create_table "categories", force: :cascade do |t|
@@ -390,8 +809,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "name"
     t.text "description"
     t.integer "position"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.string "locale", default: "en"
     t.string "slug", null: false
     t.bigint "parent_category_id"
@@ -407,8 +826,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
   create_table "channel_api", force: :cascade do |t|
     t.integer "account_id", null: false
     t.string "webhook_url"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.string "identifier"
     t.string "hmac_token"
     t.boolean "hmac_mandatory", default: false
@@ -421,8 +840,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "account_id", null: false
     t.string "email", null: false
     t.string "forward_to_email", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.boolean "imap_enabled", default: false
     t.string "imap_address", default: ""
     t.integer "imap_port", default: 0
@@ -473,8 +892,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "line_channel_id", null: false
     t.string "line_channel_secret", null: false
     t.string "line_channel_token", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["line_channel_id"], name: "index_channel_line_on_line_channel_id", unique: true
   end
 
@@ -483,8 +902,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "phone_number", null: false
     t.string "provider", default: "default"
     t.jsonb "provider_config", default: {}
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["phone_number"], name: "index_channel_sms_on_phone_number", unique: true
   end
 
@@ -492,8 +911,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "bot_name"
     t.integer "account_id", null: false
     t.string "bot_token", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["bot_token"], name: "index_channel_telegram_on_bot_token", unique: true
   end
 
@@ -514,8 +933,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "auth_token", null: false
     t.string "account_sid", null: false
     t.integer "account_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.integer "medium", default: 0
     t.string "messaging_service_sid"
     t.string "api_key_sid"
@@ -531,8 +950,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "twitter_access_token", null: false
     t.string "twitter_access_token_secret", null: false
     t.integer "account_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.boolean "tweets_enabled", default: true
     t.index ["account_id", "profile_id"], name: "index_channel_twitter_profiles_on_account_id_and_profile_id", unique: true
   end
@@ -575,10 +994,16 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "phone_number", null: false
     t.string "provider", default: "default"
     t.jsonb "provider_config", default: {}
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.jsonb "message_templates", default: {}
     t.datetime "message_templates_last_updated", precision: nil
+    t.string "wuzapi_user_token"
+    t.string "wuzapi_user_token_iv"
+    t.string "wuzapi_admin_token"
+    t.string "wuzapi_admin_token_iv"
+    t.string "evolution_api_token"
+    t.string "evolution_api_token_iv"
     t.jsonb "provider_connection", default: {}
     t.index ["phone_number"], name: "index_channel_whatsapp_on_phone_number", unique: true
     t.index ["provider_connection"], name: "index_channel_whatsapp_provider_connection", where: "((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying])::text[]))", using: :gin
@@ -591,7 +1016,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "account_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.integer "contacts_count"
+    t.integer "contacts_count", default: 0, null: false
     t.index ["account_id", "domain"], name: "index_companies_on_account_and_domain", unique: true, where: "(domain IS NOT NULL)"
     t.index ["account_id"], name: "index_companies_on_account_id"
     t.index ["name", "account_id"], name: "index_companies_on_name_and_account_id"
@@ -601,8 +1026,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "contact_id"
     t.bigint "inbox_id"
     t.text "source_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.boolean "hmac_verified", default: false
     t.string "pubsub_token"
     t.index ["contact_id"], name: "index_contact_inboxes_on_contact_id"
@@ -644,12 +1069,37 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.index ["phone_number", "account_id"], name: "index_contacts_on_phone_number_and_account_id"
   end
 
+  create_table "conversation_crm_insights", force: :cascade do |t|
+    t.bigint "conversation_id", null: false
+    t.bigint "contact_id", null: false
+    t.text "summary_text"
+    t.jsonb "structured_data", default: {}
+    t.integer "contact_sessions_count", default: 0, null: false
+    t.datetime "last_contact_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "account_id"
+    t.datetime "generated_at"
+    t.bigint "range_from_message_id"
+    t.bigint "range_to_message_id"
+    t.string "status", default: "success"
+    t.text "error_message"
+    t.string "schema_version"
+    t.string "model"
+    t.float "confidence"
+    t.index ["account_id"], name: "index_conversation_crm_insights_on_account_id"
+    t.index ["contact_id"], name: "index_conversation_crm_insights_on_contact_id"
+    t.index ["conversation_id", "generated_at"], name: "idx_on_conversation_id_generated_at_44d5836366"
+    t.index ["conversation_id"], name: "index_conversation_crm_insights_on_conversation_id"
+    t.index ["status"], name: "index_conversation_crm_insights_on_status"
+  end
+
   create_table "conversation_participants", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.bigint "user_id", null: false
     t.bigint "conversation_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["account_id"], name: "index_conversation_participants_on_account_id"
     t.index ["conversation_id"], name: "index_conversation_participants_on_conversation_id"
     t.index ["user_id", "conversation_id"], name: "index_conversation_participants_on_user_id_and_conversation_id", unique: true
@@ -683,10 +1133,14 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.datetime "waiting_since"
     t.text "cached_label_list"
     t.bigint "assignee_agent_bot_id"
+    t.string "active_scenario_key"
+    t.datetime "active_scenario_expires_at"
+    t.jsonb "active_scenario_state", default: {}, null: false
     t.index ["account_id", "display_id"], name: "index_conversations_on_account_id_and_display_id", unique: true
     t.index ["account_id", "id"], name: "index_conversations_on_id_and_account_id"
     t.index ["account_id", "inbox_id", "status", "assignee_id"], name: "conv_acid_inbid_stat_asgnid_idx"
     t.index ["account_id"], name: "index_conversations_on_account_id"
+    t.index ["active_scenario_key"], name: "index_conversations_on_active_scenario_key"
     t.index ["assignee_id", "account_id"], name: "index_conversations_on_assignee_id_and_account_id"
     t.index ["campaign_id"], name: "index_conversations_on_campaign_id"
     t.index ["contact_id"], name: "index_conversations_on_contact_id"
@@ -733,8 +1187,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.text "feedback_message"
     t.bigint "contact_id", null: false
     t.bigint "assigned_agent_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.text "csat_review_notes"
     t.datetime "review_notes_updated_at"
     t.bigint "review_notes_updated_by_id"
@@ -753,8 +1207,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "default_value"
     t.integer "attribute_model", default: 0
     t.bigint "account_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.text "attribute_description"
     t.jsonb "attribute_values", default: []
     t.string "regex_pattern"
@@ -769,8 +1223,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.jsonb "query", default: "{}", null: false
     t.bigint "account_id", null: false
     t.bigint "user_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["account_id"], name: "index_custom_filters_on_account_id"
     t.index ["user_id"], name: "index_custom_filters_on_user_id"
   end
@@ -790,8 +1244,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.jsonb "content", default: []
     t.bigint "account_id", null: false
     t.bigint "user_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.boolean "show_on_sidebar", default: false, null: false
     t.index ["account_id"], name: "index_dashboard_apps_on_account_id"
     t.index ["user_id"], name: "index_dashboard_apps_on_user_id"
@@ -804,8 +1258,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.text "processing_errors"
     t.integer "total_records"
     t.integer "processed_records"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["account_id"], name: "index_data_imports_on_account_id"
   end
 
@@ -815,8 +1269,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "account_id"
     t.integer "template_type", default: 1
     t.integer "locale", default: 0, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["name", "account_id"], name: "index_email_templates_on_name_and_account_id", unique: true
   end
 
@@ -824,8 +1278,19 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "account_id", null: false
     t.integer "category_id", null: false
     t.string "name"
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+  end
+
+  create_table "frequent_questions", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "label"
+    t.string "question_text"
+    t.integer "occurrence_count"
+    t.date "cluster_date"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_frequent_questions_on_account_id"
   end
 
   create_table "inbox_assignment_policies", force: :cascade do |t|
@@ -880,6 +1345,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "sender_name_type", default: 0, null: false
     t.string "business_name"
     t.jsonb "csat_config", default: {}, null: false
+    t.integer "auto_resolve_duration"
+    t.boolean "message_signature_enabled"
+    t.integer "typing_delay", default: 0
     t.index ["account_id"], name: "index_inboxes_on_account_id"
     t.index ["channel_id", "channel_type"], name: "index_inboxes_on_channel_id_and_channel_type"
     t.index ["portal_id"], name: "index_inboxes_on_portal_id"
@@ -888,8 +1356,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
   create_table "installation_configs", force: :cascade do |t|
     t.string "name", null: false
     t.jsonb "serialized_value", default: {}, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.boolean "locked", default: true, null: false
     t.index ["name", "created_at"], name: "index_installation_configs_on_name_and_created_at", unique: true
     t.index ["name"], name: "index_installation_configs_on_name", unique: true
@@ -903,9 +1371,111 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "hook_type", default: 0
     t.string "reference_id"
     t.string "access_token"
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+    t.jsonb "settings", default: {}
+  end
+
+  create_table "jasmine_collections", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.bigint "owner_inbox_id"
+    t.integer "visibility", default: 0
+    t.boolean "is_active", default: true
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.jsonb "settings", default: {}
+    t.index ["account_id", "owner_inbox_id"], name: "index_jasmine_collections_on_account_id_and_owner_inbox_id"
+    t.index ["account_id", "visibility"], name: "index_jasmine_collections_on_account_id_and_visibility"
+    t.index ["account_id"], name: "index_jasmine_collections_on_account_id"
+    t.index ["owner_inbox_id"], name: "index_jasmine_collections_on_owner_inbox_id"
+  end
+
+  create_table "jasmine_document_chunks", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "collection_id", null: false
+    t.bigint "document_id", null: false
+    t.text "content"
+    t.jsonb "metadata", default: {}
+    t.vector "embedding", limit: 1536
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "collection_id", "document_id"], name: "index_jasmine_chunks_on_acc_coll_doc"
+    t.index ["account_id"], name: "index_jasmine_document_chunks_on_account_id"
+    t.index ["collection_id"], name: "index_jasmine_document_chunks_on_collection_id"
+    t.index ["document_id"], name: "index_jasmine_document_chunks_on_document_id"
+    t.index ["embedding"], name: "index_jasmine_document_chunks_on_embedding", opclass: :vector_cosine_ops, using: :hnsw
+  end
+
+  create_table "jasmine_documents", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "collection_id", null: false
+    t.string "title"
+    t.text "content"
+    t.jsonb "metadata", default: {}
+    t.integer "source_type", default: 0
+    t.integer "status", default: 0
+    t.text "error_message"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "collection_id", "status"], name: "index_jasmine_docs_on_acc_coll_status"
+    t.index ["account_id"], name: "index_jasmine_documents_on_account_id"
+    t.index ["collection_id"], name: "index_jasmine_documents_on_collection_id"
+  end
+
+  create_table "jasmine_inbox_collections", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.bigint "collection_id", null: false
+    t.boolean "is_enabled", default: true
+    t.integer "priority", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "collection_id"], name: "idx_on_account_id_collection_id_3011aaebad"
+    t.index ["account_id", "inbox_id", "collection_id"], name: "index_jasmine_inbox_collections_uniqueness", unique: true
+    t.index ["account_id", "inbox_id"], name: "index_jasmine_inbox_collections_on_account_id_and_inbox_id"
+    t.index ["account_id"], name: "index_jasmine_inbox_collections_on_account_id"
+    t.index ["collection_id"], name: "index_jasmine_inbox_collections_on_collection_id"
+    t.index ["inbox_id"], name: "index_jasmine_inbox_collections_on_inbox_id"
+  end
+
+  create_table "jasmine_inbox_settings", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.string "name", default: "Jasmine"
+    t.text "system_prompt"
+    t.boolean "is_enabled", default: false
+    t.integer "mode", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.text "playbook_prompt"
+    t.float "rag_distance_threshold", default: 0.35
+    t.integer "rag_max_results", default: 3
+    t.string "model", default: "gpt-4o-mini"
+    t.float "temperature", default: 0.7
+    t.jsonb "intent_keywords", default: {}
+    t.index ["account_id", "inbox_id"], name: "index_jasmine_inbox_settings_on_account_id_and_inbox_id", unique: true
+    t.index ["account_id"], name: "index_jasmine_inbox_settings_on_account_id"
+    t.index ["inbox_id"], name: "index_jasmine_inbox_settings_on_inbox_id"
+  end
+
+  create_table "jasmine_tool_configs", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "inbox_id", null: false
+    t.string "tool_key", null: false
+    t.boolean "is_enabled", default: false, null: false
+    t.string "plug_play_id"
+    t.text "plug_play_token"
+    t.datetime "last_tested_at"
+    t.integer "last_test_status"
+    t.text "last_test_error"
+    t.integer "last_test_duration_ms"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "inbox_id", "tool_key"], name: "index_jasmine_tools_on_account_inbox_key", unique: true
+    t.index ["account_id"], name: "index_jasmine_tool_configs_on_account_id"
+    t.index ["inbox_id"], name: "index_jasmine_tool_configs_on_inbox_id"
+    t.index ["tool_key"], name: "index_jasmine_tool_configs_on_tool_key"
   end
 
   create_table "labels", force: :cascade do |t|
@@ -914,8 +1484,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "color", default: "#1f93ff", null: false
     t.boolean "show_on_sidebar"
     t.bigint "account_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["account_id"], name: "index_labels_on_account_id"
     t.index ["title", "account_id"], name: "index_labels_on_title_and_account_id", unique: true
   end
@@ -945,8 +1515,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "created_by_id"
     t.bigint "updated_by_id"
     t.jsonb "actions", default: {}, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["account_id"], name: "index_macros_on_account_id"
   end
 
@@ -955,8 +1525,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "conversation_id", null: false
     t.bigint "account_id", null: false
     t.datetime "mentioned_at", precision: nil, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["account_id"], name: "index_mentions_on_account_id"
     t.index ["conversation_id"], name: "index_mentions_on_conversation_id"
     t.index ["user_id", "conversation_id"], name: "index_mentions_on_user_id_and_conversation_id", unique: true
@@ -982,6 +1552,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.jsonb "additional_attributes", default: {}
     t.text "processed_message_content"
     t.jsonb "sentiment", default: {}
+    t.integer "in_reply_to_id"
     t.index "((additional_attributes -> 'campaign_id'::text))", name: "index_messages_on_additional_attributes_campaign_id", using: :gin
     t.index ["account_id", "content_type", "created_at"], name: "idx_messages_account_content_created"
     t.index ["account_id", "created_at", "message_type"], name: "index_messages_on_account_created_type"
@@ -991,6 +1562,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.index ["conversation_id", "account_id", "message_type", "created_at"], name: "index_messages_on_conversation_account_type_created"
     t.index ["conversation_id"], name: "index_messages_on_conversation_id"
     t.index ["created_at"], name: "index_messages_on_created_at"
+    t.index ["in_reply_to_id"], name: "index_messages_on_in_reply_to_id"
     t.index ["inbox_id"], name: "index_messages_on_inbox_id"
     t.index ["sender_type", "sender_id"], name: "index_messages_on_sender_type_and_sender_id"
     t.index ["source_id"], name: "index_messages_on_source_id"
@@ -1001,8 +1573,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "account_id", null: false
     t.bigint "contact_id", null: false
     t.bigint "user_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["account_id"], name: "index_notes_on_account_id"
     t.index ["contact_id"], name: "index_notes_on_contact_id"
     t.index ["user_id"], name: "index_notes_on_user_id"
@@ -1012,8 +1584,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "account_id"
     t.integer "user_id"
     t.integer "email_flags", default: 0, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.integer "push_flags", default: 0, null: false
     t.index ["account_id", "user_id"], name: "by_account_user", unique: true
   end
@@ -1022,8 +1594,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "user_id", null: false
     t.integer "subscription_type", null: false
     t.jsonb "subscription_attributes", default: {}, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.text "identifier"
     t.index ["identifier"], name: "index_notification_subscriptions_on_identifier", unique: true
     t.index ["user_id"], name: "index_notification_subscriptions_on_user_id"
@@ -1038,8 +1610,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "secondary_actor_type"
     t.bigint "secondary_actor_id"
     t.datetime "read_at", precision: nil
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.datetime "snoozed_until"
     t.datetime "last_activity_at", default: -> { "CURRENT_TIMESTAMP" }
     t.jsonb "meta", default: {}
@@ -1055,8 +1627,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.bigint "platform_app_id", null: false
     t.string "permissible_type", null: false
     t.bigint "permissible_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["permissible_type", "permissible_id"], name: "index_platform_app_permissibles_on_permissibles"
     t.index ["platform_app_id", "permissible_id", "permissible_type"], name: "unique_permissibles_index", unique: true
     t.index ["platform_app_id"], name: "index_platform_app_permissibles_on_platform_app_id"
@@ -1064,8 +1636,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
 
   create_table "platform_apps", force: :cascade do |t|
     t.string "name", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
   end
 
   create_table "portals", force: :cascade do |t|
@@ -1077,8 +1649,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.string "homepage_link"
     t.string "page_title"
     t.text "header_text"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.jsonb "config", default: {"allowed_locales" => ["en"]}
     t.boolean "archived", default: false
     t.bigint "channel_web_widget_id"
@@ -1099,8 +1671,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
   create_table "related_categories", force: :cascade do |t|
     t.bigint "category_id"
     t.bigint "related_category_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["category_id", "related_category_id"], name: "index_related_categories_on_category_id_and_related_category_id", unique: true
     t.index ["related_category_id", "category_id"], name: "index_related_categories_on_related_category_id_and_category_id", unique: true
   end
@@ -1112,8 +1684,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "inbox_id"
     t.integer "user_id"
     t.integer "conversation_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.float "value_in_business_hours"
     t.datetime "event_start_time", precision: nil
     t.datetime "event_end_time", precision: nil
@@ -1212,8 +1784,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
   create_table "team_members", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.bigint "user_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["team_id", "user_id"], name: "index_team_members_on_team_id_and_user_id", unique: true
     t.index ["team_id"], name: "index_team_members_on_team_id"
     t.index ["user_id"], name: "index_team_members_on_user_id"
@@ -1224,8 +1796,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.text "description"
     t.boolean "allow_auto_assign", default: true
     t.bigint "account_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["account_id"], name: "index_teams_on_account_id"
     t.index ["name", "account_id"], name: "index_teams_on_name_and_account_id", unique: true
   end
@@ -1260,7 +1832,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.text "message_signature"
     t.string "otp_secret"
     t.integer "consumed_timestep"
-    t.boolean "otp_required_for_login", default: false
+    t.boolean "otp_required_for_login", default: false, null: false
     t.text "otp_backup_codes"
     t.index ["email"], name: "index_users_on_email"
     t.index ["otp_required_for_login"], name: "index_users_on_otp_required_for_login"
@@ -1274,12 +1846,43 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "account_id"
     t.integer "inbox_id"
     t.text "url"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.integer "webhook_type", default: 0
     t.jsonb "subscriptions", default: ["conversation_status_changed", "conversation_updated", "conversation_created", "contact_created", "contact_updated", "message_created", "message_updated", "webwidget_triggered"]
     t.string "name"
     t.index ["account_id", "url"], name: "index_webhooks_on_account_id_and_url", unique: true
+  end
+
+  create_table "whatsapp_campaign_hits", force: :cascade do |t|
+    t.bigint "campaign_id", null: false
+    t.string "ip"
+    t.string "user_agent"
+    t.datetime "timestamp"
+    t.text "referer"
+    t.string "utm_source"
+    t.string "utm_medium"
+    t.string "utm_campaign"
+    t.string "utm_term"
+    t.string "utm_content"
+    t.string "country_code"
+    t.string "city"
+    t.index ["campaign_id", "timestamp"], name: "index_whatsapp_campaign_hits_on_campaign_id_and_timestamp"
+    t.index ["campaign_id"], name: "index_whatsapp_campaign_hits_on_campaign_id"
+    t.index ["timestamp"], name: "index_whatsapp_campaign_hits_on_timestamp"
+  end
+
+  create_table "whatsapp_campaigns", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.string "slug", null: false
+    t.string "phone", null: false
+    t.string "default_message"
+    t.boolean "active", default: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_whatsapp_campaigns_on_account_id"
+    t.index ["slug"], name: "index_whatsapp_campaigns_on_slug", unique: true
   end
 
   create_table "working_hours", force: :cascade do |t|
@@ -1291,8 +1894,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
     t.integer "open_minutes"
     t.integer "close_hour"
     t.integer "close_minutes"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.boolean "open_all_day", default: false
     t.index ["account_id"], name: "index_working_hours_on_account_id"
     t.index ["inbox_id"], name: "index_working_hours_on_inbox_id"
@@ -1300,11 +1903,78 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_01_162122) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "captain_assets", "accounts"
+  add_foreign_key "captain_assets", "captain_suites"
+  add_foreign_key "captain_brands", "accounts"
+  add_foreign_key "captain_configurations", "accounts"
+  add_foreign_key "captain_extras", "accounts"
+  add_foreign_key "captain_gallery_items", "accounts"
+  add_foreign_key "captain_gallery_items", "captain_units"
+  add_foreign_key "captain_gallery_items", "inboxes"
+  add_foreign_key "captain_gallery_items", "users", column: "created_by_id"
+  add_foreign_key "captain_inbox_automations", "accounts"
+  add_foreign_key "captain_inbox_automations", "inboxes"
+  add_foreign_key "captain_inbox_reminder_settings", "accounts"
+  add_foreign_key "captain_inbox_reminder_settings", "inboxes"
+  add_foreign_key "captain_inboxes", "captain_units"
+  add_foreign_key "captain_pix_charges", "captain_reservations", column: "reservation_id"
+  add_foreign_key "captain_pix_charges", "captain_units", column: "unit_id"
+  add_foreign_key "captain_pricings", "accounts"
+  add_foreign_key "captain_pricings", "captain_brands"
+  add_foreign_key "captain_prompt_audit_events", "captain_prompt_profiles", column: "prompt_profile_id"
+  add_foreign_key "captain_prompt_audit_events", "captain_prompt_versions", column: "prompt_version_id"
+  add_foreign_key "captain_prompt_block_versions", "captain_prompt_blocks", column: "prompt_block_id"
+  add_foreign_key "captain_prompt_blocks", "captain_prompt_profiles", column: "prompt_profile_id"
+  add_foreign_key "captain_prompt_improvement_cases", "captain_prompt_profiles", column: "prompt_profile_id"
+  add_foreign_key "captain_prompt_profiles", "accounts"
+  add_foreign_key "captain_prompt_profiles", "captain_assistants"
+  add_foreign_key "captain_prompt_profiles", "captain_prompt_versions", column: "active_version_id"
+  add_foreign_key "captain_prompt_versions", "captain_prompt_improvement_cases", column: "source_case_id"
+  add_foreign_key "captain_prompt_versions", "captain_prompt_profiles", column: "prompt_profile_id"
+  add_foreign_key "captain_reminders", "accounts"
+  add_foreign_key "captain_reminders", "contact_inboxes"
+  add_foreign_key "captain_reminders", "contacts"
+  add_foreign_key "captain_reminders", "conversations"
+  add_foreign_key "captain_reminders", "inboxes"
+  add_foreign_key "captain_reservations", "accounts"
+  add_foreign_key "captain_reservations", "captain_brands"
+  add_foreign_key "captain_reservations", "captain_units"
+  add_foreign_key "captain_reservations", "contact_inboxes"
+  add_foreign_key "captain_reservations", "contacts"
+  add_foreign_key "captain_reservations", "conversations"
+  add_foreign_key "captain_reservations", "inboxes"
+  add_foreign_key "captain_suites", "accounts"
+  add_foreign_key "captain_tool_configs", "accounts"
+  add_foreign_key "captain_tool_configs", "inboxes"
+  add_foreign_key "captain_units", "accounts"
+  add_foreign_key "captain_units", "captain_brands"
+  add_foreign_key "captain_units", "inboxes"
+  add_foreign_key "conversation_crm_insights", "accounts"
+  add_foreign_key "conversation_crm_insights", "contacts"
+  add_foreign_key "conversation_crm_insights", "conversations"
+  add_foreign_key "frequent_questions", "accounts"
   add_foreign_key "inboxes", "portals"
+  add_foreign_key "jasmine_collections", "accounts"
+  add_foreign_key "jasmine_collections", "inboxes", column: "owner_inbox_id"
+  add_foreign_key "jasmine_document_chunks", "accounts"
+  add_foreign_key "jasmine_document_chunks", "jasmine_collections", column: "collection_id"
+  add_foreign_key "jasmine_document_chunks", "jasmine_documents", column: "document_id"
+  add_foreign_key "jasmine_documents", "accounts"
+  add_foreign_key "jasmine_documents", "jasmine_collections", column: "collection_id"
+  add_foreign_key "jasmine_inbox_collections", "accounts"
+  add_foreign_key "jasmine_inbox_collections", "inboxes"
+  add_foreign_key "jasmine_inbox_collections", "jasmine_collections", column: "collection_id"
+  add_foreign_key "jasmine_inbox_settings", "accounts"
+  add_foreign_key "jasmine_inbox_settings", "inboxes"
+  add_foreign_key "jasmine_tool_configs", "accounts"
+  add_foreign_key "jasmine_tool_configs", "inboxes"
+  add_foreign_key "messages", "messages", column: "in_reply_to_id"
   add_foreign_key "scheduled_messages", "accounts"
   add_foreign_key "scheduled_messages", "conversations"
   add_foreign_key "scheduled_messages", "inboxes"
   add_foreign_key "scheduled_messages", "messages"
+  add_foreign_key "whatsapp_campaign_hits", "whatsapp_campaigns", column: "campaign_id"
+  add_foreign_key "whatsapp_campaigns", "accounts"
   create_trigger("accounts_after_insert_row_tr", :generated => true, :compatibility => 1).
       on("accounts").
       after(:insert).

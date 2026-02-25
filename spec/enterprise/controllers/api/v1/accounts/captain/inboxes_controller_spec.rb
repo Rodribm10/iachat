@@ -3,6 +3,7 @@ require 'rails_helper'
 RSpec.describe 'Api::V1::Accounts::Captain::Inboxes', type: :request do
   let(:account) { create(:account) }
   let(:assistant) { create(:captain_assistant, account: account) }
+  let(:assistant2) { create(:captain_assistant, account: account) }
   let(:inbox) { create(:inbox, account: account) }
   let(:inbox2) { create(:inbox, account: account) }
   let!(:captain_inbox) { create(:captain_inbox, captain_assistant: assistant, inbox: inbox) }
@@ -43,6 +44,7 @@ RSpec.describe 'Api::V1::Accounts::Captain::Inboxes', type: :request do
   end
 
   describe 'POST /api/v1/accounts/:account/captain/assistants/:assistant_id/inboxes' do
+    let(:brand) { Captain::Brand.create!(account: account, name: 'Brand Test') }
     let(:valid_params) do
       {
         inbox: {
@@ -61,6 +63,52 @@ RSpec.describe 'Api::V1::Accounts::Captain::Inboxes', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(json_response[:id]).to eq(inbox2.id)
+      end
+
+      context 'when inbox is already linked to the same assistant' do
+        it 'is idempotent and returns success' do
+          expect do
+            post "/api/v1/accounts/#{account.id}/captain/assistants/#{assistant.id}/inboxes",
+                 params: { inbox: { inbox_id: inbox.id } },
+                 headers: admin.create_new_auth_token
+          end.not_to change(CaptainInbox, :count)
+
+          expect(response).to have_http_status(:success)
+          expect(json_response[:id]).to eq(inbox.id)
+        end
+      end
+
+      context 'when inbox is already linked to another assistant' do
+        it 'returns unprocessable entity' do
+          post "/api/v1/accounts/#{account.id}/captain/assistants/#{assistant2.id}/inboxes",
+               params: { inbox: { inbox_id: inbox.id } },
+               headers: admin.create_new_auth_token
+
+          expect(response).to have_http_status(:unprocessable_entity)
+          expect(json_response[:error]).to eq('Inbox já está conectada a outro assistente.')
+        end
+      end
+
+      context 'when inbox has a linked pix unit in inbox settings' do
+        let!(:linked_unit) do
+          Captain::Unit.create!(
+            account: account,
+            captain_brand_id: brand.id,
+            name: 'Inbox Linked Unit',
+            inbox_id: inbox2.id
+          )
+        end
+
+        it 'syncs captain unit from the inbox configuration' do
+          post "/api/v1/accounts/#{account.id}/captain/assistants/#{assistant.id}/inboxes",
+               params: valid_params,
+               headers: admin.create_new_auth_token
+
+          expect(response).to have_http_status(:success)
+
+          created_link = CaptainInbox.find_by!(captain_assistant: assistant, inbox: inbox2)
+          expect(created_link.captain_unit_id).to eq(linked_unit.id)
+        end
       end
 
       context 'when inbox does not exist' do

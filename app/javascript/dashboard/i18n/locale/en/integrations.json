@@ -840,7 +840,8 @@
           "NONE": "None",
           "BEARER": "Bearer Token",
           "BASIC": "Basic Auth",
-          "API_KEY": "API Key"
+          "API_KEY": "API Key",
+          "CUSTOM_HEADERS": "Custom Headers"
         },
         "AUTH_CONFIG": {
           "BEARER_TOKEN": "Bearer Token",
@@ -852,7 +853,14 @@
           "API_KEY": "Header Name",
           "API_KEY_PLACEHOLDER": "X-API-Key",
           "API_VALUE": "Header Value",
-          "API_VALUE_PLACEHOLDER": "Enter API key value"
+          "API_VALUE_PLACEHOLDER": "Enter API key value",
+          "CUSTOM_HEADERS": "Custom Headers",
+          "CUSTOM_HEADERS_HELP": "Add one or more HTTP headers sent with every request (e.g. API IDs, tokens).",
+          "HEADER_NAME": "Header Name",
+          "HEADER_NAME_PLACEHOLDER": "e.g. PLUG-PLAY-ID",
+          "HEADER_VALUE": "Header Value",
+          "HEADER_VALUE_PLACEHOLDER": "e.g. 198",
+          "ADD_HEADER": "Add Header"
         },
         "PARAMETERS": {
           "LABEL": "Parameters",

@@ -1,7 +1,10 @@
 class Captain::Documents::CrawlJob < ApplicationJob
   queue_as :low
 
-  def perform(document)
+  def perform(document_or_id)
+    document = resolve_document(document_or_id)
+    return if document.nil?
+
     if document.pdf_document?
       perform_pdf_processing(document)
     elsif InstallationConfig.find_by(name: 'CAPTAIN_FIRECRAWL_API_KEY')&.value.present?
@@ -57,5 +60,14 @@ class Captain::Documents::CrawlJob < ApplicationJob
     webhook_url = Rails.application.routes.url_helpers.enterprise_webhooks_firecrawl_url
 
     "#{webhook_url}?assistant_id=#{document.assistant_id}&token=#{generate_firecrawl_token(document.assistant_id, document.account_id)}"
+  end
+
+  def resolve_document(document_or_id)
+    return document_or_id if document_or_id.is_a?(Captain::Document)
+
+    Captain::Document.find(document_or_id)
+  rescue ActiveRecord::RecordNotFound
+    Rails.logger.info("Captain::Documents::CrawlJob skipped. Document not found: #{document_or_id}")
+    nil
   end
 end

@@ -1,13 +1,36 @@
+require_dependency 'captain/conversation/reaction_policy'
+
 class Captain::Conversation::ResponseBuilderJob < ApplicationJob
+  include Captain::Conversation::ReactionPolicy
+
   MAX_MESSAGE_LENGTH = 10_000
+  REACTION_SAMPLE_RATE = Captain::Conversation::ReactionPolicy::REACTION_SAMPLE_RATE
+
   retry_on ActiveStorage::FileNotFoundError, attempts: 3, wait: 2.seconds
   retry_on Faraday::BadRequestError, attempts: 3, wait: 2.seconds
 
-  def perform(conversation, assistant)
+  def perform(conversation, assistant, message = nil)
     @conversation = conversation
     @inbox = conversation.inbox
     @assistant = assistant
 
+    # Cancel if there are newer messages after the provided message
+    return if debounce_requested?(message)
+
+    # Trigger typing on before processing
+    simulate_typing('typing_on')
+    @start_time = Time.zone.now
+
+    begin
+      execute_agent_response
+    ensure
+      simulate_typing('typing_off')
+    end
+  end
+
+  private
+
+  def execute_agent_response
     Current.executed_by = @assistant
 
     if captain_v2_enabled?
@@ -23,7 +46,27 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     Current.executed_by = nil
   end
 
-  private
+  def debounce_requested?(message)
+    return false if message.blank?
+
+    last_incoming = @conversation.messages.where(message_type: :incoming).last
+    last_incoming.present? && last_incoming.id != message.id
+  end
+
+  def simulate_typing(status)
+    # Trigger ActionCable for the Chatwoot dashboard
+    cable_status = status == 'typing_on' ? 'on' : 'off'
+    Conversations::TypingStatusManager.new(
+      @conversation,
+      @assistant,
+      { typing_status: cable_status, is_private: false }
+    ).toggle_typing_status
+
+    # Trigger external typing indicator (WhatsApp, API channels, etc)
+    @inbox.channel.toggle_typing_status(status, conversation: @conversation) if @inbox.channel.respond_to?(:toggle_typing_status)
+  rescue StandardError => e
+    Rails.logger.error("[CAPTAIN] Failed to simulate typing #{status}: #{e.message}")
+  end
 
   delegate :account, :inbox, to: :@conversation
 
@@ -46,11 +89,29 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
       if handoff_requested?
         process_action('handoff')
       else
+        humanized_delay(@response['response'])
         create_messages
         Rails.logger.info("[CAPTAIN][ResponseBuilderJob] Incrementing response usage for #{account.id}")
         account.increment_response_usage
       end
     end
+  end
+
+  def humanized_delay(response_text)
+    return if response_text.blank?
+
+    # Simulação: ~45ms por caracter (digitadores rápidos / humanos focados)
+    typing_speed = 45
+    target_delay = (response_text.length * typing_speed) / 1000.0
+
+    # Limite Mínimo (2s) para não parecer robótico demais em palavras como "Sim".
+    # Limite Máximo (7s) para não prender a UI do chat por longo tempo dando ansiedade ao usuário
+    target_delay = target_delay.clamp(2.0, 7.0)
+
+    elapsed_time = Time.zone.now - @start_time
+    remaining_delay = target_delay - elapsed_time
+
+    sleep(remaining_delay) if remaining_delay.positive?
   end
 
   def collect_previous_messages
@@ -109,8 +170,26 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
   end
 
   def create_messages
+    target_message = last_incoming_message
+    create_reaction(target_message) if should_send_reaction_for?(target_message)
+
     validate_message_content!(@response['response'])
     create_outgoing_message(@response['response'], agent_name: @response['agent_name'])
+  end
+
+  def create_reaction(target_message)
+    @conversation.messages.create!(
+      message_type: :outgoing,
+      account_id: account.id,
+      inbox_id: inbox.id,
+      sender: @assistant,
+      content: @response['reaction_emoji'],
+      content_attributes: {
+        'is_reaction' => true,
+        'in_reply_to' => target_message.id,
+        'in_reply_to_external_id' => target_message.source_id
+      }
+    )
   end
 
   def validate_message_content!(content)

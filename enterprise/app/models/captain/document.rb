@@ -91,13 +91,13 @@ class Captain::Document < ApplicationRecord
   def enqueue_crawl_job
     return if status != 'in_progress'
 
-    Captain::Documents::CrawlJob.perform_later(self)
+    Captain::Documents::CrawlJob.perform_later(id)
   end
 
   def enqueue_response_builder_job
     return unless should_enqueue_response_builder?
 
-    Captain::Documents::ResponseBuilderJob.perform_later(self)
+    Captain::Documents::ResponseBuilderJob.perform_later(id)
   end
 
   def should_enqueue_response_builder?

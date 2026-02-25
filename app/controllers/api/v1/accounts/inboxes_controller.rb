@@ -43,9 +43,12 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   end
 
   def update
-    inbox_params = permitted_params.except(:channel, :csat_config)
+    captain_unit_param_present = params.key?(:captain_unit_id) || params.key?('captain_unit_id')
+    inbox_params = permitted_params.except(:channel, :csat_config, :captain_unit_id)
+    captain_unit_id = permitted_params[:captain_unit_id] if captain_unit_param_present
     inbox_params[:csat_config] = format_csat_config(permitted_params[:csat_config]) if permitted_params[:csat_config].present?
     @inbox.update!(inbox_params)
+    sync_captain_unit_link(captain_unit_id) if captain_unit_param_present
     update_inbox_working_hours
     update_channel if channel_update_required?
   end
@@ -211,7 +214,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   def inbox_attributes
     [:name, :avatar, :greeting_enabled, :greeting_message, :enable_email_collect, :csat_survey_enabled,
      :enable_auto_assignment, :working_hours_enabled, :out_of_office_message, :timezone, :allow_messages_after_resolved,
-     :lock_to_single_conversation, :portal_id, :sender_name_type, :business_name,
+     :lock_to_single_conversation, :portal_id, :sender_name_type, :business_name, :captain_unit_id, :typing_delay,
      { csat_config: [:display_type, :message, :button_text, :language,
                      { survey_rules: [:operator, { values: [] }],
                        template: [:name, :template_id, :friendly_name, :content_sid, :approval_sid,
@@ -250,6 +253,29 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     elsif @inbox.twilio? && @inbox.channel.whatsapp?
       Channels::Twilio::TemplatesSyncJob.perform_later(@inbox.channel)
     end
+  end
+
+  def sync_captain_unit_link(captain_unit_id)
+    return unless defined?(Captain::Unit)
+
+    account_units = Current.account.captain_units
+    account_units.where(inbox_id: @inbox.id).update_all(inbox_id: nil)
+
+    selected_unit_id = captain_unit_id.presence
+    if selected_unit_id
+      selected_unit = account_units.find(selected_unit_id)
+      selected_unit.update!(inbox_id: @inbox.id)
+    end
+
+    return unless defined?(CaptainInbox)
+
+    if selected_unit_id
+      CaptainInbox.where(captain_unit_id: selected_unit_id)
+                  .where.not(inbox_id: @inbox.id)
+                  .update_all(captain_unit_id: nil)
+    end
+
+    @inbox.captain_inbox&.update!(captain_unit_id: selected_unit_id)
   end
 end
 

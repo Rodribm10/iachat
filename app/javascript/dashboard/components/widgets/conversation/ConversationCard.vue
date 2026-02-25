@@ -14,6 +14,7 @@ import PriorityMark from './PriorityMark.vue';
 import SLACardLabel from './components/SLACardLabel.vue';
 import ContextMenu from 'dashboard/components/ui/ContextMenu.vue';
 import VoiceCallStatus from './VoiceCallStatus.vue';
+import ReservationMarker from './ReservationMarker.vue';
 
 const props = defineProps({
   activeLabel: { type: String, default: '' },
@@ -112,6 +113,8 @@ const showMetaSection = computed(() => {
 });
 
 const hasSlaPolicyId = computed(() => props.chat?.sla_policy_id);
+const reservationMarker = computed(() => props.chat?.reservation_marker || {});
+const hasReservationMarker = computed(() => reservationMarker.value?.visible);
 
 const showLabelsSection = computed(() => {
   return props.chat.labels?.length > 0 || hasSlaPolicyId.value;
@@ -370,6 +373,9 @@ const deleteConversation = () => {
           <SLACardLabel :chat="chat" class="ltr:mr-1 rtl:ml-1" />
         </template>
       </CardLabels>
+      <div v-if="hasReservationMarker" class="mx-2 mt-1">
+        <ReservationMarker :marker="reservationMarker" compact />
+      </div>
     </div>
     <ContextMenu
       v-if="showContextMenu"

@@ -92,6 +92,10 @@ const authTypeOptions = computed(() => [
     value: 'api_key',
     label: t('CAPTAIN.CUSTOM_TOOLS.FORM.AUTH_TYPES.API_KEY'),
   },
+  {
+    value: 'custom_headers',
+    label: t('CAPTAIN.CUSTOM_TOOLS.FORM.AUTH_TYPES.CUSTOM_HEADERS'),
+  },
 ]);
 
 const v$ = useVuelidate(validationRules, state);

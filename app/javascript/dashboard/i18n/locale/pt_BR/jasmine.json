@@ -1,0 +1,84 @@
+{
+  "JASMINE": {
+    "HEADER": {
+      "TITLE": "Agentes de IA Jasmine",
+      "DESCRIPTION": "Gerencie seus agentes de IA SDR. Selecione uma caixa de entrada para configurar sua base de conhecimento.",
+      "EMPTY": "Nenhuma caixa de entrada encontrada"
+    },
+    "CONFIG": {
+      "TITLE": "Configuração da IA Jasmine",
+      "DESCRIPTION": "Configure o agente de IA para esta caixa de entrada.",
+      "ENABLE": "Ativar Agente de IA Jasmine",
+      "SYSTEM_PROMPT": "Prompt do Sistema",
+      "SYSTEM_PROMPT_HELP": "Defina a persona e as regras de comportamento para o agente.",
+      "TYPING_DELAY_LABEL": "Buffer / Delay de Digitação (Segundos)",
+      "TYPING_DELAY_PLACEHOLDER": "Ex: 5",
+      "TYPING_DELAY_HELP": "O tempo que a IA aguardará mensagens (Buffer) antes de simular a digitação e responder. Zero para imediato.",
+      "UPDATE_BUTTON": "Atualizar Configuração"
+    },
+    "KNOWLEDGE_BASE": {
+      "TITLE": "Base de Conhecimento",
+      "DESCRIPTION": "Gerencie coleções de conhecimento para esta caixa de entrada",
+      "ADD_BUTTON": "+ Nova Coleção",
+      "DOCUMENTS": "Documentos",
+      "LOADING_DOCS": "Carregando documentos...",
+      "UNTITLED_DOC": "Documento sem título",
+      "NO_DOCS": "Nenhum documento ainda. Adicione seu primeiro documento abaixo.",
+      "ADD_DOC_HEADER": "Adicionar Novo Documento",
+      "DOC_TITLE_PLACEHOLDER": "Título do documento (opcional)",
+      "DOC_CONTENT_PLACEHOLDER": "Cole ou digite seu conteúdo de conhecimento aqui...",
+      "ADD_DOC_BUTTON": "Adicionar Documento",
+      "NO_COLLECTIONS": "Nenhuma coleção ainda. Crie uma para começar.",
+      "CREATE_MODAL": {
+        "TITLE": "Criar Coleção",
+        "NAME_PLACEHOLDER": "Nome da coleção",
+        "VISIBILITY_PRIVATE": "Privada (Apenas esta caixa de entrada)",
+        "VISIBILITY_SHARED": "Compartilhada (Todas as caixas de entrada)",
+        "CANCEL": "Cancelar",
+        "CREATE": "Criar"
+      },
+      "DELETE_CONFIRM": "Tem certeza de que deseja excluir este documento?",
+      "DOCUMENT_DELETE_SUCCESS": "Documento excluído com sucesso",
+      "COLLECTION_DELETE_SUCCESS": "Coleção excluída com sucesso",
+      "SAVE_SUCCESS": "Alterações salvas com sucesso",
+      "DOCUMENT_CREATE_SUCCESS": "Documento criado com sucesso",
+      "COLLECTION_CREATE_SUCCESS": "Coleção criada com sucesso"
+    },
+    "PLAYGROUND": {
+      "TITLE": "Playground da IA Jasmine",
+      "DESCRIPTION": "Teste as respostas da Jasmine em tempo real antes de ativar para os clientes.",
+      "SELECT_INBOX": "Selecione uma Caixa de Entrada para testar",
+      "CHOOSE_INBOX": "Escolha uma caixa de entrada...",
+      "WARNING": "Certifique-se de que a Jasmine está ativada e configurada para esta caixa de entrada",
+      "EMPTY_STATE_TITLE": "Envie uma mensagem para testar a Jasmine",
+      "EMPTY_STATE_EXAMPLES": "Tente: \"Olá\", \"Quanto custa?\", \"Como funciona?\"",
+      "LOADING": "Jasmine está pensando...",
+      "INPUT_PLACEHOLDER": "Digite uma mensagem de teste...",
+      "CLEAR_TOOLTIP": "Limpar conversa",
+      "NO_INBOX_SELECTED": "Selecione uma caixa de entrada acima para começar a testar"
+    },
+    "INBOX_LIST": {
+      "ACTIVE": "Ativo",
+      "CONFIGURE": "Configurar",
+      "DESCRIPTION": "Canal {channel} configurado para IA Jasmine"
+    },
+    "WUZAPI": {
+      "STATUS": "Status: {status}",
+      "ACCOUNT_ERROR": "Erro: ID da conta não carregado. Por favor, atualize a página.",
+      "CONNECT_FALLBACK": "Clique para iniciar a conexão",
+      "CONNECT_BUTTON_FALLBACK": "Conectar WhatsApp",
+      "WEBHOOK_SECTION": "Configuração de Webhook",
+      "GET_WEBHOOK_INFO": "Obter informações de Webhook",
+      "UPDATE_WEBHOOK": "Atualizar conexão de Webhook"
+    },
+    "EVOLUTION": {
+      "STATUS": "Status: {status}",
+      "ACCOUNT_ERROR": "Erro: ID da instância não encontrado. Verifique sua configuração.",
+      "CONNECT_FALLBACK": "Clique para iniciar a conexão",
+      "CONNECT_BUTTON_FALLBACK": "Conectar WhatsApp",
+      "WEBHOOK_SECTION": "Configuração de Webhook",
+      "GET_WEBHOOK_INFO": "Obter informações de Webhook",
+      "UPDATE_WEBHOOK": "Atualizar conexão de Webhook"
+    }
+  }
+}

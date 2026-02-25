@@ -1,104 +1,197 @@
-# Chatwoot Development Guidelines
+# CLAUDE.md
 
-## Build / Test / Lint
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-- **Setup**: `bundle install && pnpm install`
-- **Run Dev**: `pnpm dev` or `overmind start -f ./Procfile.dev`
-- **Seed Local Test Data**: `bundle exec rails db:seed` (quickly populates minimal data for standard feature verification)
-- **Seed Search Test Data**: `bundle exec rails search:setup_test_data` (bulk fixture generation for search/performance/manual load scenarios)
-- **Seed Account Sample Data (richer test data)**: `Seeders::AccountSeeder` is available as an internal utility and is exposed through Super Admin `Accounts#seed`, but can be used directly in dev workflows too:
-  - UI path: Super Admin → Accounts → Seed (enqueues `Internal::SeedAccountJob`).
-  - CLI path: `bundle exec rails runner "Internal::SeedAccountJob.perform_now(Account.find(<id>))"` (or call `Seeders::AccountSeeder.new(account: Account.find(<id>)).perform!` directly).
-- **Lint JS/Vue**: `pnpm eslint` / `pnpm eslint:fix`
-- **Lint Ruby**: `bundle exec rubocop -a`
-- **Test JS**: `pnpm test` or `pnpm test:watch`
-- **Test Ruby**: `bundle exec rspec spec/path/to/file_spec.rb`
-- **Single Test**: `bundle exec rspec spec/path/to/file_spec.rb:LINE_NUMBER`
-- **Run Project**: `overmind start -f Procfile.dev`
-- **Ruby Version**: Manage Ruby via `rbenv` and install the version listed in `.ruby-version` (e.g., `rbenv install $(cat .ruby-version)`)
-- **rbenv setup**: Before running any `bundle` or `rspec` commands, init rbenv in your shell (`eval "$(rbenv init -)"`) so the correct Ruby/Bundler versions are used
-- Always prefer `bundle exec` for Ruby CLI tasks (rspec, rake, rubocop, etc.)
+## Project Overview
 
-## Code Style
+This is a **Chatwoot** customer engagement platform (open-source alternative to Intercom/Zendesk), customized for **fazer.ai**. It includes the **Synkra AIOS** framework overlay for AI-orchestrated development workflows.
 
-- **Ruby**: Follow RuboCop rules (150 character max line length)
-- **Vue/JS**: Use ESLint (Airbnb base + Vue 3 recommended)
-- **Vue Components**: Use PascalCase
-- **Events**: Use camelCase
-- **I18n**: No bare strings in templates; use i18n
-- **Error Handling**: Use custom exceptions (`lib/custom_exceptions/`)
-- **Models**: Validate presence/uniqueness, add proper indexes
-- **Type Safety**: Use PropTypes in Vue, strong params in Rails
-- **Naming**: Use clear, descriptive names with consistent casing
-- **Vue API**: Always use Composition API with `<script setup>` at the top
+**Tech Stack:**
+- Backend: Ruby 3.4.4 + Rails 7.1
+- Frontend: Vue 3 + Vite
+- Database: PostgreSQL with pgvector
+- Background Jobs: Sidekiq
+- Package Manager: **pnpm** (required, not npm/yarn)
+- Testing: RSpec (backend), Vitest (frontend)
 
-## Styling
+## Development Commands
 
-- **Tailwind Only**:  
-  - Do not write custom CSS  
-  - Do not use scoped CSS  
-  - Do not use inline styles  
-  - Always use Tailwind utility classes  
-- **Colors**: Refer to `tailwind.config.js` for color definitions
+### Starting the Application
 
-## General Guidelines
+```bash
+# Development server (Rails backend + Sidekiq + Vite)
+pnpm run dev
 
-- MVP focus: Least code change, happy-path only
-- No unnecessary defensive programming
-- Ship the happy path first: limit guards/fallbacks to what production has proven necessary, then iterate
-- Prefer minimal, readable code over elaborate abstractions; clarity beats cleverness
-- Break down complex tasks into small, testable units
-- Iterate after confirmation
-- Avoid writing specs unless explicitly asked
-- Remove dead/unreachable/unused code
-- Don’t write multiple versions or backups for the same logic — pick the best approach and implement it
-- Prefer `with_modified_env` (from spec helpers) over stubbing `ENV` directly in specs
-- Specs in parallel/reloading environments: prefer comparing `error.class.name` over constant class equality when asserting raised errors
+# Individual processes:
+# - Rails backend: http://localhost:3001
+# - Sidekiq: background worker
+# - Vite: frontend dev server
+```
 
-## Codex Worktree Workflow
+### Testing
 
-- Use a separate git worktree + branch per task to keep changes isolated.
-- Keep Codex-specific local setup under `.codex/` and use `Procfile.worktree` for worktree process orchestration.
-- The setup workflow in `.codex/environments/environment.toml` should dynamically generate per-worktree DB/port values (Rails, Vite, Redis DB index) to avoid collisions.
-- Start each worktree with its own Overmind socket/title so multiple instances can run at the same time.
+```bash
+# Frontend (Vitest) - CRITICAL: NO -- flag with pnpm test!
+pnpm test                    # Run all tests
+pnpm test <file>             # Run specific file (NOT pnpm test -- <file>)
+pnpm test:watch              # Watch mode
+pnpm test:coverage           # Coverage report
 
-## Commit Messages
+# Backend (RSpec)
+bundle exec rspec                           # All specs
+bundle exec rspec spec/models/user_spec.rb  # Specific file
+bundle exec rspec spec/models/user_spec.rb:42  # Specific line
+```
 
-- Prefer Conventional Commits: `type(scope): subject` (scope optional)
-- Example: `feat(auth): add user authentication`
-- Don't reference Claude in commit messages
+### Code Quality
 
-## Project-Specific
+```bash
+# JavaScript/Vue linting
+pnpm run eslint              # Check
+pnpm run eslint:fix          # Auto-fix
 
-- **Translations**:
-  - Only update `en.yml` and `en.json`
-  - Other languages are handled by the community
-  - Backend i18n → `en.yml`, Frontend i18n → `en.json`
-- **Frontend**:
-  - Use `components-next/` for message bubbles (the rest is being deprecated)
+# Ruby linting
+bundle exec rubocop          # Check
+bundle exec rubocop -a       # Auto-fix
+pnpm run ruby:prettier       # Same as rubocop -a
+```
 
-## Ruby Best Practices
+### Database
 
-- Use compact `module/class` definitions; avoid nested styles
+```bash
+bin/rails db:migrate
+bin/rails db:rollback
+bin/rails db:reset
+bin/rails db:seed
+```
 
-## Enterprise Edition Notes
+## Architecture Overview
 
-- Chatwoot has an Enterprise overlay under `enterprise/` that extends/overrides OSS code.
-- When you add or modify core functionality, always check for corresponding files in `enterprise/` and keep behavior compatible.
-- Follow the Enterprise development practices documented here:
-  - https://chatwoot.help/hc/handbook/articles/developing-enterprise-edition-features-38
+### Backend Structure
 
-Practical checklist for any change impacting core logic or public APIs
-- Search for related files in both trees before editing (e.g., `rg -n "FooService|ControllerName|ModelName" app enterprise`).
-- If adding new endpoints, services, or models, consider whether Enterprise needs:
-  - An override (e.g., `enterprise/app/...`), or
-  - An extension point (e.g., `prepend_mod_with`, hooks, configuration) to avoid hard forks.
-- Avoid hardcoding instance- or plan-specific behavior in OSS; prefer configuration, feature flags, or extension points consumed by Enterprise.
-- Keep request/response contracts stable across OSS and Enterprise; update both sets of routes/controllers when introducing new APIs.
-- When renaming/moving shared code, mirror the change in `enterprise/` to prevent drift.
-- Tests: Add Enterprise-specific specs under `spec/enterprise`, mirroring OSS spec layout where applicable.
-- When modifying existing OSS features for Enterprise-only behavior, add an Enterprise module (via `prepend_mod_with`/`include_mod_with`) instead of editing OSS files directly—especially for policies, controllers, and services. For Enterprise-exclusive features, place code directly under `enterprise/`.
+```
+app/
+├── controllers/       # API endpoints (API::V1::Accounts::*)
+├── models/            # ActiveRecord models
+├── services/          # Business logic (Whatsapp::Providers::*, etc.)
+├── jobs/              # Sidekiq background jobs
+├── listeners/         # Wisper event subscribers (pub/sub)
+├── builders/          # Complex object construction
+├── finders/           # Query objects
+├── policies/          # Pundit authorization
+└── javascript/        # Vue.js frontend
 
-## Branding / White-labeling note
+enterprise/app/        # Enterprise features (Captain AI, billing)
+```
 
-- For user-facing strings that currently contain "Chatwoot" but should adapt to branded/self-hosted installs, prefer applying `replaceInstallationName` from `shared/composables/useBranding` in the UI layer (for example tooltip and suggestion labels) instead of adding hardcoded brand-specific copy.
+**Key Patterns:**
+- **Services:** Business logic extracted from models
+- **Builders:** Construct complex objects
+- **Finders:** Encapsulate complex queries
+- **Listeners:** Event-driven using Wisper
+- **Policies:** Pundit for authorization
+- **Jobs:** All async work in Sidekiq
+
+### Frontend Structure
+
+```
+app/javascript/
+├── dashboard/         # Agent dashboard (Vue 3 + Vue Router + Vuex)
+│   ├── routes/       # Page components
+│   ├── store/        # Vuex state
+│   ├── components/   # Reusable components
+│   ├── api/          # API clients
+│   └── i18n/         # Translations (en, pt_BR required!)
+├── widget/           # Customer chat widget
+├── sdk/              # Embeddable JavaScript SDK
+├── portal/           # Public help center
+└── shared/           # Shared utilities
+```
+
+**Vite Import Aliases:**
+- `components` → `app/javascript/dashboard/components`
+- `dashboard` → `app/javascript/dashboard`
+- `helpers` → `app/javascript/shared/helpers`
+- `shared`, `widget`, `survey`, `v3` → respective directories
+
+## Critical Conventions
+
+### fazer.ai Branding
+**ALWAYS** style as `fazer.ai` (lowercase with dot), **NEVER** `Fazer.ai` or `FAZER.AI`
+
+### Internationalization
+**ALWAYS include pt_BR translations** for any new user-facing text
+- Location: `app/javascript/dashboard/i18n/locale/{en,pt_BR}/`
+
+### Testing Philosophy
+- Add specs when modifying code (use judgment)
+- Test behavior, not implementation
+- Consider cross-stack impacts (backend ↔ frontend)
+
+---
+
+# AIOS Framework Integration
+
+This repository includes **Synkra AIOS** - an AI-orchestrated development system.
+
+<!-- AIOS-MANAGED-START: core -->
+## Core Rules
+
+1. Siga a Constitution em `.aios-core/constitution.md`
+2. Priorize `CLI First -> Observability Second -> UI Third`
+3. Trabalhe por stories em `docs/stories/`
+4. Nao invente requisitos fora dos artefatos existentes
+<!-- AIOS-MANAGED-END: core -->
+
+<!-- AIOS-MANAGED-START: quality -->
+## Quality Gates
+
+- Rode `npm run lint`
+- Rode `npm run typecheck`
+- Rode `npm test`
+- Atualize checklist e file list da story antes de concluir
+<!-- AIOS-MANAGED-END: quality -->
+
+<!-- AIOS-MANAGED-START: codebase -->
+## Project Map
+
+- Core framework: `.aios-core/`
+- CLI entrypoints: `bin/`
+- Shared packages: `packages/`
+- Tests: `tests/`
+- Docs: `docs/`
+<!-- AIOS-MANAGED-END: codebase -->
+
+<!-- AIOS-MANAGED-START: commands -->
+## Common Commands
+
+- `npm run sync:ide`
+- `npm run sync:ide:check`
+- `npm run sync:skills:codex`
+- `npm run sync:skills:codex:global` (opcional; neste repo o padrao e local-first)
+- `npm run validate:structure`
+- `npm run validate:agents`
+<!-- AIOS-MANAGED-END: commands -->
+
+<!-- AIOS-MANAGED-START: shortcuts -->
+## Agent Shortcuts
+
+Preferencia de ativacao no Codex CLI:
+1. Use `/skills` e selecione `aios-<agent-id>` vindo de `.codex/skills` (ex.: `aios-architect`)
+2. Se preferir, use os atalhos abaixo (`@architect`, `/architect`, etc.)
+
+Interprete os atalhos abaixo carregando o arquivo correspondente em `.aios-core/development/agents/` (fallback: `.codex/agents/`), renderize o greeting via `generate-greeting.js` e assuma a persona ate `*exit`:
+
+- `@architect`, `/architect`, `/architect.md` -> `.aios-core/development/agents/architect.md`
+- `@dev`, `/dev`, `/dev.md` -> `.aios-core/development/agents/dev.md`
+- `@qa`, `/qa`, `/qa.md` -> `.aios-core/development/agents/qa.md`
+- `@pm`, `/pm`, `/pm.md` -> `.aios-core/development/agents/pm.md`
+- `@po`, `/po`, `/po.md` -> `.aios-core/development/agents/po.md`
+- `@sm`, `/sm`, `/sm.md` -> `.aios-core/development/agents/sm.md`
+- `@analyst`, `/analyst`, `/analyst.md` -> `.aios-core/development/agents/analyst.md`
+- `@devops`, `/devops`, `/devops.md` -> `.aios-core/development/agents/devops.md`
+- `@data-engineer`, `/data-engineer`, `/data-engineer.md` -> `.aios-core/development/agents/data-engineer.md`
+- `@ux-design-expert`, `/ux-design-expert`, `/ux-design-expert.md` -> `.aios-core/development/agents/ux-design-expert.md`
+- `@squad-creator`, `/squad-creator`, `/squad-creator.md` -> `.aios-core/development/agents/squad-creator.md`
+- `@aios-master`, `/aios-master`, `/aios-master.md` -> `.aios-core/development/agents/aios-master.md`
+<!-- AIOS-MANAGED-END: shortcuts -->

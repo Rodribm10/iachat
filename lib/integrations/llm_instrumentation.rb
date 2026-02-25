@@ -10,8 +10,8 @@ module Integrations::LlmInstrumentation
   def instrument_llm_call(params)
     return yield unless ChatwootApp.otel_enabled?
 
-    result = nil
     executed = false
+    result = nil
     tracer.in_span(params[:span_name]) do |span|
       setup_span_attributes(span, params)
       result = yield
@@ -21,14 +21,16 @@ module Integrations::LlmInstrumentation
     end
   rescue StandardError => e
     ChatwootExceptionTracker.new(e, account: resolve_account(params)).capture_exception
-    executed ? result : yield
+    raise e unless executed
+
+    result
   end
 
   def instrument_agent_session(params)
     return yield unless ChatwootApp.otel_enabled?
 
-    result = nil
     executed = false
+    result = nil
     tracer.in_span(params[:span_name]) do |span|
       set_metadata_attributes(span, params)
 
@@ -42,7 +44,9 @@ module Integrations::LlmInstrumentation
     end
   rescue StandardError => e
     ChatwootExceptionTracker.new(e, account: resolve_account(params)).capture_exception
-    executed ? result : yield
+    raise e unless executed
+
+    result
   end
 
   def instrument_tool_call(tool_name, arguments)

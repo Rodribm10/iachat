@@ -288,7 +288,7 @@ const menuItems = computed(() => {
           children: sortedInboxes.value.map(inbox => ({
             name: `${inbox.name}-${inbox.id}`,
             label: inbox.name,
-            icon: h(ChannelIcon, { inbox, class: 'size-[12px]' }),
+            icon: () => h(ChannelIcon, { inbox, class: 'size-[12px]' }),
             to: accountScopedRoute('inbox_dashboard', { inbox_id: inbox.id }),
             component: leafProps =>
               h(ChannelLeaf, {
@@ -306,10 +306,11 @@ const menuItems = computed(() => {
           children: labels.value.map(label => ({
             name: `${label.title}-${label.id}`,
             label: label.title,
-            icon: h('span', {
-              class: `size-[8px] rounded-sm`,
-              style: { backgroundColor: label.color },
-            }),
+            icon: () =>
+              h('span', {
+                class: `size-[8px] rounded-sm`,
+                style: { backgroundColor: label.color },
+              }),
             to: accountScopedRoute('label_conversations', {
               label: label.title,
             }),
@@ -386,6 +387,27 @@ const menuItems = computed(() => {
             navigationPath: 'captain_assistants_settings_index',
           }),
         },
+        {
+          name: 'Pix Units',
+          label: t('SIDEBAR.CAPTAIN_PIX_UNITS'),
+          activeOn: ['captain_settings_units', 'captain_settings_units_edit'],
+          to: accountScopedRoute('captain_settings_units'),
+        },
+        {
+          name: 'Gallery',
+          label: t('SIDEBAR.CAPTAIN_GALLERY'),
+          activeOn: [
+            'captain_settings_gallery',
+            'captain_settings_gallery_edit',
+          ],
+          to: accountScopedRoute('captain_settings_gallery'),
+        },
+        {
+          name: 'Reservations',
+          label: t('SIDEBAR.CAPTAIN_RESERVATIONS'),
+          activeOn: ['captain_reservations_index'],
+          to: accountScopedRoute('captain_reservations_index'),
+        },
       ],
     },
     {
@@ -434,10 +456,11 @@ const menuItems = computed(() => {
           children: labels.value.map(label => ({
             name: `${label.title}-${label.id}`,
             label: label.title,
-            icon: h('span', {
-              class: `size-[8px] rounded-sm`,
-              style: { backgroundColor: label.color },
-            }),
+            icon: () =>
+              h('span', {
+                class: `size-[8px] rounded-sm`,
+                style: { backgroundColor: label.color },
+              }),
             to: accountScopedRoute(
               'contacts_dashboard_labels_index',
               { label: label.title },

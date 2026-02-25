@@ -18,6 +18,7 @@
 #  updated_at                :datetime         not null
 #  account_id                :integer          not null
 #  conversation_id           :integer          not null
+#  in_reply_to_id            :integer
 #  inbox_id                  :integer          not null
 #  sender_id                 :bigint
 #  source_id                 :text
@@ -33,9 +34,14 @@
 #  index_messages_on_conversation_account_type_created  (conversation_id,account_id,message_type,created_at)
 #  index_messages_on_conversation_id                    (conversation_id)
 #  index_messages_on_created_at                         (created_at)
+#  index_messages_on_in_reply_to_id                     (in_reply_to_id)
 #  index_messages_on_inbox_id                           (inbox_id)
 #  index_messages_on_sender_type_and_sender_id          (sender_type,sender_id)
 #  index_messages_on_source_id                          (source_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (in_reply_to_id => messages.id)
 #
 
 class Message < ApplicationRecord
@@ -266,16 +272,16 @@ class Message < ApplicationRecord
   # Returns message content suitable for LLM consumption
   # Falls back to audio transcription or attachment placeholder when content is nil
   def content_for_llm
-    return content if content.present?
+    if attachments.blank?
+      # Fallback to pure string if no attachments to preserve string responses format
+      # everywhere in the system by default
+      return content if content.present?
 
-    audio_transcription = attachments
-                          .where(file_type: :audio)
-                          .filter_map { |att| att.meta&.dig('transcribed_text') }
-                          .join(' ')
-                          .presence
-    return "[Voice Message] #{audio_transcription}" if audio_transcription.present?
+      return '[Attachment]'
+    end
 
-    '[Attachment]' if attachments.any?
+    # Se a mensagem tiver anexo enviaremos o payload multimodal Array gerado pelo Service
+    Captain::OpenAiMessageBuilderService.new(message: self).generate_content
   end
 
   private

@@ -52,7 +52,11 @@ module Featurable
   end
 
   def enabled_features
-    all_features.select { |_feature, enabled| enabled == true }
+    features = all_features.select { |_feature, enabled| enabled == true }
+    # Temporarily force enable captain features to fix blank page UI issue
+    features['captain_integration'] = true
+    features['captain_tasks'] = true
+    features
   end
 
   def disabled_features

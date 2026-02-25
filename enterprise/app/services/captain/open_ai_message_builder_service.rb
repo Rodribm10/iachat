@@ -1,12 +1,13 @@
 class Captain::OpenAiMessageBuilderService
+  require 'base64'
   pattr_initialize [:message!]
 
-  # Extracts text and image URLs from multimodal content array (reverse of generate_content)
   def self.extract_text_and_attachments(content)
-    return [content, []] unless content.is_a?(Array)
+    raw_content = content.is_a?(RubyLLM::Content::Raw) ? content.value : content
+    return [raw_content, []] unless raw_content.is_a?(Array)
 
-    text_parts = content.select { |part| part[:type] == 'text' }.pluck(:text)
-    image_urls = content.select { |part| part[:type] == 'image_url' }.filter_map { |part| part.dig(:image_url, :url) }
+    text_parts = raw_content.select { |part| part[:type] == 'text' }.pluck(:text)
+    image_urls = raw_content.select { |part| part[:type] == 'image_url' }.filter_map { |part| part.dig(:image_url, :url) }
     [text_parts.join(' ').presence, image_urls]
   end
 
@@ -18,7 +19,19 @@ class Captain::OpenAiMessageBuilderService
     return 'Message without content' if parts.blank?
     return parts.first[:text] if parts.one? && parts.first[:type] == 'text'
 
-    parts
+    RubyLLM::Content::Raw.new(parts)
+  end
+
+  def generate_text_content
+    content = generate_content
+    return content if content.is_a?(String)
+
+    raw_parts = content.is_a?(RubyLLM::Content::Raw) ? content.value : content
+    return '' unless raw_parts.is_a?(Array)
+
+    raw_parts.map do |part|
+      part[:type] == 'text' ? part[:text] : "[#{part[:type]}]"
+    end.join("\n")
   end
 
   private
@@ -51,10 +64,24 @@ class Captain::OpenAiMessageBuilderService
   end
 
   def get_attachment_url(attachment)
+    if attachment.file.attached? && attachment.file.image?
+      begin
+        return "data:#{attachment.file.content_type};base64,#{encode_image(attachment)}"
+      rescue StandardError => e
+        Rails.logger.error "[Captain::OpenAiMessageBuilderService] Failed to encode image to Base64: #{e.message}"
+      end
+    end
+
     return attachment.download_url if attachment.download_url.present?
     return attachment.external_url if attachment.external_url.present?
 
     attachment.file.attached? ? attachment.file_url : nil
+  end
+
+  def encode_image(attachment)
+    attachment.file.blob.open do |file|
+      Base64.strict_encode64(file.read)
+    end
   end
 
   def extract_audio_transcriptions(attachments)

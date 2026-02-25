@@ -1,3 +1,5 @@
+inherit_from: .rubocop_todo.yml
+
 plugins:
   - rubocop-performance
   - rubocop-rails
@@ -18,11 +20,13 @@ Metrics/ClassLength:
   Exclude:
     - 'app/models/message.rb'
     - 'app/models/conversation.rb'
+    - 'enterprise/app/services/captain/tools/generate_pix_tool.rb'
 
 Metrics/MethodLength:
   Max: 19
   Exclude:
     - 'enterprise/lib/captain/agent.rb'
+    - 'enterprise/app/services/captain/tools/generate_pix_tool.rb'
 
 RSpec/ExampleLength:
   Max: 50
@@ -177,10 +181,10 @@ Metrics/AbcSize:
   Max: 26
   Exclude:
     - 'app/controllers/concerns/auth_helper.rb'
-
     - 'app/models/integrations/hook.rb'
     - 'app/models/canned_response.rb'
     - 'app/models/telegram_bot.rb'
+    - 'enterprise/app/services/captain/tools/generate_pix_tool.rb'
 
 Rails/RenderInline:
   Exclude:
@@ -231,6 +235,9 @@ AllCops:
     - 'tmp/**/*'
     - 'storage/**/*'
     - 'db/migrate/20230426130150_init_schema.rb'
+    - 'reference/**/*'
+    - '.aios-core/**/*'
+    - '.claude/**/*'
 
 FactoryBot/SyntaxMethods:
   Enabled: false

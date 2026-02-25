@@ -323,6 +323,49 @@ RSpec.describe Captain::Scenario, type: :model do
     end
   end
 
+  describe 'default faq tool behavior' do
+    let(:account) { create(:account) }
+    let(:assistant) { create(:captain_assistant, account: account, config: { 'feature_faq' => true }) }
+
+    it 'includes faq_lookup even when scenario has no explicit tools' do
+      scenario = build(:captain_scenario, assistant: assistant, account: account, tools: [])
+      allow(assistant).to receive(:available_agent_tools).and_return([
+                                                                       { id: 'faq_lookup', title: 'FAQ Lookup', description: 'Search FAQ responses' }
+                                                                     ])
+
+      resolved = scenario.send(:resolved_tools)
+      expect(resolved.map { |tool| tool[:id] }).to contain_exactly('faq_lookup')
+    end
+
+    it 'does not add faq_lookup when faq feature is disabled' do
+      assistant = create(:captain_assistant, account: account, config: { 'feature_faq' => false })
+      scenario = build(:captain_scenario, assistant: assistant, account: account, tools: [])
+      allow(assistant).to receive(:available_agent_tools).and_return([
+                                                                       { id: 'faq_lookup', title: 'FAQ Lookup', description: 'Search FAQ responses' }
+                                                                     ])
+
+      resolved = scenario.send(:resolved_tools)
+      expect(resolved).to be_empty
+    end
+
+    it 'merges faq_lookup with explicit scenario tools without duplicates' do
+      scenario = build(
+        :captain_scenario,
+        assistant: assistant,
+        account: account,
+        tools: %w[add_contact_note faq_lookup]
+      )
+      allow(assistant).to receive(:available_agent_tools).and_return([
+                                                                       { id: 'add_contact_note', title: 'Add Contact Note',
+                                                                         description: 'Add a note' },
+                                                                       { id: 'faq_lookup', title: 'FAQ Lookup', description: 'Search FAQ responses' }
+                                                                     ])
+
+      resolved = scenario.send(:resolved_tools)
+      expect(resolved.map { |tool| tool[:id] }).to contain_exactly('add_contact_note', 'faq_lookup')
+    end
+  end
+
   describe 'factory' do
     it 'creates a valid scenario with associations' do
       account = create(:account)

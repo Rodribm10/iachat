@@ -1,0 +1,281 @@
+{
+  "CAPTAIN_RESERVATIONS": {
+    "HEADER": "Reservas",
+    "EMPTY": "Nenhuma reserva encontrada.",
+    "VIEW": {
+      "LIST": "Lista",
+      "KANBAN": "Kanban",
+      "REVENUE": "Faturamento"
+    },
+    "FILTERS": {
+      "SEARCH": "Buscar por nome, CPF ou telefone",
+      "STATUS": "Status",
+      "STATUS_ALL": "Todos os status",
+      "UNIT": "Unidade",
+      "UNIT_ALL": "Todas as unidades",
+      "SUITE": "Suíte",
+      "DATE_FROM": "De",
+      "DATE_TO": "Até",
+      "SORT": "Ordenação",
+      "SORT_DEFAULT": "Prioridade operacional",
+      "SORT_CHECK_IN": "Data de check-in",
+      "SORT_UPDATED": "Última atualização",
+      "SORT_CREATED": "Data de criação",
+      "APPLY": "Aplicar filtros",
+      "CLEAR": "Limpar filtros"
+    },
+    "TABLE": {
+      "CUSTOMER": "Cliente",
+      "UNIT": "Unidade",
+      "SUITE": "Suíte",
+      "CHECK_IN": "Check-in",
+      "AMOUNT": "Valor",
+      "STATUS": "Status",
+      "UPDATED_AT": "Atualização",
+      "ACTIONS": "Ações"
+    },
+    "STATUS": {
+      "DRAFT": "Rascunho",
+      "PENDING_PAYMENT": "Aguardando pagamento",
+      "CONFIRMED": "Confirmada",
+      "CANCELLED": "Cancelada"
+    },
+    "ACTIONS": {
+      "OPEN_CONVERSATION": "Abrir conversa",
+      "COPY_PIX": "Copiar Pix"
+    },
+    "KANBAN": {
+      "EMPTY_COLUMN": "Nenhuma reserva neste status."
+    },
+    "REVENUE": {
+      "ONLY_CONFIRMED": "O faturamento considera apenas reservas com status confirmado.",
+      "SUMMARY": {
+        "TOTAL_REVENUE": "Faturamento total",
+        "CONFIRMED_COUNT": "Reservas confirmadas",
+        "AVERAGE_TICKET": "Ticket médio"
+      },
+      "CHARTS": {
+        "BY_UNIT": "Faturamento por unidade",
+        "BY_SUITE": "Faturamento por suíte"
+      },
+      "API": {
+        "ERROR": "Não foi possível carregar o faturamento."
+      }
+    },
+    "SIDEBAR": {
+      "NO_RESERVATION": "Nenhuma reserva vinculada a esta conversa.",
+      "LOADING": "Carregando detalhes da reserva...",
+      "STATUS": "Status",
+      "SUITE": "Suíte",
+      "CHECK_IN": "Check-in",
+      "CHECK_OUT": "Check-out",
+      "AMOUNT": "Valor",
+      "UPDATED_AT": "Atualizado em"
+    },
+    "API": {
+      "PIX_EXPIRED": "O Pix desta reserva expirou.",
+      "PIX_NOT_GENERATED": "O Pix ainda não foi gerado.",
+      "PIX_COPIED": "Pix copiado com sucesso.",
+      "PIX_COPY_FAILED": "Não foi possível copiar o Pix."
+    }
+  },
+  "CAPTAIN_SETTINGS": {
+    "TITLE": "Configurações do Captain",
+    "UNITS": {
+      "TITLE": "Unidades Pix",
+      "DESC": "Gerencie as configurações de diferentes unidades Pix Integradas com Banco Inter.",
+      "ADD_UNIT": "Adicionar Unidade",
+      "EDIT_UNIT": "Editar Unidade",
+      "DELETE_UNIT": "Deletar Unidade",
+      "LIST": {
+        "TABLE_HEADER": [
+          "Pix Key",
+          "Conta",
+          "Certificados",
+          "Monitoramento",
+          "Ações"
+        ],
+        "CERT": "Cert",
+        "KEY": "Key",
+        "PROACTIVE_ON": "Auto-check ligado",
+        "PROACTIVE_OFF": "Auto-check desligado",
+        "SEPARATOR": "|",
+        "ADD_NEW_UNIT": "Adicione uma Unidade Pix",
+        "NO_UNITS_MESSAGE": "Ainda não há nenhuma unidade pix inserida. Crie uma agora para começar a receber pelo pix do Banco Inter."
+      },
+      "DELETE": {
+        "BUTTON_TEXT": "Excluir",
+        "TITLE": "Excluir Unidade Pix",
+        "DESC": "Tem certeza de que deseja excluir esta unidade pix? Esta ação não pode ser desfeita.",
+        "CONFIRM": {
+          "TITLE": "Confirmar Exclusão",
+          "MESSAGE": "Tem certeza que deseja apagar a Unidade?",
+          "YES": "Excluir",
+          "NO": "Cancelar"
+        },
+        "API": {
+          "SUCCESS_MESSAGE": "Unidade excluída com sucesso.",
+          "ERROR_MESSAGE": "Houve um erro ao tentar excluir a unidade."
+        }
+      },
+      "ADD": {
+        "TITLE": "Nova Unidade Pix",
+        "DESC": "Adicione as credenciais do seu app Banco Inter",
+        "CANCEL_BUTTON_TEXT": "Cancelar",
+        "SUBMIT_BUTTON_TEXT": "Criar unidade",
+        "API": {
+          "SUCCESS_MESSAGE": "Unidade criada com sucesso!",
+          "ERROR_MESSAGE": "Houve um erro ao tentar criar a unidade."
+        }
+      },
+      "EDIT": {
+        "TITLE": "Editar Unidade Pix",
+        "DESC": "Atualize as credenciais do Banco Inter",
+        "CANCEL_BUTTON_TEXT": "Cancelar",
+        "SUBMIT_BUTTON_TEXT": "Salvar unidade",
+        "API": {
+          "SUCCESS_MESSAGE": "Unidade atualizada com sucesso!",
+          "ERROR_MESSAGE": "Houve um erro ao tentar atualizar."
+        }
+      },
+      "FORM": {
+        "NAME": {
+          "LABEL": "Nome da Unidade",
+          "PLACEHOLDER": "Ex: Matriz",
+          "ERROR": "O nome é obrigatório"
+        },
+        "INTER_PIX_KEY": {
+          "LABEL": "Chave Pix (do app Inter)",
+          "PLACEHOLDER": "Ex: 12.345.678/0001-90",
+          "ERROR": "A chave Pix é obrigatória",
+          "HELP_TEXT": "Sua chave Pix que receberá as cobranças"
+        },
+        "INTER_ACCOUNT_NUMBER": {
+          "LABEL": "Número da conta Inter",
+          "PLACEHOLDER": "Ex: 1234567-8",
+          "ERROR": "O número da conta é obrigatório"
+        },
+        "INTER_CLIENT_ID": {
+          "LABEL": "Client ID do App Inter",
+          "PLACEHOLDER": ""
+        },
+        "INTER_CLIENT_SECRET": {
+          "LABEL": "Client Secret do App Inter",
+          "PLACEHOLDER": ""
+        },
+        "INTER_CERT_CONTENT": {
+          "LABEL": "Conteúdo do Certificado (.crt)",
+          "PLACEHOLDER": "Cole o texto contido no arquivo .crt aqui...",
+          "UPLOAD_BUTTON": "Importar arquivo .crt"
+        },
+        "INTER_KEY_CONTENT": {
+          "LABEL": "Conteúdo da Chave (.key)",
+          "PLACEHOLDER": "Cole o texto contido no arquivo .key aqui...",
+          "UPLOAD_BUTTON": "Importar arquivo .key"
+        },
+        "PROACTIVE_PIX_POLLING": {
+          "LABEL": "Confirmação proativa de pagamento (Banco Inter)",
+          "CHECKBOX_LABEL": "Verificar pagamento automaticamente a cada 10 minutos por até 1 hora",
+          "HELP_TEXT": "Quando habilitado, o sistema consulta o Inter de forma proativa para confirmar pagamentos Pix pendentes.",
+          "DISABLED_HELP_TEXT": "Complete as credenciais do Banco Inter (Client ID/Secret, conta, chave Pix, certificado e chave) para habilitar."
+        },
+        "CERT_PRESENT_HELP": "Certificado já configurado.",
+        "CANCEL": "Cancelar",
+        "SAVE": "Salvar"
+      },
+      "INBOX": {
+        "LABEL": "Unidade Pix",
+        "PLACEHOLDER": "Selecione uma unidade",
+        "NO_UNIT": "Nenhuma unidade vinculada",
+        "CONNECT_UNIT_LABEL": "Vincular Unidade Pix",
+        "CONNECT_UNIT_PLACEHOLDER": "Escolha a unidade Inter para este inbox",
+        "CONNECT_UNIT_HELP": "Selecione qual Unidade Pix deve ser usada nesta caixa de entrada."
+      },
+      "TEST": {
+        "HEADER_TITLE": "Validação de Header",
+        "HEADER_DESCRIPTION": "Teste visual para validar carregamento da página.",
+        "BODY_TEXT": "Se esta tela abrir, o problema não está no layout base e sim na tabela ou no Vuex."
+      }
+    },
+    "GALLERY": {
+      "TITLE": "Galeria",
+      "DESC": "Gerencie as fotos de suítes que os subagentes podem enviar para os clientes.",
+      "ADD_ITEM": "Adicionar Foto",
+      "EDIT_ITEM": "Editar",
+      "DELETE_ITEM": "Excluir",
+      "LIST": {
+        "TABLE_HEADER": [
+          "Imagem",
+          "Caixa de entrada e descrição",
+          "Categoria",
+          "Suíte",
+          "Ações"
+        ],
+        "ADD_NEW_ITEM": "Adicione fotos na galeria",
+        "NO_ITEMS_MESSAGE": "Ainda não há fotos cadastradas para envio automático aos clientes."
+      },
+      "DELETE": {
+        "CONFIRM": {
+          "TITLE": "Excluir foto",
+          "MESSAGE": "Tem certeza que deseja excluir esta foto da galeria?",
+          "YES": "Excluir"
+        },
+        "API": {
+          "SUCCESS_MESSAGE": "Foto excluída com sucesso.",
+          "ERROR_MESSAGE": "Não foi possível excluir a foto."
+        }
+      },
+      "ADD": {
+        "TITLE": "Nova foto da galeria",
+        "DESC": "Cadastre uma foto de suíte e os metadados para busca pelo agente.",
+        "SUBMIT_BUTTON_TEXT": "Salvar foto",
+        "API": {
+          "SUCCESS_MESSAGE": "Foto cadastrada com sucesso!",
+          "ERROR_MESSAGE": "Não foi possível cadastrar a foto."
+        }
+      },
+      "EDIT": {
+        "TITLE": "Editar foto da galeria",
+        "DESC": "Atualize os dados e a imagem da galeria.",
+        "SUBMIT_BUTTON_TEXT": "Salvar alterações",
+        "API": {
+          "SUCCESS_MESSAGE": "Foto atualizada com sucesso!",
+          "ERROR_MESSAGE": "Não foi possível atualizar a foto."
+        }
+      },
+      "FORM": {
+        "INBOX": {
+          "LABEL": "Caixa de entrada",
+          "GLOBAL_OPTION": "Global (todas as caixas)",
+          "HELP": "Selecione a caixa de entrada onde essas fotos podem ser usadas.",
+          "GLOBAL_HELP": "Essas fotos podem ser usadas por agentes em qualquer caixa de entrada.",
+          "SPECIFIC_HELP": "Essas fotos serão usadas somente na caixa de entrada {inbox}."
+        },
+        "SUITE_CATEGORY": {
+          "LABEL": "Categoria da suíte",
+          "PLACEHOLDER": "Ex: Hidromassagem",
+          "ERROR": "A categoria é obrigatória"
+        },
+        "SUITE_NUMBER": {
+          "LABEL": "Número/identificador da suíte",
+          "PLACEHOLDER": "Ex: 101",
+          "ERROR": "O identificador da suíte é obrigatório"
+        },
+        "DESCRIPTION": {
+          "LABEL": "Descrição da foto",
+          "PLACEHOLDER": "Descreva rapidamente o que aparece na imagem",
+          "ERROR": "A descrição é obrigatória"
+        },
+        "IMAGE": {
+          "LABEL": "Imagem",
+          "HELP_TEXT": "Use imagens nítidas. Formatos recomendados: PNG/JPG.",
+          "ERROR": "A imagem é obrigatória",
+          "PREVIEW_ALT": "Pré-visualização da foto"
+        },
+        "ACTIVE": {
+          "LABEL": "Disponível para envio pelos agentes"
+        }
+      }
+    }
+  }
+}

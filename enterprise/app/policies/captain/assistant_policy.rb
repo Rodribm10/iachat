@@ -26,4 +26,12 @@ class Captain::AssistantPolicy < ApplicationPolicy
   def playground?
     true
   end
+
+  def pix?
+    true
+  end
+
+  def revenue?
+    true
+  end
 end

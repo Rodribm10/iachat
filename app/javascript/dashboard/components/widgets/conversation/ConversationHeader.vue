@@ -13,6 +13,8 @@ import { conversationListPageURL } from 'dashboard/helper/URLHelper';
 import { snoozedReopenTime } from 'dashboard/helper/snoozeHelpers';
 import { useInbox } from 'dashboard/composables/useInbox';
 import { useI18n } from 'vue-i18n';
+import { useUISettings } from 'dashboard/composables/useUISettings';
+import ReservationMarker from './ReservationMarker.vue';
 
 const props = defineProps({
   chat: {
@@ -31,6 +33,7 @@ const route = useRoute();
 const conversationHeader = ref(null);
 const { width } = useElementSize(conversationHeader);
 const { isAWebWidgetInbox } = useInbox();
+const { updateUISettings } = useUISettings();
 
 const currentChat = computed(() => store.getters.getSelectedChat);
 const accountId = computed(() => store.getters.getCurrentAccountId);
@@ -90,6 +93,15 @@ const hasMultipleInboxes = computed(
 );
 
 const hasSlaPolicyId = computed(() => props.chat?.sla_policy_id);
+const reservationMarker = computed(() => props.chat?.reservation_marker || {});
+const hasReservationMarker = computed(() => reservationMarker.value?.visible);
+
+const openReservationSummary = () => {
+  updateUISettings({
+    is_contact_sidebar_open: true,
+    is_reservation_summary_open: true,
+  });
+};
 </script>
 
 <template>
@@ -150,6 +162,12 @@ const hasSlaPolicyId = computed(() => props.chat?.sla_policy_id);
         show-extended-info
         :parent-width="width"
         class="hidden md:flex"
+      />
+      <ReservationMarker
+        v-if="hasReservationMarker"
+        :marker="reservationMarker"
+        clickable
+        @click="openReservationSummary"
       />
       <MoreActions :conversation-id="currentChat.id" />
     </div>

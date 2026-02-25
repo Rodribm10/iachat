@@ -10,6 +10,17 @@ module Enterprise::Concerns::Conversation
     around_save :ensure_applied_sla_is_created, if: -> { sla_policy_id_changed? }
   end
 
+  def reservation_marker_payload
+    marker = additional_attributes.to_h['reservation_marker']
+    marker = marker.to_h if marker.respond_to?(:to_h)
+
+    return marker if marker.is_a?(Hash) && marker['visible'].present?
+
+    Captain::Reservations::MarkerBuilder.hidden_payload
+  rescue StandardError
+    Captain::Reservations::MarkerBuilder.hidden_payload
+  end
+
   private
 
   def validate_sla_policy

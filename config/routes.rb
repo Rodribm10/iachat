@@ -74,6 +74,15 @@ Rails.application.routes.draw do
             end
             resources :custom_tools
             resources :documents, only: [:index, :show, :create, :destroy]
+            resources :gallery_items
+            resources :reservations, only: [:index, :show] do
+              collection do
+                get :revenue
+              end
+              member do
+                get :pix
+              end
+            end
             resource :tasks, only: [], controller: 'tasks' do
               post :rewrite
               post :summarize
@@ -81,6 +90,7 @@ Rails.application.routes.draw do
               post :label_suggestion
               post :follow_up
             end
+            resources :units
           end
           resource :saml_settings, only: [:show, :create, :update, :destroy]
           resources :agent_bots, only: [:index, :create, :show, :update, :destroy] do
@@ -233,6 +243,14 @@ Rails.application.routes.draw do
             resource :csat_template, only: [:show, :create], controller: 'inbox_csat_templates' do
               post :link, on: :member
               get :available_templates, on: :member
+            end
+
+            resource :wuzapi, controller: 'inboxes/wuzapi', only: [:show] do
+              get :qr
+              post :connect
+              post :disconnect
+              get :webhook_info
+              put :update_webhook
             end
           end
 
@@ -574,6 +592,7 @@ Rails.application.routes.draw do
   post 'webhooks/instagram', to: 'webhooks/instagram#events'
   post 'webhooks/tiktok', to: 'webhooks/tiktok#events'
   post 'webhooks/shopify', to: 'webhooks/shopify#events'
+  post 'webhooks/wuzapi/:inbox_id', to: 'webhooks/wuzapi#process_payload'
 
   namespace :twitter do
     resource :callback, only: [:show]
@@ -656,6 +675,15 @@ Rails.application.routes.draw do
     get 'onboarding', to: 'onboarding#index'
     post 'onboarding', to: 'onboarding#create'
   end
+
+  # ---------------------------------------------------------------------
+  # Página pública de pagamento PIX (link curto gerado via SGID pela IA)
+  get '/r/:token', to: 'public/api/v1/captain/payments#show', as: :short_payment_link
+
+  # Webhook do Banco Inter para notificações de PIX pago
+  post '/api/v1/captain/webhooks/inter_pix',
+       to: 'public/api/v1/captain/inter_webhooks#create',
+       defaults: { format: 'json' }
 
   # ---------------------------------------------------------------------
   # Routes for swagger docs

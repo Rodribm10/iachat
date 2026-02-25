@@ -1,7 +1,10 @@
 class Captain::Documents::ResponseBuilderJob < ApplicationJob
   queue_as :low
 
-  def perform(document, options = {})
+  def perform(document_or_id, options = {})
+    document = resolve_document(document_or_id)
+    return if document.nil?
+
     reset_previous_responses(document)
 
     faqs = generate_faqs(document, options)
@@ -74,5 +77,14 @@ class Captain::Documents::ResponseBuilderJob < ApplicationJob
     )
   rescue ActiveRecord::RecordInvalid => e
     Rails.logger.error I18n.t('captain.documents.response_creation_error', error: e.message)
+  end
+
+  def resolve_document(document_or_id)
+    return document_or_id if document_or_id.is_a?(Captain::Document)
+
+    Captain::Document.find(document_or_id)
+  rescue ActiveRecord::RecordNotFound
+    Rails.logger.info("Captain::Documents::ResponseBuilderJob skipped. Document not found: #{document_or_id}")
+    nil
   end
 end

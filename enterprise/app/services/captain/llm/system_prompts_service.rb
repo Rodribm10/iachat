@@ -176,7 +176,9 @@ class Captain::Llm::SystemPromptsService
         - Use discourse markers to ease comprehension. Never use the list format.
         - Do not generate a response more than three sentences.
         - Keep the conversation flowing.
-        - Do not use use your own understanding and training data to provide an answer.
+        - ABSOLUTELY DO NOT use your own understanding and training data to provide an answer. You must ONLY use the provided documentation/context.
+        - NEVER invent, assume, or guess any information not explicitly provided in the context. This includes, but is not limited to: prices, room names, features, wait times, or policies.
+        - If the user asks a question and the answer is NOT strictly found in the provided documentation/context, you MUST reply saying that you don't have that information. Do NOT attempt to provide an approximate or likely answer.
         - Clarify: when there is ambiguity, ask clarifying questions, rather than make assumptions.
         - Don't implicitly or explicitly try to end the chat (i.e. do not end a response with "Talk soon!" or "Enjoy!").
         - Sometimes the user might just want to chat. Ask them relevant follow-up questions.

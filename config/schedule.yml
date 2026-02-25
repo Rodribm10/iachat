@@ -61,6 +61,13 @@ bulk_auto_assignment_job:
   class: 'Inboxes::BulkAutoAssignmentJob'
   queue: scheduled_jobs
 
+# executed every 10 minutes
+# proactively checks pending PIX charges (Inter) while txid is still valid
+captain_proactive_pix_polling_job:
+  cron: '*/10 * * * *'
+  class: 'Captain::Payments::ProactivePixPollingSchedulerJob'
+  queue: scheduled_jobs
+
 # executed every 30 minutes for assignment_v2
 periodic_assignment_job:
   cron: '*/30 * * * *'

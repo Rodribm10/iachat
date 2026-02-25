@@ -24,6 +24,9 @@ import CollaboratorsPage from './settingsPage/CollaboratorsPage.vue';
 import WidgetBuilder from './WidgetBuilder.vue';
 import BotConfiguration from './components/BotConfiguration.vue';
 import AccountHealth from './components/AccountHealth.vue';
+import WuzapiConfiguration from './channels/wuzapi/WuzapiConfiguration.vue';
+import EvolutionGoConfiguration from './channels/evolution_go/EvolutionGoConfiguration.vue';
+import InboxAutoResolve from './components/InboxAutoResolve.vue';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
 import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -55,6 +58,9 @@ export default {
     Editor,
     Avatar,
     AccountHealth,
+    WuzapiConfiguration,
+    EvolutionGoConfiguration,
+    InboxAutoResolve,
   },
   mixins: [inboxMixin],
   setup() {
@@ -81,10 +87,13 @@ export default {
       replyTime: '',
       selectedTabIndex: 0,
       selectedPortalSlug: '',
+      captainUnitId: null,
       showBusinessNameInput: false,
       healthData: null,
       isLoadingHealth: false,
       healthError: null,
+      messageSignatureEnabled: false,
+      typingDelay: 0,
     };
   },
   computed: {
@@ -93,7 +102,22 @@ export default {
       isFeatureEnabledonAccount: 'accounts/isFeatureEnabledonAccount',
       uiFlags: 'inboxes/getUIFlags',
       portals: 'portals/allPortals',
+      captainUnits: 'captainUnits/getUnits',
     }),
+    captainUnitOptions() {
+      const options = (this.captainUnits || []).map(unit => ({
+        id: unit.id,
+        label: unit.name,
+      }));
+
+      return [
+        {
+          id: null,
+          label: this.$t('CAPTAIN_SETTINGS.UNITS.INBOX.NO_UNIT'),
+        },
+        ...options,
+      ];
+    },
     selectedTabKey() {
       return this.tabs[this.selectedTabIndex]?.key;
     },
@@ -109,12 +133,6 @@ export default {
       }
       if (this.isATwilioWhatsAppChannel) {
         return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO');
-      }
-      if (this.isAWhatsAppBaileysChannel) {
-        return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.BAILEYS');
-      }
-      if (this.isAWhatsAppZapiChannel) {
-        return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.ZAPI');
       }
       return '';
     },
@@ -165,9 +183,7 @@ export default {
         this.isAVoiceChannel ||
         (this.isAnEmailChannel && !this.inbox.provider) ||
         this.shouldShowWhatsAppConfiguration ||
-        this.isAWebWidgetInbox ||
-        this.isAWhatsAppBaileysChannel ||
-        this.isAWhatsAppZapiChannel
+        this.isAWebWidgetInbox
       ) {
         visibleToAllChannelTabs = [
           ...visibleToAllChannelTabs,
@@ -403,7 +419,10 @@ export default {
       this.$store.dispatch('agents/get');
       this.$store.dispatch('teams/get');
       this.$store.dispatch('labels/get');
-      this.$store.dispatch('inboxes/get').then(() => {
+      Promise.all([
+        this.$store.dispatch('inboxes/get'),
+        this.$store.dispatch('captainUnits/get'),
+      ]).then(() => {
         this.avatarUrl = this.inbox.avatar_url;
         this.selectedInboxName = this.inbox.name;
         this.webhookUrl = this.inbox.webhook_url;
@@ -424,6 +443,14 @@ export default {
         this.selectedPortalSlug = this.inbox.help_center
           ? this.inbox.help_center.slug
           : '';
+        this.captainUnitId =
+          this.inbox.captain_unit_id ||
+          this.captainUnits.find(
+            unit => Number(unit.inbox_id) === Number(this.currentInboxId)
+          )?.id ||
+          null;
+        this.typingDelay = this.inbox.typing_delay || 0;
+        this.messageSignatureEnabled = this.inbox.message_signature_enabled;
 
         // Set initial tab after inbox data is loaded
         this.setTabFromRouteParam();
@@ -443,9 +470,12 @@ export default {
                 portal => portal.slug === this.selectedPortalSlug
               ).id
             : null,
+          captain_unit_id: this.captainUnitId,
+          typing_delay: this.typingDelay,
           lock_to_single_conversation: this.locktoSingleConversation,
           sender_name_type: this.senderNameType,
           business_name: this.businessName || null,
+          message_signature_enabled: this.messageSignatureEnabled,
           channel: {
             widget_color: this.inbox.widget_color,
             website_url: this.channelWebsiteUrl,
@@ -517,7 +547,7 @@ export default {
       :header-title="inboxName"
     >
       <woot-tabs
-        class="[&_ul]:p-0 top-px relative"
+        class="[&_ul]:p-0"
         :index="selectedTabIndex"
         :border="false"
         @change="onTabChange"
@@ -541,6 +571,14 @@ export default {
       <WhatsappReauthorize
         v-if="whatsappUnauthorized"
         :whatsapp-registration-incomplete="whatsappRegistrationIncomplete"
+        :inbox="inbox"
+      />
+      <WuzapiConfiguration
+        v-if="isAWhatsAppChannel && inbox.provider === 'wuzapi'"
+        :inbox="inbox"
+      />
+      <EvolutionGoConfiguration
+        v-if="isAWhatsAppChannel && inbox.provider === 'evolution'"
         :inbox="inbox"
       />
       <DuplicateInboxBanner
@@ -582,6 +620,18 @@ export default {
             "
             @blur="v$.selectedInboxName.$touch"
           />
+          <InboxAutoResolve :inbox="inbox" class="mb-4" />
+          <div class="flex flex-row items-center gap-2 mb-4">
+            <input
+              id="messageSignatureEnabled"
+              v-model="messageSignatureEnabled"
+              type="checkbox"
+              @change="updateInbox"
+            />
+            <label for="messageSignatureEnabled">
+              {{ $t('INBOX_MGMT.ADD.MESSAGE_SIGNATURE.LABEL') }}
+            </label>
+          </div>
           <woot-input
             v-if="isAPIInbox"
             v-model="webhookUrl"
@@ -794,6 +844,47 @@ export default {
             </select>
             <p class="pb-1 text-sm not-italic text-n-slate-11">
               {{ $t('INBOX_MGMT.HELP_CENTER.SUB_TEXT') }}
+            </p>
+          </div>
+          <div class="pb-4">
+            <label>
+              {{ $t('CAPTAIN_SETTINGS.UNITS.INBOX.CONNECT_UNIT_LABEL') }}
+            </label>
+            <select v-model="captainUnitId">
+              <option
+                v-for="option in captainUnitOptions"
+                :key="option.id === null ? 'no-unit' : option.id"
+                :value="option.id"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+            <p class="pb-1 text-sm not-italic text-n-slate-11">
+              {{ $t('CAPTAIN_SETTINGS.UNITS.INBOX.CONNECT_UNIT_HELP') }}
+            </p>
+          </div>
+
+          <div v-if="captainUnitId" class="pb-4">
+            <label>
+              {{
+                $t('JASMINE.CONFIG.TYPING_DELAY_LABEL') ||
+                'Delay de digitação (segundos)'
+              }}
+            </label>
+            <input
+              v-model.number="typingDelay"
+              type="number"
+              min="0"
+              max="60"
+              :placeholder="
+                $t('JASMINE.CONFIG.TYPING_DELAY_PLACEHOLDER') || 'Ex: 5'
+              "
+            />
+            <p class="pb-1 text-sm not-italic text-n-slate-11">
+              {{
+                $t('JASMINE.CONFIG.TYPING_DELAY_HELP') ||
+                'Tempo simulado (em segundos) que a IA passará digitando antes de responder. Um valor baixo resulta em respostas mais rápidas, mas reações podem passar despercebidas.'
+              }}
             </p>
           </div>
           <label v-if="canLocktoSingleConversation" class="pb-4">

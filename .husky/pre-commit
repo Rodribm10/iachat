@@ -1,11 +1,23 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
+# Ensure hooks always use project Ruby (rbenv + .ruby-version), not system Ruby.
+export PATH="$HOME/.rbenv/bin:$PATH"
+if command -v rbenv >/dev/null 2>&1; then
+  eval "$(rbenv init -)"
+  if [ -f .ruby-version ]; then
+    rbenv shell "$(cat .ruby-version)"
+  fi
+fi
+
 # lint js and vue files
 npx --no-install lint-staged
 
 # lint only staged ruby files
-git diff --name-only --cached | xargs ls -1 2>/dev/null | grep '\.rb$' | xargs bundle exec rubocop --force-exclusion
+STAGED_RB_FILES=$(git diff --name-only --cached --diff-filter=ACMR -- '*.rb')
+if [ -n "$STAGED_RB_FILES" ]; then
+  echo "$STAGED_RB_FILES" | xargs bundle exec rubocop --force-exclusion
+fi
 
 # stage rubocop changes to files
 # git diff --name-only --cached | xargs git add

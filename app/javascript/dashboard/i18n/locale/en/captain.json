@@ -1,0 +1,281 @@
+{
+  "CAPTAIN_RESERVATIONS": {
+    "HEADER": "Reservations",
+    "EMPTY": "No reservations found.",
+    "VIEW": {
+      "LIST": "List",
+      "KANBAN": "Kanban",
+      "REVENUE": "Revenue"
+    },
+    "FILTERS": {
+      "SEARCH": "Search by name, CPF, or phone",
+      "STATUS": "Status",
+      "STATUS_ALL": "All statuses",
+      "UNIT": "Unit",
+      "UNIT_ALL": "All units",
+      "SUITE": "Suite",
+      "DATE_FROM": "From",
+      "DATE_TO": "To",
+      "SORT": "Sort",
+      "SORT_DEFAULT": "Operational priority",
+      "SORT_CHECK_IN": "Check-in date",
+      "SORT_UPDATED": "Last update",
+      "SORT_CREATED": "Created at",
+      "APPLY": "Apply filters",
+      "CLEAR": "Clear filters"
+    },
+    "TABLE": {
+      "CUSTOMER": "Customer",
+      "UNIT": "Unit",
+      "SUITE": "Suite",
+      "CHECK_IN": "Check-in",
+      "AMOUNT": "Amount",
+      "STATUS": "Status",
+      "UPDATED_AT": "Updated",
+      "ACTIONS": "Actions"
+    },
+    "STATUS": {
+      "DRAFT": "Draft",
+      "PENDING_PAYMENT": "Awaiting payment",
+      "CONFIRMED": "Confirmed",
+      "CANCELLED": "Cancelled"
+    },
+    "ACTIONS": {
+      "OPEN_CONVERSATION": "Open conversation",
+      "COPY_PIX": "Copy Pix"
+    },
+    "KANBAN": {
+      "EMPTY_COLUMN": "No reservations in this status."
+    },
+    "REVENUE": {
+      "ONLY_CONFIRMED": "Revenue includes only reservations with confirmed status.",
+      "SUMMARY": {
+        "TOTAL_REVENUE": "Total revenue",
+        "CONFIRMED_COUNT": "Confirmed reservations",
+        "AVERAGE_TICKET": "Average ticket"
+      },
+      "CHARTS": {
+        "BY_UNIT": "Revenue by unit",
+        "BY_SUITE": "Revenue by suite"
+      },
+      "API": {
+        "ERROR": "Unable to load revenue."
+      }
+    },
+    "SIDEBAR": {
+      "NO_RESERVATION": "No reservation linked to this conversation.",
+      "LOADING": "Loading reservation details...",
+      "STATUS": "Status",
+      "SUITE": "Suite",
+      "CHECK_IN": "Check-in",
+      "CHECK_OUT": "Check-out",
+      "AMOUNT": "Amount",
+      "UPDATED_AT": "Updated at"
+    },
+    "API": {
+      "PIX_EXPIRED": "Pix for this reservation is expired.",
+      "PIX_NOT_GENERATED": "Pix has not been generated yet.",
+      "PIX_COPIED": "Pix copied successfully.",
+      "PIX_COPY_FAILED": "Unable to copy Pix."
+    }
+  },
+  "CAPTAIN_SETTINGS": {
+    "TITLE": "Captain Settings",
+    "UNITS": {
+      "TITLE": "Pix Units",
+      "DESC": "Manage the settings of different Pix units integrated with Banco Inter.",
+      "ADD_UNIT": "Add Unit",
+      "EDIT_UNIT": "Edit Unit",
+      "DELETE_UNIT": "Delete Unit",
+      "LIST": {
+        "TABLE_HEADER": [
+          "Pix Key",
+          "Account",
+          "Certificates",
+          "Monitoring",
+          "Actions"
+        ],
+        "CERT": "Cert",
+        "KEY": "Key",
+        "PROACTIVE_ON": "Auto-check on",
+        "PROACTIVE_OFF": "Auto-check off",
+        "SEPARATOR": "|",
+        "ADD_NEW_UNIT": "Add a Pix Unit",
+        "NO_UNITS_MESSAGE": "There are no pix units entered yet. Create one now to start receiving by Banco Inter pix."
+      },
+      "DELETE": {
+        "BUTTON_TEXT": "Delete",
+        "TITLE": "Delete Pix Unit",
+        "DESC": "Are you sure you want to delete this pix unit? This action cannot be undone.",
+        "CONFIRM": {
+          "TITLE": "Confirm Deletion",
+          "MESSAGE": "Are you sure you want to delete the Unit?",
+          "YES": "Delete",
+          "NO": "Cancel"
+        },
+        "API": {
+          "SUCCESS_MESSAGE": "Unit deleted successfully.",
+          "ERROR_MESSAGE": "There was an error trying to delete the unit."
+        }
+      },
+      "ADD": {
+        "TITLE": "New Pix Unit",
+        "DESC": "Add your Banco Inter app credentials",
+        "CANCEL_BUTTON_TEXT": "Cancel",
+        "SUBMIT_BUTTON_TEXT": "Create unit",
+        "API": {
+          "SUCCESS_MESSAGE": "Unit created successfully!",
+          "ERROR_MESSAGE": "There was an error trying to create the unit."
+        }
+      },
+      "EDIT": {
+        "TITLE": "Edit Pix Unit",
+        "DESC": "Update Banco Inter credentials",
+        "CANCEL_BUTTON_TEXT": "Cancel",
+        "SUBMIT_BUTTON_TEXT": "Save unit",
+        "API": {
+          "SUCCESS_MESSAGE": "Unit updated successfully!",
+          "ERROR_MESSAGE": "There was an error trying to update."
+        }
+      },
+      "FORM": {
+        "NAME": {
+          "LABEL": "Unit Name",
+          "PLACEHOLDER": "Ex: Headquaters",
+          "ERROR": "Name is required"
+        },
+        "INTER_PIX_KEY": {
+          "LABEL": "Pix Key (from Inter app)",
+          "PLACEHOLDER": "Ex: 12.345.678/0001-90",
+          "ERROR": "Pix key is required",
+          "HELP_TEXT": "Your Pix key that will receive the charges"
+        },
+        "INTER_ACCOUNT_NUMBER": {
+          "LABEL": "Inter account number",
+          "PLACEHOLDER": "Ex: 1234567-8",
+          "ERROR": "Account number is required"
+        },
+        "INTER_CLIENT_ID": {
+          "LABEL": "Inter App Client ID",
+          "PLACEHOLDER": ""
+        },
+        "INTER_CLIENT_SECRET": {
+          "LABEL": "Inter App Client Secret",
+          "PLACEHOLDER": ""
+        },
+        "INTER_CERT_CONTENT": {
+          "LABEL": "Certificate Content (.crt)",
+          "PLACEHOLDER": "Paste the text contained in the .crt file here...",
+          "UPLOAD_BUTTON": "Import .crt file"
+        },
+        "INTER_KEY_CONTENT": {
+          "LABEL": "Key Content (.key)",
+          "PLACEHOLDER": "Paste the text contained in the .key file here...",
+          "UPLOAD_BUTTON": "Import .key file"
+        },
+        "PROACTIVE_PIX_POLLING": {
+          "LABEL": "Proactive payment confirmation (Banco Inter)",
+          "CHECKBOX_LABEL": "Check payment automatically every 10 minutes for up to 1 hour",
+          "HELP_TEXT": "When enabled, the system proactively queries Inter to confirm pending Pix payments.",
+          "DISABLED_HELP_TEXT": "Complete Banco Inter credentials (Client ID/Secret, account, Pix key, certificate and key) to enable."
+        },
+        "CERT_PRESENT_HELP": "Certificate already configured.",
+        "CANCEL": "Cancel",
+        "SAVE": "Save"
+      },
+      "INBOX": {
+        "LABEL": "Pix Unit",
+        "PLACEHOLDER": "Select a unit",
+        "NO_UNIT": "No unit linked",
+        "CONNECT_UNIT_LABEL": "Link Pix Unit",
+        "CONNECT_UNIT_PLACEHOLDER": "Choose the Inter unit for this inbox",
+        "CONNECT_UNIT_HELP": "Select which Pix Unit should be used by this inbox."
+      },
+      "TEST": {
+        "HEADER_TITLE": "Header validation",
+        "HEADER_DESCRIPTION": "Visual test to validate page rendering.",
+        "BODY_TEXT": "If this screen appears, the issue is likely in the table or Vuex, not in the base layout."
+      }
+    },
+    "GALLERY": {
+      "TITLE": "Gallery",
+      "DESC": "Manage suite photos that subagents can send to customers.",
+      "ADD_ITEM": "Add Photo",
+      "EDIT_ITEM": "Edit",
+      "DELETE_ITEM": "Delete",
+      "LIST": {
+        "TABLE_HEADER": [
+          "Image",
+          "Inbox and description",
+          "Category",
+          "Suite",
+          "Actions"
+        ],
+        "ADD_NEW_ITEM": "Add gallery photos",
+        "NO_ITEMS_MESSAGE": "There are no photos available yet for automatic customer sending."
+      },
+      "DELETE": {
+        "CONFIRM": {
+          "TITLE": "Delete photo",
+          "MESSAGE": "Are you sure you want to delete this photo from the gallery?",
+          "YES": "Delete"
+        },
+        "API": {
+          "SUCCESS_MESSAGE": "Photo deleted successfully.",
+          "ERROR_MESSAGE": "Unable to delete the photo."
+        }
+      },
+      "ADD": {
+        "TITLE": "New gallery photo",
+        "DESC": "Upload a suite photo and metadata for agent search.",
+        "SUBMIT_BUTTON_TEXT": "Save photo",
+        "API": {
+          "SUCCESS_MESSAGE": "Photo created successfully!",
+          "ERROR_MESSAGE": "Unable to create the photo."
+        }
+      },
+      "EDIT": {
+        "TITLE": "Edit gallery photo",
+        "DESC": "Update gallery metadata and image.",
+        "SUBMIT_BUTTON_TEXT": "Save changes",
+        "API": {
+          "SUCCESS_MESSAGE": "Photo updated successfully!",
+          "ERROR_MESSAGE": "Unable to update the photo."
+        }
+      },
+      "FORM": {
+        "INBOX": {
+          "LABEL": "Inbox",
+          "GLOBAL_OPTION": "Global (all inboxes)",
+          "HELP": "Select which inbox can use these photos.",
+          "GLOBAL_HELP": "These photos can be used by agents in any inbox.",
+          "SPECIFIC_HELP": "These photos will be used only in inbox {inbox}."
+        },
+        "SUITE_CATEGORY": {
+          "LABEL": "Suite category",
+          "PLACEHOLDER": "Ex: Hydromassage",
+          "ERROR": "Suite category is required"
+        },
+        "SUITE_NUMBER": {
+          "LABEL": "Suite number/identifier",
+          "PLACEHOLDER": "Ex: 101",
+          "ERROR": "Suite identifier is required"
+        },
+        "DESCRIPTION": {
+          "LABEL": "Photo description",
+          "PLACEHOLDER": "Describe what appears in this photo",
+          "ERROR": "Description is required"
+        },
+        "IMAGE": {
+          "LABEL": "Image",
+          "HELP_TEXT": "Use clear photos. Recommended formats: PNG/JPG.",
+          "ERROR": "Image is required",
+          "PREVIEW_ALT": "Photo preview"
+        },
+        "ACTIVE": {
+          "LABEL": "Available for agent sending"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pagamento via Pix</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  </style>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen px-4">
+
+  <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+    <!-- Header -->
+    <div class="bg-indigo-600 p-6 text-center">
+      <h1 class="text-white text-xl font-bold mb-1">Pagamento via Pix</h1>
+      <p class="text-indigo-100 text-sm">
+        <%= @charge.unit&.name || 'Reserva de Suíte' %>
+      </p>
+    </div>
+
+    <!-- Content -->
+    <div class="p-8">
+      <div class="text-center mb-8">
+        <p class="text-gray-500 text-sm uppercase tracking-wide font-semibold">Valor a Pagar</p>
+        <p class="text-4xl font-extrabold text-gray-900 mt-2">
+          <%= ActiveSupport::NumberHelper.number_to_currency(@charge.original_value, unit: 'R$ ', separator: ',', delimiter: '.') %>
+        </p>
+      </div>
+
+      <div class="bg-gray-100 rounded-lg p-4 mb-6 relative group">
+        <label class="block text-xs font-medium text-gray-500 mb-1 uppercase">Pix Copia e Cola</label>
+        <div class="font-mono text-sm text-gray-600 break-all line-clamp-3 overflow-hidden h-16">
+          <%= @charge.pix_copia_e_cola %>
+        </div>
+        <div class="absolute inset-0 bg-gradient-to-b from-transparent to-gray-100/90 pointer-events-none"></div>
+      </div>
+
+      <button onclick="copyPix()" id="copyBtn" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-xl shadow-lg transform transition active:scale-95 flex items-center justify-center gap-2 text-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+        </svg>
+        <span>COPIAR CÓDIGO PIX</span>
+      </button>
+
+      <p id="feedback" class="text-center text-green-600 font-medium mt-4 opacity-0 transition-opacity duration-300">
+        Código copiado com sucesso! ✅
+      </p>
+
+      <div class="mt-8 text-center bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+        <p class="text-sm text-yellow-800">
+          <strong>Próximo passo:</strong><br>
+          Após pagar no app do seu banco, volte ao WhatsApp e avise para confirmar sua reserva.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const pixCode = "<%= j @charge.pix_copia_e_cola %>";
+
+    function showSuccess() {
+      const btn = document.getElementById('copyBtn');
+      const feedback = document.getElementById('feedback');
+
+      btn.classList.remove('bg-green-500', 'hover:bg-green-600');
+      btn.classList.add('bg-gray-800', 'hover:bg-gray-900');
+      btn.innerHTML = '<span>CÓDIGO COPIADO!</span>';
+      feedback.classList.remove('opacity-0');
+
+      setTimeout(() => {
+        btn.classList.add('bg-green-500', 'hover:bg-green-600');
+        btn.classList.remove('bg-gray-800', 'hover:bg-gray-900');
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg><span>COPIAR CÓDIGO PIX</span>';
+        feedback.classList.add('opacity-0');
+      }, 3000);
+    }
+
+    function copyPix() {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(pixCode).then(showSuccess).catch(() => fallbackCopy());
+      } else {
+        fallbackCopy();
+      }
+    }
+
+    function fallbackCopy() {
+      var textArea = document.createElement("textarea");
+      textArea.value = pixCode;
+      textArea.style.top = "0"; textArea.style.left = "0";
+      textArea.style.position = "fixed"; textArea.style.opacity = "0";
+      document.body.appendChild(textArea);
+      textArea.focus(); textArea.select();
+      try {
+        if (document.execCommand('copy')) showSuccess();
+      } catch (err) {
+        alert('Não foi possível copiar automaticamente. Por favor, copie manualmente.');
+      }
+      document.body.removeChild(textArea);
+    }
+  </script>
+</body>
+</html>

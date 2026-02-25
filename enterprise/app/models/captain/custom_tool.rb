@@ -49,7 +49,7 @@ class Captain::CustomTool < ApplicationRecord
   belongs_to :account
 
   enum :http_method, %w[GET POST].index_by(&:itself), validate: true
-  enum :auth_type, %w[none bearer basic api_key].index_by(&:itself), default: :none, validate: true, prefix: :auth
+  enum :auth_type, %w[none bearer basic api_key custom_headers].index_by(&:itself), default: :none, validate: true, prefix: :auth
 
   before_validation :generate_slug
 

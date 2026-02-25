@@ -7,6 +7,7 @@ import automation from './automation.json';
 import bulkActions from './bulkActions.json';
 import campaign from './campaign.json';
 import cannedMgmt from './cannedMgmt.json';
+import captain from './captain.json';
 import chatlist from './chatlist.json';
 import components from './components.json';
 import contact from './contact.json';
@@ -23,6 +24,7 @@ import inbox from './inbox.json';
 import inboxMgmt from './inboxMgmt.json';
 import integrationApps from './integrationApps.json';
 import integrations from './integrations.json';
+import jasmine from './jasmine.json';
 import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
 import macros from './macros.json';
@@ -46,6 +48,7 @@ export default {
   ...bulkActions,
   ...campaign,
   ...cannedMgmt,
+  ...captain,
   ...chatlist,
   ...components,
   ...contact,
@@ -62,6 +65,7 @@ export default {
   ...inboxMgmt,
   ...integrationApps,
   ...integrations,
+  ...jasmine,
   ...labelsMgmt,
   ...login,
   ...macros,

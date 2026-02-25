@@ -7,6 +7,7 @@
 #  id                            :integer          not null, primary key
 #  allow_messages_after_resolved :boolean          default(TRUE)
 #  auto_assignment_config        :jsonb
+#  auto_resolve_duration         :integer
 #  business_name                 :string
 #  channel_type                  :string
 #  csat_config                   :jsonb            not null
@@ -17,10 +18,12 @@
 #  greeting_enabled              :boolean          default(FALSE)
 #  greeting_message              :string
 #  lock_to_single_conversation   :boolean          default(FALSE), not null
+#  message_signature_enabled     :boolean
 #  name                          :string           not null
 #  out_of_office_message         :string
 #  sender_name_type              :integer          default("friendly"), not null
 #  timezone                      :string           default("UTC")
+#  typing_delay                  :integer          default(0)
 #  working_hours_enabled         :boolean          default(FALSE)
 #  created_at                    :datetime         not null
 #  updated_at                    :datetime         not null

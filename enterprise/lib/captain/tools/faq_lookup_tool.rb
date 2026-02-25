@@ -3,15 +3,19 @@ class Captain::Tools::FaqLookupTool < Captain::Tools::BasePublicTool
   param :query, type: 'string', desc: 'The question or topic to search for in the FAQ database'
 
   def perform(_tool_context, query:)
+    Rails.logger.info "[Captain][FaqLookupTool] Starting search with query: '#{query}'"
     log_tool_usage('searching', { query: query })
 
     # Use existing vector search on approved responses
     responses = @assistant.responses.approved.search(query).to_a
+    Rails.logger.info "[Captain][FaqLookupTool] Query returned #{responses.size} results."
 
     if responses.empty?
+      Rails.logger.info "[Captain][FaqLookupTool] No results found for: #{query}"
       log_tool_usage('no_results', { query: query })
       "No relevant FAQs found for: #{query}"
     else
+      Rails.logger.info '[Captain][FaqLookupTool] Found results, formatting...'
       log_tool_usage('found_results', { query: query, count: responses.size })
       format_responses(responses)
     end

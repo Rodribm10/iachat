@@ -2,16 +2,18 @@
 #
 # Table name: captain_scenarios
 #
-#  id           :bigint           not null, primary key
-#  description  :text
-#  enabled      :boolean          default(TRUE), not null
-#  instruction  :text
-#  title        :string
-#  tools        :jsonb
-#  created_at   :datetime         not null
-#  updated_at   :datetime         not null
-#  account_id   :bigint           not null
-#  assistant_id :bigint           not null
+#  id               :bigint           not null, primary key
+#  description      :text
+#  enabled          :boolean          default(TRUE), not null
+#  fallback_message :text
+#  instruction      :text
+#  title            :string
+#  tools            :jsonb
+#  trigger_keywords :text
+#  created_at       :datetime         not null
+#  updated_at       :datetime         not null
+#  account_id       :bigint           not null
+#  assistant_id     :bigint           not null
 #
 # Indexes
 #
@@ -23,6 +25,8 @@
 class Captain::Scenario < ApplicationRecord
   include Concerns::CaptainToolsHelpers
   include Concerns::Agentable
+
+  DEFAULT_TOOL_IDS = %w[faq_lookup].freeze
 
   self.table_name = 'captain_scenarios'
 
@@ -68,12 +72,18 @@ class Captain::Scenario < ApplicationRecord
   end
 
   def resolved_tools
-    return [] if tools.blank?
-
     available_tools = assistant.available_agent_tools
-    tools.filter_map do |tool_id|
+    tool_ids = (Array(tools) + default_tool_ids).uniq
+
+    tool_ids.filter_map do |tool_id|
       available_tools.find { |tool| tool[:id] == tool_id }
     end
+  end
+
+  def default_tool_ids
+    return [] unless ActiveModel::Type::Boolean.new.cast(feature_faq)
+
+    DEFAULT_TOOL_IDS
   end
 
   def resolve_tool_instance(tool_metadata)

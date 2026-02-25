@@ -45,4 +45,32 @@ You have access to these tools:
 {% for tool in tools -%}
 - {{ tool.id }}: {{ tool.description }}
 {% endfor %}
+
+{% assign has_faq_lookup = false %}
+{% assign has_check_pix_payment = false %}
+{% for tool in tools -%}
+{% if tool.id == 'faq_lookup' -%}
+{% assign has_faq_lookup = true %}
+{% endif -%}
+{% if tool.id == 'check_pix_payment' -%}
+{% assign has_check_pix_payment = true %}
+{% endif -%}
+{% endfor -%}
+
+{% if has_faq_lookup -%}
+# Knowledge Requirement
+Before answering with any factual hotel information (prices, policies, rules, schedules, amenities, passwords), call the `faq_lookup` tool first in the current turn.
+When answering prices or reservation amounts, use only values returned by `faq_lookup` in this turn. Do not infer or reuse old values from conversation memory.
+Only say the information is unavailable if `faq_lookup` does not return relevant results.
+{% endif -%}
+
+{% if has_check_pix_payment -%}
+# Payment Verification Requirement
+If the customer says they already paid the Pix ("já paguei", "paguei o pix", "acabei de pagar", "segue comprovante"), call `check_pix_payment` before saying payment is pending or before handing off.
+Use the tool response as the source of truth for payment status in that turn.
+{% endif -%}
+
+# Orchestrator Boundary
+If the user asks a broad factual question that is not required to execute this scenario's current workflow step, transfer back to the orchestrator using `handoff_to_{{ assistant_name }}`.
+Use this scenario primarily for execution tasks, not as a generic knowledge router.
 {%- endif %}

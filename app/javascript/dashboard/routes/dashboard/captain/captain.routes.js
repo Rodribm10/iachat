@@ -16,6 +16,7 @@ import DocumentsIndex from './documents/Index.vue';
 import ResponsesIndex from './responses/Index.vue';
 import ResponsesPendingIndex from './responses/Pending.vue';
 import CustomToolsIndex from './tools/Index.vue';
+import ReservationsIndex from './reservations/Index.vue';
 
 const meta = {
   permissions: ['administrator', 'agent'],
@@ -129,5 +130,11 @@ export const routes = [
       };
     },
     children: [...assistantRoutes],
+  },
+  {
+    path: frontendURL('accounts/:accountId/captain/reservations'),
+    component: ReservationsIndex,
+    name: 'captain_reservations_index',
+    meta,
   },
 ];

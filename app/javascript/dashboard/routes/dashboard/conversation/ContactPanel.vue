@@ -18,6 +18,7 @@ import ContactNotes from './contact/ContactNotes.vue';
 import ScheduledMessages from './scheduledMessages/ScheduledMessages.vue';
 import ConversationInfo from './ConversationInfo.vue';
 import CustomAttributes from './customAttributes/CustomAttributes.vue';
+import ReservationSummary from './reservation/ReservationSummary.vue';
 import Draggable from 'vuedraggable';
 import MacrosList from './Macros/List.vue';
 import ShopifyOrdersList from 'dashboard/components/widgets/conversation/ShopifyOrdersList.vue';
@@ -77,6 +78,7 @@ const isLinearConnected = computed(
 const store = useStore();
 const currentChat = useMapGetter('getSelectedChat');
 const conversationId = computed(() => props.conversationId);
+const reservationMarker = computed(() => currentChat.value?.reservation_marker);
 const conversationMetadataGetter = useMapGetter(
   'conversationMetadata/getConversationMetadata'
 );
@@ -119,6 +121,7 @@ const closeContactPanel = () => {
   updateUISettings({
     is_contact_sidebar_open: false,
     is_copilot_panel_open: false,
+    is_reservation_summary_open: false,
   });
 };
 
@@ -217,6 +220,19 @@ onMounted(() => {
                 :conversation-attributes="conversationAdditionalAttributes"
                 :contact-attributes="contactAdditionalAttributes"
               />
+            </AccordionItem>
+          </div>
+          <div v-else-if="element.name === 'reservation_summary'">
+            <AccordionItem
+              :title="$t('CONVERSATION_SIDEBAR.ACCORDION.RESERVATION')"
+              :is-open="isContactSidebarItemOpen('is_reservation_summary_open')"
+              compact
+              @toggle="
+                value =>
+                  toggleSidebarUIState('is_reservation_summary_open', value)
+              "
+            >
+              <ReservationSummary :marker="reservationMarker" />
             </AccordionItem>
           </div>
           <div v-else-if="element.name === 'contact_attributes'">

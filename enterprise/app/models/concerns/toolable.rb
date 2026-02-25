@@ -55,6 +55,13 @@ module Concerns::Toolable
       else
         {}
       end
+    when 'custom_headers'
+      # Suporta múltiplos headers configurados pelo usuário via UI.
+      # Formato esperado em auth_config: { "headers": [{"name": "X-API-ID", "value": "123"}, ...] }
+      headers = auth_config['headers'] || []
+      headers.each_with_object({}) do |h, acc|
+        acc[h['name']] = h['value'] if h['name'].present? && h['value'].present?
+      end
     else
       {}
     end

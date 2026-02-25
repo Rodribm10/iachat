@@ -34,3 +34,18 @@
   title: 'Handoff to Human'
   description: 'Hand off the conversation to a human agent'
   icon: 'user-switch'
+
+- id: generate_pix
+  title: 'Gerar Pix'
+  description: 'Gera uma cobrança Pix via Banco Inter para a reserva ativa da conversa'
+  icon: 'payment'
+
+- id: check_pix_payment
+  title: 'Verificar Pagamento Pix'
+  description: 'Consulta no Banco Inter se a cobrança Pix já foi paga'
+  icon: 'check-circle'
+
+- id: send_suite_images
+  title: 'Enviar Fotos de Suíte'
+  description: 'Envia fotos da galeria da unidade para o cliente, com filtros por categoria/suíte'
+  icon: 'image'

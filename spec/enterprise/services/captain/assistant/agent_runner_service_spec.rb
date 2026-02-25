@@ -76,9 +76,10 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
     it 'runs agent with extracted user message and context' do
       expected_context = {
         session_id: "#{account.id}_#{conversation.display_id}",
+        current_agent: assistant.name.to_s.parameterize(separator: '_'),
         conversation_history: [
           { role: :user, content: 'Hello there', agent_name: nil },
-          { role: :assistant, content: 'Hi! How can I help you?', agent_name: 'Assistant' },
+          { role: :assistant, content: 'Hi! How can I help you?', agent_name: nil },
           { role: :user, content: 'I need help with my account', agent_name: nil }
         ],
         state: hash_including(
@@ -119,6 +120,136 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
       end
     end
 
+    context 'when faq guardrail should force a FAQ lookup before uncertainty response' do
+      let(:message_history) do
+        [
+          { role: 'user', content: 'Preciso da senha da internet' }
+        ]
+      end
+      let(:mock_result) do
+        instance_double(
+          Agents::RunResult,
+          output: {
+            'response' => 'Não tenho acesso a essa informação no momento.',
+            'reasoning' => 'Out of scope'
+          },
+          context: nil,
+          messages: [
+            { role: :user, content: 'Preciso da senha da internet' },
+            { role: :assistant, content: 'Não tenho acesso a essa informação no momento.' }
+          ]
+        )
+      end
+
+      before do
+        allow(assistant).to receive(:feature_faq).and_return(true)
+      end
+
+      it 'replaces uncertain response with faq answer when faq tool was not called' do
+        approved_scope = double('approved_scope')
+        faq_response = double('faq_response', answer: 'A senha do Wi-Fi é 1001prime.')
+        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
+        allow(approved_scope).to receive(:search).with('Preciso da senha da internet').and_return([faq_response])
+
+        result = service.generate_response(message_history: message_history)
+
+        expect(result['response']).to eq('A senha do Wi-Fi é 1001prime.')
+        expect(result['reasoning']).to eq('FAQ guardrail applied due to uncertain response without faq_lookup call.')
+      end
+
+      it 'returns faq-not-found message when search has no match' do
+        approved_scope = double('approved_scope')
+        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
+        allow(approved_scope).to receive(:search).and_return([])
+
+        result = service.generate_response(message_history: message_history)
+
+        expect(result['response']).to eq(
+          'Consultei o FAQ e não encontrei essa informação cadastrada ainda. Posso te ajudar com outro tema ou te transferir para um atendente.'
+        )
+        expect(result['reasoning']).to eq('FAQ guardrail applied; no FAQ entry found for query.')
+      end
+
+      it 'replaces price response with faq answer when faq tool was not called in current turn' do
+        allow(mock_result).to receive(:output).and_return(
+          {
+            'response' => 'Rodrigo, para confirmar a reserva da suíte Aluba, o valor total é R$ 260,00 e o sinal é R$ 130,00.',
+            'reasoning' => 'Valor calculado para reserva'
+          }
+        )
+        allow(mock_result).to receive(:messages).and_return(
+          [
+            { role: :user, content: 'Rodrigo borba machado CPF: 00251938131 para amanhã na pernoite mesmo duração de 2 horas' },
+            {
+              role: :assistant,
+              content: 'Rodrigo, para confirmar a reserva da suíte Aluba, o valor total é R$ 260,00 e o sinal é R$ 130,00.'
+            }
+          ]
+        )
+
+        approved_scope = double('approved_scope')
+        faq_response = double('faq_response', answer: 'O valor da suíte Aluba é R$ 5,00 para qualquer duração.')
+        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
+        allow(approved_scope).to receive(:search) do |query|
+          if query.include?('valor da suíte Aluba')
+            [faq_response]
+          else
+            []
+          end
+        end
+
+        result = service.generate_response(message_history: message_history)
+
+        expect(result['response']).to eq('O valor da suíte Aluba é R$ 5,00 para qualquer duração.')
+        expect(result['reasoning']).to eq('FAQ guardrail applied due to price response without faq_lookup call.')
+      end
+
+      it 'does not force fallback when faq_lookup was already called' do
+        allow(mock_result).to receive(:messages).and_return(
+          [
+            { role: :user, content: 'Preciso da senha da internet' },
+            {
+              role: :assistant,
+              content: '',
+              tool_calls: [{ id: 'call_1', name: 'captain--tools--faq_lookup', arguments: { query: 'senha da internet' } }]
+            }
+          ]
+        )
+        approved_scope = double('approved_scope')
+        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
+        expect(approved_scope).not_to receive(:search)
+
+        result = service.generate_response(message_history: message_history)
+
+        expect(result['response']).to eq('Não tenho acesso a essa informação no momento.')
+      end
+
+      it 'forces fallback when faq_lookup happened only in a previous turn' do
+        allow(mock_result).to receive(:messages).and_return(
+          [
+            { role: :user, content: 'Qual o horário do café?' },
+            {
+              role: :assistant,
+              content: '',
+              tool_calls: [{ id: 'call_prev', name: 'captain--tools--faq_lookup', arguments: { query: 'horário do café' } }]
+            },
+            { role: :assistant, content: 'O café é servido das 07h às 09h.' },
+            { role: :user, content: 'Preciso da senha da internet' },
+            { role: :assistant, content: 'Não tenho acesso a essa informação no momento.' }
+          ]
+        )
+        approved_scope = double('approved_scope')
+        faq_response = double('faq_response', answer: 'A senha do Wi-Fi é 1001prime.')
+        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
+        allow(approved_scope).to receive(:search).with('Preciso da senha da internet').and_return([faq_response])
+
+        result = service.generate_response(message_history: message_history)
+
+        expect(result['response']).to eq('A senha do Wi-Fi é 1001prime.')
+        expect(result['reasoning']).to eq('FAQ guardrail applied due to uncertain response without faq_lookup call.')
+      end
+    end
+
     context 'when agent result is a string' do
       let(:mock_result) { instance_double(Agents::RunResult, output: 'Simple string response', context: nil) }
 
@@ -128,6 +259,30 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
         expect(result).to eq({
                                'response' => 'Simple string response',
                                'reasoning' => 'Processed by agent',
+                               'agent_name' => nil
+                             })
+      end
+    end
+
+    context 'when agent result is a duplicated JSON string' do
+      let(:mock_result) do
+        instance_double(
+          Agents::RunResult,
+          output: <<~JSON_OUTPUT.strip,
+            {"response":"Rodrigo, valor total R$ 260,00.","reasoning":"Primeira resposta","reaction_emoji":"💰"}
+            {"response":"Rodrigo, para confirmar a reserva, o sinal é R$ 130,00. Posso gerar o Pix?","reasoning":"Resposta final","reaction_emoji":"💰"}
+          JSON_OUTPUT
+          context: nil
+        )
+      end
+
+      it 'parses structured json and returns only the final response text' do
+        result = service.generate_response(message_history: message_history)
+
+        expect(result).to eq({
+                               'response' => 'Rodrigo, para confirmar a reserva, o sinal é R$ 130,00. Posso gerar o Pix?',
+                               'reasoning' => 'Resposta final',
+                               'reaction_emoji' => '💰',
                                'agent_name' => nil
                              })
       end
@@ -187,7 +342,7 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
       expect(context).to include(
         conversation_history: array_including(
           { role: :user, content: 'Hello there', agent_name: nil },
-          { role: :assistant, content: 'Hi! How can I help you?', agent_name: 'Assistant' }
+          { role: :assistant, content: 'Hi! How can I help you?', agent_name: nil }
         ),
         state: hash_including(
           account_id: account.id,

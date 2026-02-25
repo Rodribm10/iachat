@@ -1,0 +1,95 @@
+# Documentação Técnica: Integração Banco Inter API (Pix V2)
+
+Esta documentação descreve a integração com a API de Parceiros do Banco Inter (CDPJ) para processamento de pagamentos via Pix, implementada no ecossistema Captain/Chatwoot.
+
+## 🔑 Autenticação e Segurança
+
+A API do Banco Inter utiliza um modelo de segurança robusto baseado em **Mutual TLS (mTLS)** e **OAuth2**.
+
+- **Protocolo**: HTTPS com Certificado Digital (Chave Pública e Privada).
+- **OAuth2 Flow**: `client_credentials`.
+- **Scopes Utilizados**: `cob.write`, `cob.read`, `webhook.write`, `webhook.read`, `extrato.read`.
+- **Headers Mandatórios**:
+  - `x-conta-corrente`: Número da conta corrente do parceiro.
+  - `Authorization`: Token Bearer obtido via OAuth2.
+
+### Credenciais
+As credenciais são configuradas por Unidade (`Captain::Unit`) e incluem:
+- `client_id` / `client_secret`
+- `inter_cert_path` e `inter_key_path` (Caminhos para arquivos `.pem`)
+- `inter_pix_key` (Chave Pix CPF/CNPJ/E-mail/EVP)
+
+---
+
+## 🚀 Fluxo de Cobrança Pix (Cobrança Imediata)
+
+O sistema utiliza o endpoint de **Cobrança Imediata (Cob)** para gerar faturas Pix para reservas.
+
+### 1. Geração da Cobrança
+**Endpoint**: `POST https://cdpj.partners.bancointer.com.br/pix/v2/cob`  
+**Serviços Locais**: `Captain::Inter::CobService` e `Captain::InterService`.
+
+**Payload Exemplo**:
+```json
+{
+  "calendario": { "expiracao": 3600 },
+  "devedor": {
+    "cpf": "12345678900",
+    "nome": "Nome do Cliente"
+  },
+  "valor": { "original": "150.00" },
+  "chave": "sua-chave-pix@email.com",
+  "solicitacaoPagador": "Reserva #12345"
+}
+```
+
+### 2. Pix One-Tap (Link Seguro)
+Para melhorar a UX no WhatsApp, foi implementado o fluxo **One-Tap**:
+- Em vez de enviar o código bruto (geralmente muito longo), o bot envia um link curto: `https://seu-dominio/r/:token`.
+- O `:token` é um **SGID (Signed Global ID)** com expiração de 2 horas.
+- Ao abrir o link, o cliente vê uma página otimizada com o botão "Copiar Pix" e feedback visual.
+
+---
+
+## 🔗 Webhooks e Confirmação
+
+O Banco Inter notifica o sistema sobre o pagamento através de webhooks.
+
+- **Endpoint**: `POST /public/api/v1/captain/inter_webhooks`
+- **Controller**: `Public::Api::V1::Captain::InterWebhooksController`
+
+**Processamento**:
+1. Extração do `txid` (Transaction ID) e `endToEndId` (Identificador E2E do Banco Central).
+2. Verificação de idempotência (evita processar o mesmo pagamento duas vezes).
+3. Atualização do status da `Captain::PixCharge` para `paid`.
+4. Disparo do `Captain::Payments::ConfirmationService` para validar a reserva.
+5. Mensagem automática enviada via Chatwoot confirmando o pagamento para o cliente.
+
+---
+
+## 🛠️ Modelos de Dados Principais
+
+### `Captain::PixCharge`
+- Atributos: `txid`, `e2eid`, `status` (active, paid, expired, failed), `pix_copia_e_cola`.
+- Relações: `belongs_to :reservation`, `belongs_to :unit`.
+
+---
+
+## 📂 Localização dos Arquivos
+
+| Componente | Caminho |
+| :--- | :--- |
+| **Service Principal** | `app/services/captain/inter_service.rb` |
+| **Service Enterprise** | `enterprise/app/services/captain/inter/cob_service.rb` |
+| **Controller Webhook** | `app/controllers/public/api/v1/captain/inter_webhooks_controller.rb` |
+| **Model** | `enterprise/app/models/captain/pix_charge.rb` |
+| **Página de Pagamento** | `app/views/public/api/v1/captain/payments/show.html.erb` |
+
+---
+
+## 📝 Notas de Manutenção (Ressalvas)
+- **Encoding**: Foi corrigido um bug crítico onde a API do Inter retornava caracteres em encoding binário que causavam falha no Rails ao renderizar JSON. Sempre use `.force_encoding('UTF-8')` ao lidar com a resposta da API do Inter.
+- **Ambiente de Dev**: No ambiente de desenvolvimento local, o sistema sanitiza URLs de `0.0.0.0` para `127.0.0.1` para garantir que o link One-Tap seja acessível localmente.
+
+---
+*Documentação gerada em 23/02/2026 baseada na análise técnica do repositório local devido à instabilidade do Notion.*
