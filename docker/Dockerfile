@@ -25,7 +25,7 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml .pnpm-file.cjs ./
+COPY package.json pnpm-lock.yaml ./
 
 RUN npm install -g pnpm@${PNPM_VERSION}
 ENV PATH="$PNPM_HOME:$PATH"
