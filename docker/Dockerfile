@@ -47,11 +47,17 @@ RUN pnpm config set store-dir /pnpm/store \
 COPY . .
 
 # Generate production assets
-RUN SECRET_KEY_BASE=precompile_placeholder RAILS_LOG_TO_STDOUT=enabled bundle exec rake assets:precompile \
+# Usando RAILS_ENV=production explicitamente e garantindo que não tente conectar ao DB/Redis
+RUN bundle exec rake assets:precompile \
+  RAILS_ENV=production \
+  SECRET_KEY_BASE=placeholder_for_compilation \
+  RAILS_LOG_TO_STDOUT=enabled \
+  DATABASE_URL=postgresql://fake_user:fake_password@localhost:5432/fake_db \
+  REDIS_URL=redis://localhost:6379/0 \
   && rm -rf spec node_modules tmp/cache
 
 # Generate .git_sha file
-RUN git rev-parse HEAD > /app/.git_sha
+RUN git rev-parse HEAD > /app/.git_sha || echo "no-git" > /app/.git_sha
 
 # final build stage
 FROM ruby:3.4.4-alpine3.21
@@ -59,8 +65,8 @@ FROM ruby:3.4.4-alpine3.21
 ARG PNPM_VERSION="10.2.0"
 ENV PNPM_VERSION=${PNPM_VERSION}
 
+# Adicionando dependências de runtime necessárias para as gemas compiladas
 RUN apk update && apk add --no-cache \
-  build-base \
   openssl \
   tzdata \
   postgresql-client \
@@ -68,7 +74,10 @@ RUN apk update && apk add --no-cache \
   git \
   vips \
   ffmpeg \
-  shared-mime-info
+  shared-mime-info \
+  libstdc++ \
+  libffi \
+  gcompat
 
 WORKDIR /app
 
