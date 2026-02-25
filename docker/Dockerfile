@@ -1,57 +1,33 @@
 # pre-build stage
-FROM node:24-alpine as node
+FROM node:23-alpine as node
+
 FROM ruby:3.4.4-alpine3.21 AS pre-builder
 
-ARG NODE_VERSION="24.13.0"
 ARG PNPM_VERSION="10.2.0"
-ENV NODE_VERSION=${NODE_VERSION}
 ENV PNPM_VERSION=${PNPM_VERSION}
 
-# ARG default to production settings
-# For development docker-compose file overrides ARGS
-ARG BUNDLE_WITHOUT="development:test"
-ENV BUNDLE_WITHOUT ${BUNDLE_WITHOUT}
-ENV BUNDLER_VERSION=2.5.16
-
-ARG RAILS_SERVE_STATIC_FILES=true
-ENV RAILS_SERVE_STATIC_FILES ${RAILS_SERVE_STATIC_FILES}
-
-ARG RAILS_ENV=production
-ENV RAILS_ENV ${RAILS_ENV}
-
-ARG NODE_OPTIONS="--max-old-space-size=4096 --openssl-legacy-provider"
-ENV NODE_OPTIONS ${NODE_OPTIONS}
-
-ENV BUNDLE_PATH="/gems"
-
-RUN apk update && apk add --no-cache \
-  openssl \
-  tar \
-  build-base \
-  tzdata \
-  postgresql-dev \
-  postgresql-client \
-  git \
-  curl \
-  xz \
-  && mkdir -p /var/app \
-  && gem install bundler -v "$BUNDLER_VERSION"
-
-COPY --from=node /usr/local/bin/node /usr/local/bin/
+# install node
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+COPY --from=node /usr/local/include/node /usr/local/include/node
+RUN ln -s /usr/local/bin/node /usr/local/bin/nodejs \
+  && ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
   && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 
+RUN apk add --no-cache \
+  build-base \
+  git \
+  nodejs \
+  npm \
+  tzdata \
+  shared-mime-info \
+  vips-dev
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml .pnpm-file.cjs ./
+
 RUN npm install -g pnpm@${PNPM_VERSION}
-
-RUN echo 'export PNPM_HOME="/root/.local/share/pnpm"' >> /root/.shrc \
-  && echo 'export PATH="$PNPM_HOME:$PATH"' >> /root/.shrc \
-  && export PNPM_HOME="/root/.local/share/pnpm" \
-  && export PATH="$PNPM_HOME:$PATH" \
-  && pnpm --version
-
-# Persist the environment variables in Docker
-ENV PNPM_HOME="/root/.local/share/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 
 WORKDIR /app
@@ -71,8 +47,9 @@ RUN if [ "$RAILS_ENV" = "production" ]; then \
   else bundle install -j 4 -r 3; \
   fi
 
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm i
+COPY package.json pnpm-lock.yaml .pnpm-file.cjs ./
+RUN pnpm config set store-dir /pnpm/store
+RUN --mount=type=cache,target=/pnpm/store pnpm i --frozen-lockfile
 
 COPY . /app
 

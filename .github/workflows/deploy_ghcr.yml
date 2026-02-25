@@ -70,7 +70,7 @@ jobs:
             NODE_ENV=production
 
           # Publica por digest e deixa o merge job criar a tag multi-arch final
-          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,push=true
 
           # Cache em dois níveis:
           # 1) GHA por branch+arquitetura (hit rápido no fluxo atual)
