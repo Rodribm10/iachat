@@ -109,6 +109,38 @@ RSpec.describe Webhooks::WhatsappEventsJob do
     end
   end
 
+  context 'when phone number format differs in webhook payload' do
+    it 'finds channel by normalized phone number and processes event' do
+      wuzapi_channel = create(
+        :channel_whatsapp,
+        provider: 'wuzapi',
+        phone_number: '+55 (61) 99186-8492',
+        sync_templates: false,
+        validate_provider_config: false
+      )
+      wuzapi_params = {
+        phone_number: '5561991868492',
+        type: 'Message',
+        event: {
+          Info: {
+            ID: '3A721AC0A215F23ACFA9',
+            IsFromMe: false,
+            IsGroup: false,
+            Type: 'text',
+            Sender: '556182098580@s.whatsapp.net',
+            Timestamp: Time.current.iso8601
+          },
+          Message: { conversation: 'Ola terse' }
+        }
+      }
+
+      allow(Whatsapp::IncomingMessageWuzapiService).to receive(:new).and_return(process_service)
+      expect(Whatsapp::IncomingMessageWuzapiService).to receive(:new).with(inbox: wuzapi_channel.inbox, params: wuzapi_params)
+
+      job.perform_now(wuzapi_params)
+    end
+  end
+
   context 'when whatsapp business params' do
     it 'enqueue Whatsapp::IncomingMessageWhatsappCloudService based on the number in payload' do
       other_channel = create(:channel_whatsapp, phone_number: '+1987654', provider: 'whatsapp_cloud', sync_templates: false,

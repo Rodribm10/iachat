@@ -46,6 +46,16 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response.parsed_body['error']).to eq('Inactive WhatsApp number')
       end
+
+      it 'returns service unavailable even when incoming phone has different formatting' do
+        allow(Rails.logger).to receive(:warn)
+        allow(GlobalConfig).to receive(:get_value).with('INACTIVE_WHATSAPP_NUMBERS').and_return('+55 (61) 91234-5678')
+
+        post '/webhooks/whatsapp/5561912345678', params: { content: 'hello' }
+
+        expect(Rails.logger).to have_received(:warn).with('Rejected webhook for inactive WhatsApp number: 5561912345678')
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
     end
 
     context 'when INACTIVE_WHATSAPP_NUMBERS config is not set' do

@@ -30,19 +30,33 @@ class Webhooks::WhatsappController < ActionController::API
   end
 
   def valid_token?(token)
-    channel = Channel::Whatsapp.find_by(phone_number: params[:phone_number])
+    channel = find_channel_by_phone_number(params[:phone_number])
     whatsapp_webhook_verify_token = channel.provider_config['webhook_verify_token'] if channel.present?
     token == whatsapp_webhook_verify_token if whatsapp_webhook_verify_token.present?
   end
 
   def inactive_whatsapp_number?
-    phone_number = params[:phone_number]
+    phone_number = normalize_phone(params[:phone_number])
     return false if phone_number.blank?
 
     inactive_numbers = GlobalConfig.get_value('INACTIVE_WHATSAPP_NUMBERS').to_s
     return false if inactive_numbers.blank?
 
     inactive_numbers_array = inactive_numbers.split(',').map(&:strip)
-    inactive_numbers_array.include?(phone_number)
+    inactive_numbers_array.map { |number| normalize_phone(number) }.include?(phone_number)
+  end
+
+  def find_channel_by_phone_number(phone_number)
+    raw_phone = phone_number.to_s.strip
+    digits_only = normalize_phone(raw_phone)
+    return if raw_phone.blank? && digits_only.blank?
+
+    Channel::Whatsapp.find_by(phone_number: raw_phone) ||
+      Channel::Whatsapp.find_by(phone_number: "+#{digits_only}") ||
+      Channel::Whatsapp.where("regexp_replace(phone_number, '[^0-9]', '', 'g') = ?", digits_only).first
+  end
+
+  def normalize_phone(phone_number)
+    phone_number.to_s.gsub(/\D/, '')
   end
 end

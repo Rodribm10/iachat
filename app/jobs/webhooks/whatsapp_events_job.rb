@@ -79,7 +79,7 @@ class Webhooks::WhatsappEventsJob < ApplicationJob
 
     return unless params[:phone_number]
 
-    Channel::Whatsapp.find_by(phone_number: params[:phone_number])
+    find_channel_by_phone_number(params[:phone_number])
   end
 
   def channel_is_inactive?(channel)
@@ -96,8 +96,18 @@ class Webhooks::WhatsappEventsJob < ApplicationJob
     # we will give priority to the phone_number in the payload
     phone_number = "+#{params[:entry].first[:changes].first.dig(:value, :metadata, :display_phone_number)}"
     phone_number_id = params[:entry].first[:changes].first.dig(:value, :metadata, :phone_number_id)
-    channel = Channel::Whatsapp.find_by(phone_number: phone_number)
+    channel = find_channel_by_phone_number(phone_number)
     # validate to ensure the phone number id matches the whatsapp channel
     channel if channel && channel.provider_config['phone_number_id'] == phone_number_id
+  end
+
+  def find_channel_by_phone_number(phone_number)
+    raw_phone = phone_number.to_s.strip
+    digits_only = raw_phone.gsub(/\D/, '')
+    return if raw_phone.blank? && digits_only.blank?
+
+    Channel::Whatsapp.find_by(phone_number: raw_phone) ||
+      Channel::Whatsapp.find_by(phone_number: "+#{digits_only}") ||
+      Channel::Whatsapp.where("regexp_replace(phone_number, '[^0-9]', '', 'g') = ?", digits_only).first
   end
 end
