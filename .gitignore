@@ -128,3 +128,4 @@ Thumbs.db
 .claude/
 .env.aios
 .env.backup*
+reference/chatwoot-develop
