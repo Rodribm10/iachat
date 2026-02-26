@@ -53,5 +53,31 @@ RSpec.describe 'Api::V1::Accounts::Captain::Units', type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(response.parsed_body['errors'].join).to match(/só pode ser habilitado/i)
     end
+
+    it 'creates a default brand automatically when account has no captain brand' do
+      account_with_no_brand = create(:account)
+      admin_without_brand = create(:user, account: account_with_no_brand, role: :administrator)
+
+      params = {
+        captain_unit: {
+          name: 'Hotel Sem Marca',
+          inter_client_id: 'cid',
+          inter_client_secret: 'csecret',
+          inter_pix_key: '12345678901',
+          inter_account_number: '210339349'
+        }
+      }
+
+      expect(Captain::Brand.where(account_id: account_with_no_brand.id).count).to eq(0)
+
+      post "/api/v1/accounts/#{account_with_no_brand.id}/captain/units",
+           params: params,
+           headers: admin_without_brand.create_new_auth_token
+
+      expect(response).to have_http_status(:created)
+      brands = Captain::Brand.where(account_id: account_with_no_brand.id)
+      expect(brands.count).to eq(1)
+      expect(Captain::Unit.last.captain_brand_id).to eq(brands.first.id)
+    end
   end
 end

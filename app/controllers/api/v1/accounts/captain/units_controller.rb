@@ -13,7 +13,7 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
 
   def create
     @unit = Current.account.captain_units.build(unit_params)
-    @unit.captain_brand_id ||= Captain::Brand.where(account_id: Current.account.id).first&.id
+    @unit.captain_brand_id ||= default_brand.id
     ActiveRecord::Base.transaction do
       @unit.save!
       sync_inbox_link!(@unit)
@@ -42,6 +42,14 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
 
   def ensure_captain_enabled
     # Dependendo da regra de negócio, pode-se verificar as features da conta aqui original
+  end
+
+  def default_brand
+    @default_brand ||= Captain::Brand.where(account_id: Current.account.id).first ||
+                       Captain::Brand.create!(
+                         account_id: Current.account.id,
+                         name: 'Marca padrão'
+                       )
   end
 
   def set_unit

@@ -133,8 +133,11 @@ export default {
         this.$router.push({ name: 'captain_settings_units' });
       } catch (error) {
         const action = this.isNew ? 'ADD' : 'EDIT';
+        const apiError =
+          error?.response?.data?.errors?.join(' | ') ||
+          error?.response?.data?.message;
         useAlert(
-          error?.response?.data?.message ||
+          apiError ||
             // eslint-disable-next-line
             this.$t(`CAPTAIN_SETTINGS.UNITS.${action}.API.ERROR_MESSAGE`)
         );
