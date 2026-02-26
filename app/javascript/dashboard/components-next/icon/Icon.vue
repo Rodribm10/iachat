@@ -7,8 +7,12 @@ const props = defineProps({
 
 const renderIcon = () => {
   if (!props.icon) return null;
-  if (typeof props.icon === 'function' || isVNode(props.icon)) {
+  if (isVNode(props.icon)) {
     return props.icon;
+  }
+  if (typeof props.icon === 'function') {
+    const resolved = props.icon();
+    return isVNode(resolved) ? resolved : h(props.icon);
   }
   return h('span', { class: props.icon });
 };

@@ -100,13 +100,19 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
   def humanized_delay(response_text)
     return if response_text.blank?
 
-    # Simulação: ~45ms por caracter (digitadores rápidos / humanos focados)
-    typing_speed = 45
-    target_delay = (response_text.length * typing_speed) / 1000.0
+    text = response_text.to_s
+    words_count = text.scan(/\b[\p{L}\p{N}]+\b/u).size
+    chars_count = text.length
+    punctuation_pauses = text.count(',.!?;:')
 
-    # Limite Mínimo (2s) para não parecer robótico demais em palavras como "Sim".
-    # Limite Máximo (7s) para não prender a UI do chat por longo tempo dando ansiedade ao usuário
-    target_delay = target_delay.clamp(2.0, 7.0)
+    # Modela tempo de digitação de forma mais humana:
+    # - base por palavra (mais estável para textos longos),
+    # - ajuste por tamanho,
+    # - pequenas pausas por pontuação,
+    # - jitter para não repetir sempre o mesmo tempo.
+    base_time = (words_count * 0.32) + (chars_count * 0.01) + (punctuation_pauses * 0.18)
+    jitter = 0.85 + (rand * 0.35)
+    target_delay = (base_time * jitter).clamp(1.8, 18.0)
 
     elapsed_time = Time.zone.now - @start_time
     remaining_delay = target_delay - elapsed_time

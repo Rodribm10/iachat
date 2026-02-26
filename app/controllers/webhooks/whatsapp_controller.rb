@@ -14,6 +14,12 @@ class Webhooks::WhatsappController < ActionController::API
   private
 
   def perform_whatsapp_events_job
+    if ignorable_wuzapi_status_event?
+      Rails.logger.info("Ignoring WuzAPI status broadcast event for #{params[:phone_number]}")
+      head :ok
+      return
+    end
+
     perform_sync if params[:awaitResponse].present?
     return if performed?
 
@@ -58,5 +64,11 @@ class Webhooks::WhatsappController < ActionController::API
 
   def normalize_phone(phone_number)
     phone_number.to_s.gsub(/\D/, '')
+  end
+
+  def ignorable_wuzapi_status_event?
+    params[:type].to_s == 'Message' &&
+      (params.dig(:event, :Info, :Chat).to_s == 'status@broadcast' ||
+        params.dig(:event, :Chat).to_s == 'status@broadcast')
   end
 end

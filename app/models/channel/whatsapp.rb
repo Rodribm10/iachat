@@ -25,7 +25,7 @@
 #  index_channel_whatsapp_provider_connection  (provider_connection) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying])::text[])) USING gin
 #
 
-class Channel::Whatsapp < ApplicationRecord
+class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLength
   include Channelable
   include Reauthorizable
 
@@ -203,22 +203,11 @@ class Channel::Whatsapp < ApplicationRecord
   end
 
   def move_tokens_to_encrypted_attributes
-    if (provider == 'evolution') && provider_config['evolution_api_token'].present?
-      self.evolution_api_token = provider_config['evolution_api_token']
-      provider_config.delete('evolution_api_token')
-    end
-
+    move_evolution_token_to_encrypted_attribute
     return unless provider == 'wuzapi'
 
-    if provider_config['wuzapi_user_token'].present?
-      self.wuzapi_user_token = provider_config['wuzapi_user_token']
-      provider_config.delete('wuzapi_user_token')
-    end
-
-    return if provider_config['wuzapi_admin_token'].blank?
-
-    self.wuzapi_admin_token = provider_config['wuzapi_admin_token']
-    provider_config.delete('wuzapi_admin_token')
+    move_wuzapi_user_token_to_encrypted_attribute
+    move_wuzapi_admin_token_to_encrypted_attribute
   end
 
   def validate_provider_config
@@ -226,53 +215,11 @@ class Channel::Whatsapp < ApplicationRecord
   end
 
   def perform_webhook_setup
-    if provider == 'wuzapi'
-      return if inbox.blank?
+    return setup_wuzapi_webhook if provider == 'wuzapi'
+    return setup_evolution_webhook if provider == 'evolution'
+    return provider_service.setup_channel_provider if provider_service.respond_to?(:setup_channel_provider)
 
-      base_url = provider_config['wuzapi_base_url']
-      # Use encrypted token
-      user_token = wuzapi_user_token
-
-      return if user_token.blank?
-
-      # Construct Chatwoot Webhook URL
-      # Using standard route: /webhooks/whatsapp/:phone_number for WuzAPI as per fix
-      app_url = ENV['FRONTEND_URL'].presence || 'http://localhost:3000'
-      webhook_url = "#{app_url}/webhooks/whatsapp/#{phone_number}"
-
-      begin
-        client = Wuzapi::Client.new(base_url)
-        client.set_webhook(user_token, webhook_url)
-      rescue StandardError => e
-        Rails.logger.error "Wuzapi Webhook Setup Failed: #{e.message}"
-      end
-    elsif provider == 'evolution'
-      return if inbox.blank?
-
-      base_url = provider_config['evolution_base_url']
-      api_token = evolution_api_token
-
-      return if api_token.blank?
-
-      app_url = ENV['FRONTEND_URL'].presence || 'http://localhost:3000'
-      webhook_url = "#{app_url}/webhooks/evolution/#{phone_number}"
-
-      begin
-        client = EvolutionApi::Client.new(base_url, api_token)
-        instance_name = "Chatwoot_#{phone_number}"
-        client.set_webhook(instance_name, webhook_url)
-      rescue StandardError => e
-        Rails.logger.error "Evolution Webhook Setup Failed: #{e.message}"
-      end
-    elsif provider_service.respond_to?(:setup_channel_provider)
-      provider_service.setup_channel_provider
-    else
-      # 360Dialog / Cloud logic
-      business_account_id = provider_config['business_account_id']
-      api_key = provider_config['api_key']
-
-      Whatsapp::WebhookSetupService.new(self, business_account_id, api_key).perform
-    end
+    setup_default_webhook
   end
 
   def teardown_webhooks
@@ -291,79 +238,18 @@ class Channel::Whatsapp < ApplicationRecord
     return if provider_config['wuzapi_base_url'].blank?
 
     client = Wuzapi::Client.new(provider_config['wuzapi_base_url'])
-
-    # 1. Try Logout (User Token)
-    if wuzapi_user_token.present?
-      begin
-        client.session_logout(wuzapi_user_token)
-      rescue StandardError => e
-        Rails.logger.warn "Wuzapi Logout Failed: #{e.message}"
-      end
-
-      # 2. Try Disconnect (User Token)
-      begin
-        client.session_disconnect(wuzapi_user_token)
-      rescue StandardError => e
-        Rails.logger.warn "Wuzapi Disconnect Failed: #{e.message}"
-      end
-    end
-
-    # 3. Last Resort: Delete User via Admin API (Global Token)
-    return unless wuzapi_admin_token.present? && provider_config['wuzapi_user_id'].present?
-
-    begin
-      client.delete_user(wuzapi_admin_token, provider_config['wuzapi_user_id'])
-    rescue StandardError => e
-      Rails.logger.warn "Wuzapi Delete User Failed: #{e.message}"
-    end
+    disconnect_wuzapi_user_session(client)
+    delete_wuzapi_user_with_admin_token(client)
   end
 
   def provision_wuzapi_user
     return unless provider == 'wuzapi' && provider_config['auto_create_user']
     return if wuzapi_user_token.present?
 
-    base_url = provider_config['wuzapi_base_url']
-    # Use encrypted admin token
     admin_token = wuzapi_admin_token
-
-    # Custom Name: <InboxName>_<Phone>
-    # Sanitize to allow only alphanumeric (Wuzapi limitations)
-    raw_name = inbox&.name || inbox_name_for_provisioning
-    sanitized_inbox_name = raw_name.to_s.gsub(/[^a-zA-Z0-9]/, '_')
-    prefix = (sanitized_inbox_name.presence || 'Chatwoot')
-    user_name = "#{prefix}_#{phone_number}"
-
-    # Helper to attempt provision
-    attempt_provision = lambda do |url|
-      service = Wuzapi::ProvisioningService.new(url, admin_token)
-      service.provision(user_name)
-    end
-
-    begin
-      result = attempt_provision.call(base_url)
-    rescue StandardError => e
-      Rails.logger.warn "Wuzapi Provisioning failed with URL #{base_url}: #{e.message}"
-      # Fallback: if url ends in /api, strip it and try again
-      if base_url.match?(%r{/api/?$})
-        fallback_url = base_url.gsub(%r{/api/?$}, '')
-        Rails.logger.info "Retrying Wuzapi Provisioning with fallback URL: #{fallback_url}"
-        begin
-          result = attempt_provision.call(fallback_url)
-          # If success, update the config to use the working URL
-          provider_config['wuzapi_base_url'] = fallback_url
-          Rails.logger.info "Wuzapi Provisioning fallback successful. Updated base_url to #{fallback_url}"
-        rescue StandardError => retry_e
-          Rails.logger.error "Wuzapi Provisioning fallback also failed: #{retry_e.message}"
-          errors.add(:base, "Wuzapi Provisioning Failed: #{retry_e.message}")
-          throw(:abort)
-        end
-      else
-        errors.add(:base, "Wuzapi Provisioning Failed: #{e.message}")
-        throw(:abort)
-      end
-    end
-
-    # Success handling
+    base_url = provider_config['wuzapi_base_url']
+    user_name = build_wuzapi_user_name
+    result = provision_wuzapi_user_with_fallback(base_url, admin_token, user_name)
     provider_config['wuzapi_user_id'] = result[:wuzapi_user_id]
     self.wuzapi_user_token = result[:wuzapi_user_token]
 
@@ -394,45 +280,159 @@ class Channel::Whatsapp < ApplicationRecord
     return unless provider == 'evolution'
     return if evolution_api_token.blank?
 
-    base_url = provider_config['evolution_base_url']
-    token = evolution_api_token
-    instance_name = "Chatwoot_#{phone_number}"
-
     begin
-      client = EvolutionApi::Client.new(base_url, token)
-      # Tenta criar a instância; se já existe, não tem problema fahar, usamos a mesma ou damos fetch no token
-      begin
-        client.create_instance(instance_name)
-      rescue StandardError => e
-        Rails.logger.warn "Evolution Create Instance failed (might already exist): #{e.message}"
-      end
-
-      # Apply instances settings if present in provider_config
-      evolution_settings = provider_config['settings']
-      if evolution_settings.is_a?(Hash)
-        begin
-          # Set settings (Always Online)
-          client.set_settings(instance_name, {
-                                'alwaysOnline' => evolution_settings['always_online'] == 'true' || evolution_settings['always_online'] == true
-                              })
-
-          # Set instance settings (Reject Call, Read, groups, status)
-          client.set_instance_settings(instance_name, {
-                                         'rejectCall' => evolution_settings['reject_call'] == 'true' || evolution_settings['reject_call'] == true,
-                                         'readMessages' => evolution_settings['read_messages'] == 'true' || evolution_settings['read_messages'] == true,
-                                         'ignoreGroups' => evolution_settings['ignore_groups'] == 'true' || evolution_settings['ignore_groups'] == true,
-                                         'ignoreStatus' => evolution_settings['ignore_status'] == 'true' || evolution_settings['ignore_status'] == true
-                                       })
-        rescue StandardError => e
-          Rails.logger.warn "Evolution Apply Settings failed: #{e.message}"
-        end
-      end
-      # Success: Store the instance ID
+      instance_name = "Chatwoot_#{phone_number}"
+      client = EvolutionApi::Client.new(provider_config['evolution_base_url'], evolution_api_token)
+      create_evolution_instance(client, instance_name)
+      apply_evolution_instance_settings(client, instance_name)
       provider_config['evolution_instance_id'] = instance_name
     rescue StandardError => e
       Rails.logger.error "Evolution Provisioning failed: #{e.message}"
       errors.add(:base, "Evolution Provisioning Failed: #{e.message}")
       throw(:abort)
     end
+  end
+
+  def move_evolution_token_to_encrypted_attribute
+    return unless provider == 'evolution'
+    return if provider_config['evolution_api_token'].blank?
+
+    self.evolution_api_token = provider_config['evolution_api_token']
+    provider_config.delete('evolution_api_token')
+  end
+
+  def move_wuzapi_user_token_to_encrypted_attribute
+    return if provider_config['wuzapi_user_token'].blank?
+
+    self.wuzapi_user_token = provider_config['wuzapi_user_token']
+    provider_config.delete('wuzapi_user_token')
+  end
+
+  def move_wuzapi_admin_token_to_encrypted_attribute
+    return if provider_config['wuzapi_admin_token'].blank?
+
+    self.wuzapi_admin_token = provider_config['wuzapi_admin_token']
+    provider_config.delete('wuzapi_admin_token')
+  end
+
+  def setup_wuzapi_webhook
+    return if inbox.blank?
+    return if wuzapi_user_token.blank?
+
+    client = Wuzapi::Client.new(provider_config['wuzapi_base_url'])
+    client.set_webhook(wuzapi_user_token, wuzapi_webhook_url)
+  rescue StandardError => e
+    Rails.logger.error "Wuzapi Webhook Setup Failed: #{e.message}"
+  end
+
+  def setup_evolution_webhook
+    return if inbox.blank?
+    return if evolution_api_token.blank?
+
+    client = EvolutionApi::Client.new(provider_config['evolution_base_url'], evolution_api_token)
+    client.set_webhook("Chatwoot_#{phone_number}", evolution_webhook_url)
+  rescue StandardError => e
+    Rails.logger.error "Evolution Webhook Setup Failed: #{e.message}"
+  end
+
+  def setup_default_webhook
+    business_account_id = provider_config['business_account_id']
+    api_key = provider_config['api_key']
+    Whatsapp::WebhookSetupService.new(self, business_account_id, api_key).perform
+  end
+
+  def wuzapi_webhook_url
+    app_url = ENV['FRONTEND_URL'].presence || 'http://localhost:3000'
+    webhook_phone = phone_number.to_s.gsub(/\D/, '')
+    "#{app_url}/webhooks/whatsapp/#{webhook_phone}"
+  end
+
+  def evolution_webhook_url
+    app_url = ENV['FRONTEND_URL'].presence || 'http://localhost:3000'
+    "#{app_url}/webhooks/evolution/#{phone_number}"
+  end
+
+  def disconnect_wuzapi_user_session(client)
+    return if wuzapi_user_token.blank?
+
+    safely_with_wuzapi_log('Logout') { client.session_logout(wuzapi_user_token) }
+    safely_with_wuzapi_log('Disconnect') { client.session_disconnect(wuzapi_user_token) }
+  end
+
+  def delete_wuzapi_user_with_admin_token(client)
+    return unless wuzapi_admin_token.present? && provider_config['wuzapi_user_id'].present?
+
+    safely_with_wuzapi_log('Delete User') do
+      client.delete_user(wuzapi_admin_token, provider_config['wuzapi_user_id'])
+    end
+  end
+
+  def safely_with_wuzapi_log(action)
+    yield
+  rescue StandardError => e
+    Rails.logger.warn "Wuzapi #{action} Failed: #{e.message}"
+  end
+
+  def build_wuzapi_user_name
+    raw_name = inbox&.name || inbox_name_for_provisioning
+    sanitized_inbox_name = raw_name.to_s.gsub(/[^a-zA-Z0-9]/, '_')
+    prefix = sanitized_inbox_name.presence || 'Chatwoot'
+    "#{prefix}_#{phone_number}"
+  end
+
+  def provision_wuzapi_user_with_fallback(base_url, admin_token, user_name)
+    provision_wuzapi_user_for_url(base_url, admin_token, user_name)
+  rescue StandardError => e
+    handle_wuzapi_provision_failure(base_url, admin_token, user_name, e)
+  end
+
+  def provision_wuzapi_user_for_url(url, admin_token, user_name)
+    service = Wuzapi::ProvisioningService.new(url, admin_token)
+    service.provision(user_name)
+  end
+
+  def handle_wuzapi_provision_failure(base_url, admin_token, user_name, error)
+    Rails.logger.warn "Wuzapi Provisioning failed with URL #{base_url}: #{error.message}"
+    raise error unless base_url.match?(%r{/api/?$})
+
+    fallback_url = base_url.gsub(%r{/api/?$}, '')
+    Rails.logger.info "Retrying Wuzapi Provisioning with fallback URL: #{fallback_url}"
+    result = provision_wuzapi_user_for_url(fallback_url, admin_token, user_name)
+    provider_config['wuzapi_base_url'] = fallback_url
+    Rails.logger.info "Wuzapi Provisioning fallback successful. Updated base_url to #{fallback_url}"
+    result
+  rescue StandardError => e
+    Rails.logger.error "Wuzapi Provisioning fallback also failed: #{e.message}"
+    errors.add(:base, "Wuzapi Provisioning Failed: #{e.message}")
+    throw(:abort)
+  end
+
+  def create_evolution_instance(client, instance_name)
+    client.create_instance(instance_name)
+  rescue StandardError => e
+    Rails.logger.warn "Evolution Create Instance failed (might already exist): #{e.message}"
+  end
+
+  def apply_evolution_instance_settings(client, instance_name)
+    evolution_settings = provider_config['settings']
+    return unless evolution_settings.is_a?(Hash)
+
+    client.set_settings(instance_name, { 'alwaysOnline' => to_boolean(evolution_settings['always_online']) })
+    client.set_instance_settings(instance_name, evolution_instance_settings_payload(evolution_settings))
+  rescue StandardError => e
+    Rails.logger.warn "Evolution Apply Settings failed: #{e.message}"
+  end
+
+  def evolution_instance_settings_payload(evolution_settings)
+    {
+      'rejectCall' => to_boolean(evolution_settings['reject_call']),
+      'readMessages' => to_boolean(evolution_settings['read_messages']),
+      'ignoreGroups' => to_boolean(evolution_settings['ignore_groups']),
+      'ignoreStatus' => to_boolean(evolution_settings['ignore_status'])
+    }
+  end
+
+  def to_boolean(value)
+    value == true || value == 'true'
   end
 end

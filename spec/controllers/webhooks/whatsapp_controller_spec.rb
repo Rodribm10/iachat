@@ -99,5 +99,24 @@ RSpec.describe 'Webhooks::WhatsappController', type: :request do
         expect(response).to have_http_status(:not_found)
       end
     end
+
+    context 'when payload is WuzAPI status broadcast event' do
+      it 'returns ok without enqueuing job' do
+        allow(Webhooks::WhatsappEventsJob).to receive(:perform_later)
+
+        post '/webhooks/whatsapp/556133712229', params: {
+          type: 'Message',
+          event: {
+            Info: {
+              Chat: 'status@broadcast',
+              Type: 'media'
+            }
+          }
+        }
+
+        expect(Webhooks::WhatsappEventsJob).not_to have_received(:perform_later)
+        expect(response).to have_http_status(:ok)
+      end
+    end
   end
 end

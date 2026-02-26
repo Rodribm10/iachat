@@ -13,7 +13,7 @@ module Concerns::CaptainToolsHelpers
     #
     # @return [Array<Hash>] Array of tool hashes with :id, :title, :description, :icon
     def built_in_agent_tools
-      @built_in_agent_tools ||= load_agent_tools
+      load_agent_tools
     end
 
     # Resolves a tool class from a tool ID.
@@ -22,7 +22,9 @@ module Concerns::CaptainToolsHelpers
     # @param tool_id [String] The snake_case tool identifier
     # @return [Class, nil] The tool class if found, nil if not resolvable
     def resolve_tool_class(tool_id)
-      class_name = "Captain::Tools::#{tool_id.classify}Tool"
+      # Use camelize instead of classify to avoid singularization issues
+      # (e.g. send_suite_images -> SendSuiteImagesTool).
+      class_name = "Captain::Tools::#{tool_id.to_s.camelize}Tool"
       class_name.safe_constantize
     end
 
@@ -31,7 +33,7 @@ module Concerns::CaptainToolsHelpers
     #
     # @return [Array<String>] Array of built-in tool IDs
     def built_in_tool_ids
-      @built_in_tool_ids ||= built_in_agent_tools.map { |tool| tool[:id] }
+      built_in_agent_tools.map { |tool| tool[:id] }
     end
 
     private

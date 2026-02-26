@@ -41,7 +41,7 @@ class Api::V1::Accounts::Inboxes::WuzapiController < Api::V1::Accounts::BaseCont
 
   def connect
     # Trigger connection (if needed by Wuzapi flow)
-
+    ensure_webhook_is_configured
     result = client.session_connect(user_token)
     render json: result
   rescue Wuzapi::Client::Error => e
@@ -79,7 +79,7 @@ class Api::V1::Accounts::Inboxes::WuzapiController < Api::V1::Accounts::BaseCont
 
   def update_webhook
     # Re-calculate correct webhook URL from model
-    url = @inbox.channel.webhook_url
+    url = expected_webhook_url
     client.update_webhook(user_token, url)
     render json: { success: true, message: 'Webhook updated successfully', webhook_url: url }
   rescue Wuzapi::Client::Error => e
@@ -113,6 +113,16 @@ class Api::V1::Accounts::Inboxes::WuzapiController < Api::V1::Accounts::BaseCont
       Rails.logger.info "Wuzapi Request using Token (last 6): ******#{token.to_s[-6..]}"
     end
     token
+  end
+
+  def ensure_webhook_is_configured
+    client.set_webhook(user_token, expected_webhook_url)
+  rescue Wuzapi::Client::Error => e
+    Rails.logger.warn "Wuzapi webhook pre-connect setup failed for inbox #{@inbox.id}: #{e.message}"
+  end
+
+  def expected_webhook_url
+    @expected_webhook_url ||= @inbox.callback_webhook_url.to_s.sub('/webhooks/whatsapp/+', '/webhooks/whatsapp/')
   end
 
   def already_connected?(status)
