@@ -3,8 +3,8 @@ name: Build and Push to GHCR (multi-arch)
 on:
   push:
     branches:
-      - chatwoot-jasmine
-      - main
+      - '**'
+
   workflow_dispatch:
 
 env:
