@@ -111,6 +111,9 @@ class Captain::Assistant < ApplicationRecord
       name: name,
       description: description,
       product_name: config['product_name'] || 'this product',
+      current_date: Time.current.in_time_zone('Brasilia').strftime('%d/%m/%Y'),
+      current_time: Time.current.in_time_zone('Brasilia').strftime('%H:%M'),
+      current_timezone: 'Horário de Brasília (BRT/BRST)',
       scenarios: scenarios.enabled.map do |scenario|
         {
           title: scenario.title,

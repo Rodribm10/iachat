@@ -52,6 +52,9 @@ class Captain::Scenario < ApplicationRecord
       instructions: resolved_instructions,
       tools: resolved_tools,
       assistant_name: assistant.name.downcase.gsub(/\s+/, '_'),
+      current_date: Time.current.in_time_zone('Brasilia').strftime('%d/%m/%Y'),
+      current_time: Time.current.in_time_zone('Brasilia').strftime('%H:%M'),
+      current_timezone: 'Horário de Brasília (BRT/BRST)',
       response_guidelines: response_guidelines || [],
       guardrails: guardrails || []
     }

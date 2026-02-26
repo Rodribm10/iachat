@@ -46,7 +46,11 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
     @conversation ||= resolve_conversation(args, params)
     return error_response('Erro técnico ao enviar fotos. Não consegui identificar a conversa atual.') if @conversation.blank?
 
-    enrich_suite_filters_from_conversation!(actual_params)
+    if actual_params[:suite_category].blank? && actual_params[:suite_number].blank?
+      return error_response(
+        'Erro: Para buscar fotos, é obrigatório informar o parâmetro suite_category ou suite_number correspondente ao pedido do cliente.'
+      )
+    end
 
     selected_items = find_selected_items(actual_params)
     return no_images_response(actual_params) if selected_items.blank?
@@ -171,34 +175,6 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
     return items if items.blank?
 
     items.limit(normalize_limit(actual_params[:limit]))
-  end
-
-  def enrich_suite_filters_from_conversation!(actual_params)
-    return if normalize_filter(actual_params[:suite_number]).present?
-
-    inferred_suite = infer_suite_number_from_last_incoming_message
-    return if inferred_suite.blank?
-
-    actual_params[:suite_number] = inferred_suite
-  end
-
-  def infer_suite_number_from_last_incoming_message
-    text = last_incoming_text
-    return nil if text.blank?
-
-    # Captura "suite 110", "suíte 110", "suite n 110", "suite nº 110".
-    match = text.match(/\bsu[ií]te\s*(?:n(?:u|ú)?m(?:ero)?\.?\s*)?(?:n[ºo]\s*)?([a-z0-9_-]{1,20})\b/i)
-    return nil if match.blank?
-
-    normalize_filter(match[1])
-  end
-
-  def last_incoming_text
-    @conversation.messages
-                 .where(message_type: :incoming)
-                 .order(created_at: :desc)
-                 .limit(1)
-                 .pick(:content)
   end
 
   def send_images(items)
