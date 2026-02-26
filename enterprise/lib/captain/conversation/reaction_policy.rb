@@ -1,5 +1,6 @@
 module Captain::Conversation::ReactionPolicy
-  REACTION_SAMPLE_RATE = 5
+  REACTION_SAMPLE_RATE = 20
+  REACTION_SAMPLE_THRESHOLD = 7
   GREETING_PATTERNS = [
     /\boi\b/,
     /\bola\b/,
@@ -10,6 +11,17 @@ module Captain::Conversation::ReactionPolicy
     /\bhello\b/,
     /\bhi\b/,
     /\bhey\b/
+  ].freeze
+  GRATITUDE_PATTERNS = [
+    /\bobrigad[oa]\b/,
+    /\bobg\b/,
+    /\bvaleu\b/,
+    /\bagradeco\b/,
+    /\bagradecid[oa]\b/,
+    /\bthanks\b/,
+    /\bthank you\b/,
+    /\bthx\b/,
+    /\bty\b/
   ].freeze
   FAREWELL_PATTERNS = [
     /\btchau\b/,
@@ -27,19 +39,20 @@ module Captain::Conversation::ReactionPolicy
   def should_send_reaction_for?(target_message)
     return false if @response['reaction_emoji'].blank?
     return false if target_message.blank?
-    return true if greeting_or_farewell?(target_message.content)
+    return true if greeting_farewell_or_gratitude?(target_message.content)
 
     sampled_reaction_slot?(target_message)
   end
 
   def sampled_reaction_slot?(target_message)
-    (target_message.id % REACTION_SAMPLE_RATE).zero?
+    (target_message.id % REACTION_SAMPLE_RATE) < REACTION_SAMPLE_THRESHOLD
   end
 
-  def greeting_or_farewell?(text)
+  def greeting_farewell_or_gratitude?(text)
     normalized = normalize_reaction_text(text)
     GREETING_PATTERNS.any? { |pattern| normalized.match?(pattern) } ||
-      FAREWELL_PATTERNS.any? { |pattern| normalized.match?(pattern) }
+      FAREWELL_PATTERNS.any? { |pattern| normalized.match?(pattern) } ||
+      GRATITUDE_PATTERNS.any? { |pattern| normalized.match?(pattern) }
   end
 
   def normalize_reaction_text(text)

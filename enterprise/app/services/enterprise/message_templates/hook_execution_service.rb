@@ -31,16 +31,11 @@ module Enterprise::MessageTemplates::HookExecutionService
 
   def schedule_captain_response
     job_args = [conversation, conversation.inbox.captain_assistant, message]
-    delay = conversation.inbox.typing_delay.to_i
 
     if message.attachments.blank?
-      if delay.positive?
-        Captain::Conversation::ResponseBuilderJob.set(wait: delay.seconds).perform_later(*job_args)
-      else
-        Captain::Conversation::ResponseBuilderJob.perform_later(*job_args)
-      end
+      Captain::Conversation::ResponseBuilderJob.perform_later(*job_args)
     else
-      wait_time = calculate_attachment_wait_time + delay.seconds
+      wait_time = calculate_attachment_wait_time
       Captain::Conversation::ResponseBuilderJob.set(wait: wait_time).perform_later(*job_args)
     end
   end

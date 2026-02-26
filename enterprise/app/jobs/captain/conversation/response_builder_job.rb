@@ -17,6 +17,12 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     # Cancel if there are newer messages after the provided message
     return if debounce_requested?(message)
 
+    # Simulate reading the message before starting to type
+    delay_before_typing(message)
+
+    # Re-check debounce to avoid race condition where another message arrived during reading sleep
+    return if debounce_requested?(message)
+
     # Trigger typing on before processing
     simulate_typing('typing_on')
     @start_time = Time.zone.now
@@ -51,6 +57,28 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
 
     last_incoming = @conversation.messages.where(message_type: :incoming).last
     last_incoming.present? && last_incoming.id != message.id
+  end
+
+  def delay_before_typing(message)
+    return if message.blank? || message.content.blank?
+
+    chars_count = message.content.to_s.length
+    configured_delay = @inbox.typing_delay.to_i
+
+    # Simulate reading time proportional to configured delay. Max reading is ~40% of configured delay.
+    max_reading = configured_delay.positive? ? (configured_delay * 0.4) : 4.0
+    min_reading = [1.0, max_reading].min
+    reading_time = (chars_count / 25.0).clamp(min_reading, max_reading)
+
+    # Add jitter (randomness between 85% and 120%)
+    jitter = 0.85 + (rand * 0.35)
+    delay = reading_time * jitter
+
+    Rails.logger.info(
+      "[CAPTAIN][ResponseBuilderJob] Simulating reading delay of #{delay.round(2)}s " \
+      "for message of #{chars_count} chars"
+    )
+    sleep(delay)
   end
 
   def simulate_typing(status)
@@ -101,23 +129,33 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     return if response_text.blank?
 
     text = response_text.to_s
-    words_count = text.scan(/\b[\p{L}\p{N}]+\b/u).size
     chars_count = text.length
     punctuation_pauses = text.count(',.!?;:')
+    configured_delay = @inbox.typing_delay.to_i
 
-    # Modela tempo de digitação de forma mais humana:
-    # - base por palavra (mais estável para textos longos),
-    # - ajuste por tamanho,
-    # - pequenas pausas por pontuação,
-    # - jitter para não repetir sempre o mesmo tempo.
-    base_time = (words_count * 0.32) + (chars_count * 0.01) + (punctuation_pauses * 0.18)
+    # Modela tempo de digitação de forma mais humana no WhatsApp:
+    # - Velocidade média de digitação: ~15 a 20 caracteres por segundo
+    # - Pequenas pausas por pontuação
+    base_time = (chars_count / 15.0) + (punctuation_pauses * 0.25)
+
+    # Se configurado, max_typing é o valor escolhido, senão, 12s
+    max_typing = configured_delay.positive? ? configured_delay.to_f : 12.0
+    min_delay = [2.0, max_typing].min
+
+    # Adicionando uma ligeira variação humana
     jitter = 0.85 + (rand * 0.35)
-    target_delay = (base_time * jitter).clamp(1.8, 18.0)
+    target_delay = (base_time * jitter).clamp(min_delay, max_typing)
 
     elapsed_time = Time.zone.now - @start_time
     remaining_delay = target_delay - elapsed_time
 
-    sleep(remaining_delay) if remaining_delay.positive?
+    return unless remaining_delay.positive?
+
+    Rails.logger.info(
+      "[CAPTAIN][ResponseBuilderJob] Simulating typing delay of #{remaining_delay.round(2)}s " \
+      "(target: #{target_delay.round(2)}s, total elapsed: #{elapsed_time.round(2)}s, configured_max: #{max_typing}s)"
+    )
+    sleep(remaining_delay)
   end
 
   def collect_previous_messages

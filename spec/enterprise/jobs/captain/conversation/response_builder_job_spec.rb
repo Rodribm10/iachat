@@ -239,7 +239,7 @@ RSpec.describe Captain::Conversation::ResponseBuilderJob, type: :job do
       job.instance_variable_set(:@response, { 'reaction_emoji' => '👍' })
     end
 
-    def create_incoming_until_slot(modulo_target:)
+    def create_incoming_until_slot(sample_target:)
       loop do
         message = create(
           :message,
@@ -248,7 +248,7 @@ RSpec.describe Captain::Conversation::ResponseBuilderJob, type: :job do
           message_type: :incoming,
           content: 'quero saber disponibilidade'
         )
-        return message if (message.id % described_class::REACTION_SAMPLE_RATE).zero? == modulo_target
+        return message if job.send(:sampled_reaction_slot?, message) == sample_target
       end
     end
 
@@ -264,14 +264,26 @@ RSpec.describe Captain::Conversation::ResponseBuilderJob, type: :job do
       expect(job.send(:should_send_reaction_for?, message)).to be(true)
     end
 
-    it 'blocks reaction for regular messages outside the 20% sample' do
-      message = create_incoming_until_slot(modulo_target: false)
+    it 'always allows reaction for gratitude messages' do
+      message = create(
+        :message,
+        conversation: conversation,
+        inbox: inbox,
+        message_type: :incoming,
+        content: 'Obrigado pelo atendimento'
+      )
+
+      expect(job.send(:should_send_reaction_for?, message)).to be(true)
+    end
+
+    it 'blocks reaction for regular messages outside the 35% sample' do
+      message = create_incoming_until_slot(sample_target: false)
 
       expect(job.send(:should_send_reaction_for?, message)).to be(false)
     end
 
-    it 'allows reaction for regular messages inside the 20% sample' do
-      message = create_incoming_until_slot(modulo_target: true)
+    it 'allows reaction for regular messages inside the 35% sample' do
+      message = create_incoming_until_slot(sample_target: true)
 
       expect(job.send(:should_send_reaction_for?, message)).to be(true)
     end
