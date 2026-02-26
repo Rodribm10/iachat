@@ -73,6 +73,18 @@ const statusLabel = computed(() => {
     : translated;
 });
 
+const statusColor = computed(() => {
+  const status =
+    reservation.value?.ui_status || props.marker?.status || 'draft';
+  const colors = {
+    draft: 'bg-n-slate-3 text-n-slate-11',
+    pending_payment: 'bg-n-amber-3 text-n-amber-11',
+    confirmed: 'bg-n-teal-3 text-n-teal-11',
+    cancelled: 'bg-n-ruby-3 text-n-ruby-11',
+  };
+  return colors[status] || 'bg-n-slate-3 text-n-slate-11';
+});
+
 const onCopyPix = async () => {
   if (!pixValue.value) {
     useAlert(
@@ -107,7 +119,12 @@ const onCopyPix = async () => {
         <span class="text-n-slate-11">{{
           $t('CAPTAIN_RESERVATIONS.SIDEBAR.STATUS')
         }}</span>
-        <span class="font-medium text-n-slate-12">{{ statusLabel }}</span>
+        <span
+          class="px-2 py-0.5 text-xs rounded font-medium"
+          :class="statusColor"
+        >
+          {{ statusLabel }}
+        </span>
       </div>
       <div class="flex items-start justify-between gap-2">
         <span class="text-n-slate-11">{{

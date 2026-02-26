@@ -106,4 +106,40 @@ RSpec.describe Captain::Tools::SendSuiteImagesTool, type: :model do
     expect(result[:success]).to be(true)
     expect(result[:formatted_message]).to match(/não encontrei fotos cadastradas/i)
   end
+
+  it 'infers suite number from customer message when suite_number is not passed' do
+    create(
+      :captain_gallery_item,
+      :inbox_scoped,
+      account: account,
+      captain_unit: unit,
+      inbox: conversation.inbox,
+      suite_category: 'hidromassagem',
+      suite_number: '110'
+    )
+    create(
+      :captain_gallery_item,
+      :inbox_scoped,
+      account: account,
+      captain_unit: unit,
+      inbox: conversation.inbox,
+      suite_category: 'hidromassagem',
+      suite_number: '101'
+    )
+    create(
+      :message,
+      conversation: conversation,
+      inbox: conversation.inbox,
+      message_type: :incoming,
+      content: 'Vc tem a foto da suíte 110?'
+    )
+
+    result = nil
+    expect do
+      result = tool.execute(tool_context, suite_category: 'hidromassagem')
+    end.to change { conversation.messages.outgoing.where(sender: assistant).count }.by(1)
+
+    expect(result[:success]).to be(true)
+    expect(result[:suite_number]).to eq('110')
+  end
 end

@@ -257,6 +257,16 @@ const suiteRevenueChart = computed(() => ({
   ],
 }));
 
+const statusColor = reservationStatus => {
+  const colors = {
+    draft: 'bg-n-slate-3 text-n-slate-11',
+    pending_payment: 'bg-n-amber-3 text-n-amber-11',
+    confirmed: 'bg-n-teal-3 text-n-teal-11',
+    cancelled: 'bg-n-ruby-3 text-n-ruby-11',
+  };
+  return colors[reservationStatus] || 'bg-n-slate-3 text-n-slate-11';
+};
+
 onMounted(() => {
   readFiltersFromRoute();
   store.dispatch('captainUnits/get');
@@ -483,7 +493,8 @@ onMounted(() => {
               <td class="px-3 py-2">{{ formatMoney(reservation.amount) }}</td>
               <td class="px-3 py-2">
                 <span
-                  class="px-2 py-1 text-xs rounded-full bg-n-surface-2 text-n-slate-12"
+                  class="px-2 py-1 text-xs rounded-full font-medium"
+                  :class="statusColor(reservation.ui_status)"
                 >
                   {{ reservation.status_label }}
                 </span>

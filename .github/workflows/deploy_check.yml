@@ -22,22 +22,23 @@ jobs:
         run: echo "https://chatwoot-pr-${{ github.event.pull_request.number }}.herokuapp.com"
       - name: Check Deployment Status
         run: |
-          max_attempts=10
+          max_attempts=15
           attempt=1
           status_code=0
           echo "Waiting for review app to be deployed/redeployed, trying in  10 minutes..."
           sleep 600
           while [ $attempt -le $max_attempts ]; do
-            response=$(curl -s -o /dev/null -w "%{http_code}" https://chatwoot-pr-${{ github.event.pull_request.number }}.herokuapp.com/api)
+            response=$(curl -s -o /dev/null -w "%{http_code}" https://chatwoot-pr-${{ github.event.pull_request.number }}.herokuapp.com/health)
             status_code=$(echo $response | head -n   1)
             if [ $status_code -eq   200 ]; then
-              body=$(curl -s https://chatwoot-pr-${{ github.event.pull_request.number }}.herokuapp.com/api)
+              body=$(curl -s https://chatwoot-pr-${{ github.event.pull_request.number }}.herokuapp.com/health)
               if echo "$body" | jq -e '.version and .timestamp and .queue_services == "ok" and .data_services == "ok"' > /dev/null; then
                 echo "Deployment successful"
                 exit 0
               else
                 echo "Deployment status unknown, retrying in   3 minutes..."
                 sleep 180
+                attempt=$((attempt +  1))
               fi
             else
               echo "Waiting for review app to be ready, retrying in  3 minutes..."
