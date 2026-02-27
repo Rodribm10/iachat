@@ -18,11 +18,13 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
       properties: {
         suite_category: {
           type: 'string',
-          description: 'Opcional. Categoria da suíte (ex: luxo, hidro, master).'
+          description: 'Opcional. Categoria/tipo da suíte (ex: Hidromassagem, ALEXA, STILO, VL, PrimeAL). ' \
+                       'Use quando o cliente mencionar o TIPO/NOME da suíte, não o número.'
         },
         suite_number: {
           type: 'string',
-          description: 'Opcional. Número/identificador da suíte (ex: 101, alexa, aluba).'
+          description: 'Opcional. Número específico da suíte (ex: 101, 102, 103, 109, 202). ' \
+                       'Use APENAS quando o cliente mencionar um NÚMERO específico como "suíte 101" ou "quarto 202".'
         },
         limit: {
           type: 'integer',
@@ -211,12 +213,21 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
     category = normalize_filter(actual_params[:suite_category])
     suite_number = normalize_filter(actual_params[:suite_number])
 
+    # Sugerir buscar por categoria se buscou por número e não achou
+    suggestion = if category.blank? && suite_number.present?
+                   "\n\nDica para a IA: Tente buscar por suite_category em vez de suite_number."
+                 else
+                   ''
+                 end
+
     detail = []
     detail << "categoria #{category}" if category.present?
     detail << "suíte #{suite_number}" if suite_number.present?
     detail_text = detail.present? ? " para #{detail.join(' e ')}" : ''
 
-    success_response("Não encontrei fotos cadastradas na galeria desta caixa de entrada nem no acervo global#{detail_text}.")
+    success_response(
+      "Não encontrei fotos cadastradas na galeria desta caixa de entrada nem no acervo global#{detail_text}.#{suggestion}"
+    )
   end
 
   def success_payload(selected_items, sent_count, actual_params)

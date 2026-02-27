@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_02_26_002000) do
+ActiveRecord::Schema[7.1].define(version: 2026_02_26_230001) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -366,6 +366,25 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_26_002000) do
     t.index ["account_id"], name: "index_captain_configurations_on_account_id"
   end
 
+  create_table "captain_conversation_insights", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "captain_unit_id"
+    t.date "period_start", null: false
+    t.date "period_end", null: false
+    t.string "status", default: "pending", null: false
+    t.jsonb "payload"
+    t.integer "conversations_count", default: 0
+    t.integer "messages_count", default: 0
+    t.integer "llm_tokens_used"
+    t.datetime "generated_at", precision: nil
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "status"], name: "index_captain_conversation_insights_on_account_id_and_status"
+    t.index ["account_id"], name: "index_captain_conversation_insights_on_account_id"
+    t.index ["captain_unit_id", "period_start", "period_end"], name: "idx_captain_insights_unique_period", unique: true
+    t.index ["captain_unit_id"], name: "index_captain_conversation_insights_on_captain_unit_id"
+  end
+
   create_table "captain_custom_tools", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.string "slug", null: false
@@ -683,6 +702,19 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_26_002000) do
     t.index ["source_type", "source_id"], name: "index_captain_reminders_on_source_type_and_source_id"
   end
 
+  create_table "captain_report_snapshots", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "captain_unit_id"
+    t.date "snapshot_date", null: false
+    t.jsonb "data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "snapshot_date"], name: "index_captain_report_snapshots_on_account_id_and_snapshot_date"
+    t.index ["account_id"], name: "index_captain_report_snapshots_on_account_id"
+    t.index ["captain_unit_id", "snapshot_date"], name: "idx_captain_snapshots_unique_date", unique: true
+    t.index ["captain_unit_id"], name: "index_captain_report_snapshots_on_captain_unit_id"
+  end
+
   create_table "captain_reservations", force: :cascade do |t|
     t.bigint "account_id", null: false
     t.bigint "inbox_id", null: false
@@ -768,6 +800,15 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_26_002000) do
     t.index ["captain_assistant_id", "tool_key"], name: "index_captain_tool_configs_on_assistant_id_and_tool_key", unique: true
     t.index ["captain_assistant_id"], name: "index_captain_tool_configs_on_captain_assistant_id"
     t.index ["inbox_id"], name: "index_captain_tool_configs_on_inbox_id"
+  end
+
+  create_table "captain_unit_inboxes", force: :cascade do |t|
+    t.bigint "captain_unit_id", null: false
+    t.bigint "inbox_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["captain_unit_id", "inbox_id"], name: "index_captain_unit_inboxes_on_unit_and_inbox", unique: true
+    t.index ["inbox_id"], name: "index_captain_unit_inboxes_on_inbox_id"
   end
 
   create_table "captain_units", force: :cascade do |t|
@@ -1907,6 +1948,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_26_002000) do
   add_foreign_key "captain_assets", "captain_suites"
   add_foreign_key "captain_brands", "accounts"
   add_foreign_key "captain_configurations", "accounts"
+  add_foreign_key "captain_conversation_insights", "accounts"
+  add_foreign_key "captain_conversation_insights", "captain_units"
   add_foreign_key "captain_extras", "accounts"
   add_foreign_key "captain_gallery_items", "accounts"
   add_foreign_key "captain_gallery_items", "captain_units"
@@ -1936,6 +1979,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_26_002000) do
   add_foreign_key "captain_reminders", "contacts"
   add_foreign_key "captain_reminders", "conversations"
   add_foreign_key "captain_reminders", "inboxes"
+  add_foreign_key "captain_report_snapshots", "accounts"
+  add_foreign_key "captain_report_snapshots", "captain_units"
   add_foreign_key "captain_reservations", "accounts"
   add_foreign_key "captain_reservations", "captain_brands"
   add_foreign_key "captain_reservations", "captain_units"
@@ -1946,6 +1991,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_26_002000) do
   add_foreign_key "captain_suites", "accounts"
   add_foreign_key "captain_tool_configs", "accounts"
   add_foreign_key "captain_tool_configs", "inboxes"
+  add_foreign_key "captain_unit_inboxes", "captain_units", on_delete: :cascade
+  add_foreign_key "captain_unit_inboxes", "inboxes", on_delete: :cascade
   add_foreign_key "captain_units", "accounts"
   add_foreign_key "captain_units", "captain_brands"
   add_foreign_key "captain_units", "inboxes"

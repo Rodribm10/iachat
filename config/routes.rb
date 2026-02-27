@@ -91,6 +91,12 @@ Rails.application.routes.draw do
               post :follow_up
             end
             resources :units
+            namespace :reports do
+              resource :operational, only: [:show], controller: 'reports/operational'
+              resources :insights, only: [:index, :show] do
+                post :generate, on: :collection
+              end
+            end
           end
           resource :saml_settings, only: [:show, :create, :update, :destroy]
           resources :agent_bots, only: [:index, :create, :show, :update, :destroy] do
