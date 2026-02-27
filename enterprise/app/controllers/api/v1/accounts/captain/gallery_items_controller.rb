@@ -116,7 +116,7 @@ class Api::V1::Accounts::Captain::GalleryItemsController < Api::V1::Accounts::Ba
   def normalize_gallery_scope!(attrs)
     if attrs[:inbox_id].blank? && attrs[:captain_unit_id].present?
       unit = Current.account.captain_units.find_by(id: attrs[:captain_unit_id])
-      attrs[:inbox_id] = unit&.inbox_id
+      attrs[:inbox_id] = unit&.inboxes&.first&.id
     end
 
     scope = attrs[:scope].presence

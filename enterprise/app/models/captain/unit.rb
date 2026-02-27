@@ -48,7 +48,9 @@ class Captain::Unit < ApplicationRecord
 
   belongs_to :account
   belongs_to :brand, class_name: 'Captain::Brand', foreign_key: 'captain_brand_id', inverse_of: :units
-  belongs_to :inbox, optional: true
+  has_many :unit_inboxes, class_name: 'Captain::UnitInbox', foreign_key: :captain_unit_id,
+                          inverse_of: :captain_unit, dependent: :destroy
+  has_many :inboxes, through: :unit_inboxes
   has_many :pix_charges, class_name: 'Captain::PixCharge', dependent: :restrict_with_error
   has_many :gallery_items, class_name: 'Captain::GalleryItem', foreign_key: :captain_unit_id, inverse_of: :captain_unit,
                            dependent: :destroy
