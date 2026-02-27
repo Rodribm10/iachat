@@ -1,36 +1,5 @@
 import * as MutationTypes from '../mutation-types';
-import ApiClient from '../../api';
-
-const captainReportsAPI = {
-  getOperational: (accountId, params) =>
-    ApiClient.get(`/api/v1/accounts/${accountId}/captain/reports/operational`, {
-      params,
-    }),
-  getInsights: (accountId, params) =>
-    ApiClient.get(`/api/v1/accounts/${accountId}/captain/reports/insights`, {
-      params,
-    }),
-  getInsight: (accountId, id) =>
-    ApiClient.get(
-      `/api/v1/accounts/${accountId}/captain/reports/insights/${id}`
-    ),
-  generateInsight: (accountId, data) =>
-    ApiClient.post(
-      `/api/v1/accounts/${accountId}/captain/reports/insights/generate`,
-      data
-    ),
-};
-
-const state = {
-  operational: null,
-  insights: [],
-  currentInsight: null,
-  uiFlags: {
-    isFetchingOperational: false,
-    isFetchingInsights: false,
-    isGenerating: false,
-  },
-};
+import CaptainReportsAPI from '../../api/captain/reports';
 
 export const getters = {
   getOperational: $state => $state.operational,
@@ -55,16 +24,12 @@ export const mutations = {
 };
 
 export const actions = {
-  async fetchOperational({ commit, rootGetters }, params = {}) {
-    const accountId = rootGetters['auth/getCurrentAccountId'];
+  async fetchOperational({ commit }, params = {}) {
     commit(MutationTypes.SET_CAPTAIN_REPORTS_UI_FLAGS, {
       isFetchingOperational: true,
     });
     try {
-      const { data } = await captainReportsAPI.getOperational(
-        accountId,
-        params
-      );
+      const { data } = await CaptainReportsAPI.getOperational(params);
       commit(MutationTypes.SET_CAPTAIN_REPORTS_OPERATIONAL, data);
     } finally {
       commit(MutationTypes.SET_CAPTAIN_REPORTS_UI_FLAGS, {
@@ -73,13 +38,12 @@ export const actions = {
     }
   },
 
-  async fetchInsights({ commit, rootGetters }, params = {}) {
-    const accountId = rootGetters['auth/getCurrentAccountId'];
+  async fetchInsights({ commit }, params = {}) {
     commit(MutationTypes.SET_CAPTAIN_REPORTS_UI_FLAGS, {
       isFetchingInsights: true,
     });
     try {
-      const { data } = await captainReportsAPI.getInsights(accountId, params);
+      const { data } = await CaptainReportsAPI.getInsights(params);
       commit(MutationTypes.SET_CAPTAIN_REPORTS_INSIGHTS, data);
     } finally {
       commit(MutationTypes.SET_CAPTAIN_REPORTS_UI_FLAGS, {
@@ -88,17 +52,27 @@ export const actions = {
     }
   },
 
-  async generateInsight({ commit, dispatch, rootGetters }, payload) {
-    const accountId = rootGetters['auth/getCurrentAccountId'];
+  async generateInsight({ commit, dispatch }, params) {
     commit(MutationTypes.SET_CAPTAIN_REPORTS_UI_FLAGS, { isGenerating: true });
     try {
-      await captainReportsAPI.generateInsight(accountId, payload);
-      await dispatch('fetchInsights', { unit_id: payload.unit_id });
+      await CaptainReportsAPI.generateInsight(params);
+      await dispatch('fetchInsights', params);
     } finally {
       commit(MutationTypes.SET_CAPTAIN_REPORTS_UI_FLAGS, {
         isGenerating: false,
       });
     }
+  },
+};
+
+const state = {
+  operational: null,
+  insights: [],
+  currentInsight: null,
+  uiFlags: {
+    isFetchingOperational: false,
+    isFetchingInsights: false,
+    isGenerating: false,
   },
 };
 

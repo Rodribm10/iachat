@@ -1021,5 +1021,43 @@
       "CONFIRM_BUTTON_LABEL": "Delete",
       "CANCEL_BUTTON_LABEL": "Cancel"
     }
+  },
+  "CAPTAIN_REPORTS": {
+    "TITLE": "AI Reports",
+    "DESC": "Weekly AI-generated insights based on conversations from each unit.",
+    "LOADING": "Loading reports...",
+    "ALL_UNITS": "All units",
+    "TABS": {
+      "INSIGHTS": "AI Insights",
+      "OPERATIONAL": "Operational"
+    },
+    "STATUS": {
+      "PENDING": "Pending",
+      "PROCESSING": "Processing",
+      "DONE": "Completed",
+      "FAILED": "Failed"
+    },
+    "GENERATE": {
+      "BUTTON": "Generate Analysis",
+      "SUCCESS": "Analysis queued successfully! It will be available shortly.",
+      "ERROR": "Error requesting analysis. Please try again."
+    },
+    "INSIGHT": {
+      "CONVERSATIONS": "conversations",
+      "MESSAGES": "messages",
+      "TOP_TOPICS": "Top Topics",
+      "AI_FAILURES": "AI Improvement Points",
+      "COUNT_PREFIX": "(",
+      "COUNT_SUFFIX": ")",
+      "BULLET": "•"
+    },
+    "EMPTY": {
+      "TITLE": "No analysis available",
+      "MESSAGE": "Click Generate Analysis to create the first weekly report with conversation insights."
+    },
+    "OPERATIONAL": {
+      "COMING_SOON": "Coming Soon",
+      "COMING_SOON_DESC": "Real-time operational data (reservations, Pix charges, etc.) will be available here soon."
+    }
   }
 }

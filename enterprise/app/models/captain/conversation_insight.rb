@@ -24,12 +24,14 @@ class Captain::ConversationInsight < ApplicationRecord
 
   belongs_to :account
   belongs_to :captain_unit, class_name: 'Captain::Unit', optional: true
+  belongs_to :inbox, optional: true
 
   validates :period_start, :period_end, :status, presence: true
   validates :status, inclusion: { in: STATUSES }
 
   scope :done, -> { where(status: 'done') }
   scope :for_unit, ->(unit_id) { where(captain_unit_id: unit_id) }
+  scope :for_inbox, ->(inbox_id) { where(inbox_id: inbox_id) }
   scope :for_period, ->(start_date, end_date) { where(period_start: start_date, period_end: end_date) }
 
   def mark_processing!

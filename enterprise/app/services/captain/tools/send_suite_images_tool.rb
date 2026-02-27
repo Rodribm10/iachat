@@ -18,17 +18,19 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
       properties: {
         suite_category: {
           type: 'string',
-          description: 'Opcional. Categoria/tipo da suíte (ex: Hidromassagem, ALEXA, STILO, VL, PrimeAL). ' \
-                       'Use quando o cliente mencionar o TIPO/NOME da suíte, não o número.'
+          description: 'Categoria/tipo da suíte (ex: Hidromassagem, ALEXA, STILO). ' \
+                       'Use SOMENTE quando o cliente mencionar o TIPO/NOME da suíte sem citar um número específico. ' \
+                       'Não combine com suite_number — os parâmetros são mutuamente exclusivos.'
         },
         suite_number: {
           type: 'string',
-          description: 'Opcional. Número específico da suíte (ex: 101, 102, 103, 109, 202). ' \
-                       'Use APENAS quando o cliente mencionar um NÚMERO específico como "suíte 101" ou "quarto 202".'
+          description: 'Número específico da suíte (ex: 101, 202, 109). ' \
+                       'Use quando o cliente mencionar um NÚMERO como "suíte 101". ' \
+                       'Quando fornecido, IGNORA suite_category. Não combine com suite_category.'
         },
         limit: {
           type: 'integer',
-          description: 'Opcional. Quantidade de imagens para enviar (padrão: 3, máximo: 5).'
+          description: 'Quantidade de imagens para enviar (padrão: 3, máximo: 5).'
         },
         inbox_id: {
           type: 'integer',
@@ -150,27 +152,45 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
       hash.key?('conversation')
   end
 
+  # rubocop:disable Metrics/MethodLength
+  # Lógica de busca mutuamente exclusiva:
+  # - Suite number fornecido → busca SOMENTE por número (ignora categoria)
+  # - Só categoria fornecida → busca SOMENTE por categoria
   def find_items(actual_params)
-    scope = Captain::GalleryItem
-            .active
-            .where(account_id: @conversation.account_id)
-            .includes(image_attachment: :blob)
-            .ordered
+    suite_number = normalize_text_search(actual_params[:suite_number])
+    category     = normalize_text_search(actual_params[:suite_category])
 
-    unit_id = actual_params[:captain_unit_id].presence
-    scope = scope.where(captain_unit_id: unit_id) if unit_id.present?
+    base_scope = Captain::GalleryItem
+                 .active
+                 .where(account_id: @conversation.account_id)
+                 .includes(image_attachment: :blob)
+                 .ordered
 
-    category = normalize_filter(actual_params[:suite_category])
-    suite_number = normalize_filter(actual_params[:suite_number])
+    if suite_number.present?
+      # Prioridade: número da suíte (match exato normalizado)
+      filters = base_scope.where('LOWER(suite_number) = ?', suite_number)
+    elsif category.present?
+      # Categoria: fuzzy case-insensitive, ignora acentos via REPLACE
+      filters = base_scope.where(
+        'LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(suite_category, ' \
+        "'ã','a'),'â','a'),'á','a'),'à','a'),'é','e'),'ê','e')) " \
+        '= LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(?, ' \
+        "'ã','a'),'â','a'),'á','a'),'à','a'),'é','e'),'ê','e'))",
+        category
+      )
+    else
+      return Captain::GalleryItem.none
+    end
 
-    scope = scope.where('LOWER(suite_category) = ?', category.downcase) if category.present?
-    scope = scope.where('LOWER(suite_number) = ?', suite_number.downcase) if suite_number.present?
+    # Tenta primeiro o inbox atual da conversa (jamais busca em outros inboxes)
+    target_inbox = resolve_target_inbox_id(actual_params)
+    inbox_result = filters.where(scope: 'inbox', inbox_id: target_inbox)
+    return inbox_result if inbox_result.exists?
 
-    inbox_scope = scope.where(scope: 'inbox', inbox_id: resolve_target_inbox_id(actual_params))
-    return inbox_scope if inbox_scope.exists?
-
-    scope.where(scope: 'global')
+    # Fallback APENAS para acervo global (fotos genéricas sem vínculo de unidade)
+    filters.where(scope: 'global')
   end
+  # rubocop:enable Metrics/MethodLength
 
   def find_selected_items(actual_params)
     items = find_items(actual_params)
@@ -202,6 +222,12 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
     value.to_s.strip.presence
   end
 
+  # Normaliza para comparação SQL: strip + downcase
+  def normalize_text_search(value)
+    str = value.to_s.strip.downcase
+    str.presence
+  end
+
   def resolve_target_inbox_id(actual_params)
     requested_inbox_id = actual_params[:inbox_id].presence
     return @conversation.inbox_id if requested_inbox_id.blank?
@@ -210,23 +236,26 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
   end
 
   def no_images_response(actual_params)
-    category = normalize_filter(actual_params[:suite_category])
+    category     = normalize_filter(actual_params[:suite_category])
     suite_number = normalize_filter(actual_params[:suite_number])
 
-    # Sugerir buscar por categoria se buscou por número e não achou
+    # Se buscou por número e não achou, sugerir tentar pela categoria da suíte
     suggestion = if category.blank? && suite_number.present?
-                   "\n\nDica para a IA: Tente buscar por suite_category em vez de suite_number."
+                   ' Dica: tente usar suite_category para buscar fotos da categoria desta suíte.'
                  else
                    ''
                  end
 
-    detail = []
-    detail << "categoria #{category}" if category.present?
-    detail << "suíte #{suite_number}" if suite_number.present?
-    detail_text = detail.present? ? " para #{detail.join(' e ')}" : ''
+    searched_for = if suite_number.present?
+                     "suíte #{suite_number}"
+                   elsif category.present?
+                     "categoria #{category}"
+                   else
+                     'as fotos solicitadas'
+                   end
 
     success_response(
-      "Não encontrei fotos cadastradas na galeria desta caixa de entrada nem no acervo global#{detail_text}.#{suggestion}"
+      "Não encontrei fotos para #{searched_for} na galeria (nem por inbox nem no acervo global).#{suggestion}"
     )
   end
 

@@ -3,10 +3,11 @@ class Captain::Llm::ConversationInsightService < Llm::BaseAiService
 
   MAX_CHARS_PER_CHUNK = 40_000
 
-  def initialize(account:, unit:, conversations:)
+  def initialize(account:, conversations:, unit: nil, inbox: nil)
     super()
     @account = account
     @unit = unit
+    @inbox = inbox
     @conversations = conversations
   end
 
@@ -23,7 +24,7 @@ class Captain::Llm::ConversationInsightService < Llm::BaseAiService
 
   private
 
-  attr_reader :account, :unit, :conversations
+  attr_reader :account, :unit, :inbox, :conversations
 
   def build_chunks
     texts = conversations.map(&:to_llm_text).reject(&:blank?)
@@ -62,8 +63,9 @@ class Captain::Llm::ConversationInsightService < Llm::BaseAiService
   end
 
   def system_prompt
+    entity_name = inbox&.name || unit&.name || 'Geral'
     Captain::Llm::SystemPromptsService.conversation_insights_analyzer(
-      unit.name,
+      entity_name,
       account.locale_english_name
     )
   end

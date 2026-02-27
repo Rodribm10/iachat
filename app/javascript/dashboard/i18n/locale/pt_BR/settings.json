@@ -342,6 +342,7 @@
     "CAPTAIN_PIX_UNITS": "Unidades Pix",
     "CAPTAIN_GALLERY": "Galeria",
     "CAPTAIN_RESERVATIONS": "Reservas",
+    "CAPTAIN_REPORTS": "Relatórios IA",
     "HOME": "Principal",
     "AGENTS": "Agentes",
     "AGENT_BOTS": "Robôs",
@@ -816,6 +817,46 @@
       "DESCRIPTION": "Are you sure you want to delete this policy? This action cannot be undone.",
       "CONFIRM_BUTTON_LABEL": "Excluir",
       "CANCEL_BUTTON_LABEL": "Cancelar"
+    }
+  },
+  "CAPTAIN_REPORTS": {
+    "TITLE": "Relatórios IA",
+    "DESC": "Análises semanais geradas por IA com base nas conversas de cada unidade.",
+    "LOADING": "Carregando relatórios...",
+    "ALL_UNITS": "Todas as unidades",
+    "TABS": {
+      "INSIGHTS": "Insights IA",
+      "OPERATIONAL": "Operacional"
+    },
+    "UNITS_GROUP": "Unidades Pix",
+    "INBOXES_GROUP": "Caixas de Entrada",
+    "STATUS": {
+      "PENDING": "Pendente",
+      "PROCESSING": "Processando",
+      "DONE": "Concluído",
+      "FAILED": "Falhou"
+    },
+    "GENERATE": {
+      "BUTTON": "Gerar Análise",
+      "SUCCESS": "Análise enfileirada com sucesso! Em breve estará disponível.",
+      "ERROR": "Erro ao solicitar análise. Tente novamente."
+    },
+    "INSIGHT": {
+      "CONVERSATIONS": "conversas",
+      "MESSAGES": "mensagens",
+      "TOP_TOPICS": "Principais Tópicos",
+      "AI_FAILURES": "Pontos de Melhoria da IA",
+      "COUNT_PREFIX": "(",
+      "COUNT_SUFFIX": ")",
+      "BULLET": "•"
+    },
+    "EMPTY": {
+      "TITLE": "Nenhuma análise disponível",
+      "MESSAGE": "Clique em Gerar Análise para criar o primeiro relatório semanal com insights das conversas."
+    },
+    "OPERATIONAL": {
+      "COMING_SOON": "Em breve",
+      "COMING_SOON_DESC": "Os dados operacionais em tempo real (reservas, cobranças Pix, etc.) estarão disponíveis aqui em breve."
     }
   }
 }
