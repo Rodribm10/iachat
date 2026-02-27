@@ -536,6 +536,19 @@
           "BUTTON_TEXT": "Excluir {assistantName}"
         }
       },
+      "ORCHESTRATOR_PROMPT": {
+        "SECTION_TITLE": "Prompt do Orquestrador",
+        "SECTION_DESCRIPTION": "Edite o prompt base que define o comportamento central da IA. Deixe vazio para usar o prompt padrão do sistema.",
+        "LABEL": "Prompt do Orquestrador",
+        "DESCRIPTION": "Este prompt controla como a IA toma decisões, classifica pedidos e faz handoff para agentes especializados.",
+        "PLACEHOLDER": "Digite o prompt customizado aqui. Formatação Liquid ({{ variavel }}) é suportada.",
+        "WARNING": "⚠️ Atenção: Alterar o prompt pode impactar todo o comportamento da IA. Sempre valide as mudanças antes de salvar. Use \"Restaurar Padrão\" para voltar ao comportamento original.",
+        "SAVE_BUTTON": "Salvar Prompt",
+        "RESET_BUTTON": "Restaurar Padrão",
+        "USING_DEFAULT": "Usando prompt padrão do sistema",
+        "USING_CUSTOM": "Usando prompt customizado",
+        "VALIDATION_ERROR": "O prompt não pode ficar em branco. Use 'Restaurar Padrão' para voltar ao padrão do sistema."
+      },
       "OPTIONS": {
         "EDIT_ASSISTANT": "Editar Assistente",
         "DELETE_ASSISTANT": "Excluir Assistente",

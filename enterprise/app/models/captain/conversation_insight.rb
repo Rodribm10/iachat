@@ -3,18 +3,33 @@
 # Table name: captain_conversation_insights
 #
 #  id                  :bigint           not null, primary key
-#  account_id          :bigint           not null
-#  captain_unit_id     :bigint
-#  period_start        :date             not null
-#  period_end          :date             not null
-#  status              :string           default("pending"), not null
-#  payload             :jsonb
 #  conversations_count :integer          default(0)
-#  messages_count      :integer          default(0)
-#  llm_tokens_used     :integer
 #  generated_at        :datetime
+#  llm_tokens_used     :integer
+#  messages_count      :integer          default(0)
+#  payload             :jsonb
+#  period_end          :date             not null
+#  period_start        :date             not null
+#  status              :string           default("pending"), not null
 #  created_at          :datetime         not null
 #  updated_at          :datetime         not null
+#  account_id          :bigint           not null
+#  captain_unit_id     :bigint
+#  inbox_id            :bigint
+#
+# Indexes
+#
+#  idx_captain_insights_on_unit_inbox_period                     (captain_unit_id,inbox_id,period_start,period_end) UNIQUE
+#  index_captain_conversation_insights_on_account_id             (account_id)
+#  index_captain_conversation_insights_on_account_id_and_status  (account_id,status)
+#  index_captain_conversation_insights_on_captain_unit_id        (captain_unit_id)
+#  index_captain_conversation_insights_on_inbox_id               (inbox_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...       (account_id => accounts.id)
+#  fk_rails_...       (captain_unit_id => captain_units.id)
+#  fk_rails_inbox_id  (inbox_id => inboxes.id)
 #
 
 class Captain::ConversationInsight < ApplicationRecord

@@ -48,7 +48,7 @@ class Api::V1::Accounts::Captain::AssistantsController < Api::V1::Accounts::Base
   end
 
   def assistant_params
-    permitted = params.require(:assistant).permit(:name, :description,
+    permitted = params.require(:assistant).permit(:name, :description, :orchestrator_prompt,
                                                   config: [
                                                     :product_name, :feature_faq, :feature_memory, :feature_citation,
                                                     :welcome_message, :handoff_message, :resolution_message,

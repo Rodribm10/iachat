@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_02_27_030000) do
+ActiveRecord::Schema[7.1].define(version: 2026_02_27_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -335,6 +335,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_27_030000) do
     t.string "llm_model", default: "gpt-3.5-turbo"
     t.text "api_key"
     t.jsonb "handoff_webhook_config", default: {}
+    t.text "orchestrator_prompt"
     t.index ["account_id"], name: "index_captain_assistants_on_account_id"
   end
 
