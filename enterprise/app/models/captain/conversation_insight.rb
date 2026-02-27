@@ -20,6 +20,8 @@
 class Captain::ConversationInsight < ApplicationRecord
   include Rails.application.routes.url_helpers
 
+  self.table_name = 'captain_conversation_insights'
+
   STATUSES = %w[pending processing done failed].freeze
 
   belongs_to :account

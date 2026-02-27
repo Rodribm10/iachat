@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_02_26_230001) do
+ActiveRecord::Schema[7.1].define(version: 2026_02_27_030000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -379,10 +379,12 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_26_230001) do
     t.datetime "generated_at", precision: nil
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "inbox_id"
     t.index ["account_id", "status"], name: "index_captain_conversation_insights_on_account_id_and_status"
     t.index ["account_id"], name: "index_captain_conversation_insights_on_account_id"
-    t.index ["captain_unit_id", "period_start", "period_end"], name: "idx_captain_insights_unique_period", unique: true
+    t.index ["captain_unit_id", "inbox_id", "period_start", "period_end"], name: "idx_captain_insights_on_unit_inbox_period", unique: true
     t.index ["captain_unit_id"], name: "index_captain_conversation_insights_on_captain_unit_id"
+    t.index ["inbox_id"], name: "index_captain_conversation_insights_on_inbox_id"
   end
 
   create_table "captain_custom_tools", force: :cascade do |t|
@@ -1950,6 +1952,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_26_230001) do
   add_foreign_key "captain_configurations", "accounts"
   add_foreign_key "captain_conversation_insights", "accounts"
   add_foreign_key "captain_conversation_insights", "captain_units"
+  add_foreign_key "captain_conversation_insights", "inboxes", name: "fk_rails_inbox_id"
   add_foreign_key "captain_extras", "accounts"
   add_foreign_key "captain_gallery_items", "accounts"
   add_foreign_key "captain_gallery_items", "captain_units"
