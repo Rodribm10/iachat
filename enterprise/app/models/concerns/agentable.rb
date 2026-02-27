@@ -35,6 +35,10 @@ module Concerns::Agentable
     end
   end
 
+  def default_orchestrator_prompt
+    Captain::PromptRenderer.read_template(template_name)
+  end
+
   private
 
   def agent_name
