@@ -63,10 +63,10 @@ const handleReset = () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="flex flex-col gap-4 w-full">
     <!-- Aviso de risco -->
     <div
-      class="flex items-start gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800"
+      class="flex items-start gap-3 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800 w-full"
     >
       <span class="i-lucide-triangle-alert mt-0.5 shrink-0 text-yellow-500" />
       <p class="text-sm leading-relaxed">
@@ -75,23 +75,26 @@ const handleReset = () => {
     </div>
 
     <!-- Textarea do prompt -->
-    <div class="flex flex-col gap-1.5">
-      <label class="text-sm font-medium text-n-slate-12">
-        {{ t('CAPTAIN.ASSISTANTS.ORCHESTRATOR_PROMPT.LABEL') }}
-      </label>
-      <p class="text-xs text-n-slate-11">
-        {{ t('CAPTAIN.ASSISTANTS.ORCHESTRATOR_PROMPT.DESCRIPTION') }}
-      </p>
-      <textarea
-        v-model="promptText"
-        rows="18"
-        :placeholder="t('CAPTAIN.ASSISTANTS.ORCHESTRATOR_PROMPT.PLACEHOLDER')"
-        class="w-full rounded-lg border border-n-weak bg-n-alpha-1 px-3 py-2.5 text-sm text-n-slate-12 placeholder:text-n-slate-9 focus:outline-none focus:ring-2 focus:ring-n-brand resize-y font-mono"
-      />
+    <div class="flex flex-col gap-2 w-full">
+      <div class="flex flex-col">
+        <label class="text-sm font-medium text-n-slate-12">
+          {{ t('CAPTAIN.ASSISTANTS.ORCHESTRATOR_PROMPT.LABEL') }}
+        </label>
+        <p class="text-xs text-n-slate-11">
+          {{ t('CAPTAIN.ASSISTANTS.ORCHESTRATOR_PROMPT.DESCRIPTION') }}
+        </p>
+      </div>
+      <div class="w-full">
+        <textarea
+          v-model="promptText"
+          :placeholder="t('CAPTAIN.ASSISTANTS.ORCHESTRATOR_PROMPT.PLACEHOLDER')"
+          class="w-full min-h-[500px] rounded-lg border border-n-weak bg-n-alpha-1 px-3 py-2.5 text-sm text-n-slate-12 placeholder:text-n-slate-9 focus:outline-none focus:ring-2 focus:ring-n-brand resize-y font-mono"
+        />
+      </div>
     </div>
 
     <!-- Botões -->
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-3 mt-2 w-full">
       <button
         class="inline-flex items-center gap-1.5 rounded-lg bg-n-brand px-4 py-2 text-sm font-medium text-white hover:bg-n-brand-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         :disabled="!isDirty"
