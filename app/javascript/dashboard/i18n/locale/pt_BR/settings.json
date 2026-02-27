@@ -824,6 +824,7 @@
     "DESC": "Análises semanais geradas por IA com base nas conversas de cada unidade.",
     "LOADING": "Carregando relatórios...",
     "ALL_UNITS": "Todas as unidades",
+    "ALL_INBOXES": "Todas as caixas de entrada",
     "TABS": {
       "INSIGHTS": "Insights IA",
       "OPERATIONAL": "Operacional"

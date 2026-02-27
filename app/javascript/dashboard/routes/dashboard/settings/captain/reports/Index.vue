@@ -10,53 +10,33 @@ import Button from 'dashboard/components-next/button/Button.vue';
 const { t } = useI18n();
 const store = useStore();
 
-const units = useMapGetter('captainUnits/getUnits');
 const inboxes = useMapGetter('inboxes/getInboxes');
 const insights = useMapGetter('captainReports/getInsights');
 const uiFlags = useMapGetter('captainReports/getUIFlags');
 
 const activeTab = ref('insights');
-const selectedFilter = ref({ type: 'unit', id: null });
+const selectedInboxId = ref(null);
 
 const tabs = [{ key: 'insights' }, { key: 'operational' }];
 
 onMounted(async () => {
-  await store.dispatch('captainUnits/get');
   await store.dispatch('inboxes/get');
-  await store.dispatch('captainReports/fetchInsights', {
-    unit_id: null,
-  });
+  await store.dispatch('captainReports/fetchInsights', {});
 });
 
 const onFilterChange = async event => {
   const value = event.target.value;
-  if (!value) {
-    selectedFilter.value = { type: 'unit', id: null };
-  } else {
-    const [type, id] = value.split(':');
-    selectedFilter.value = { type, id: Number(id) };
-  }
-
-  const params = {};
-  if (selectedFilter.value.type === 'unit') {
-    params.unit_id = selectedFilter.value.id;
-  } else {
-    params.inbox_id = selectedFilter.value.id;
-  }
-
-  await store.dispatch('captainReports/fetchInsights', params);
+  selectedInboxId.value = value ? Number(value) : null;
+  await store.dispatch('captainReports/fetchInsights', {
+    inbox_id: selectedInboxId.value,
+  });
 };
 
 const onGenerateInsight = async () => {
-  const params = {};
-  if (selectedFilter.value.type === 'unit') {
-    params.unit_id = selectedFilter.value.id;
-  } else {
-    params.inbox_id = selectedFilter.value.id;
-  }
-
   try {
-    await store.dispatch('captainReports/generateInsight', params);
+    await store.dispatch('captainReports/generateInsight', {
+      inbox_id: selectedInboxId.value,
+    });
     useAlert(t('CAPTAIN_REPORTS.GENERATE.SUCCESS'));
   } catch {
     useAlert(t('CAPTAIN_REPORTS.GENERATE.ERROR'));
@@ -108,25 +88,16 @@ const periodLabel = insight =>
               class="rounded-lg border border-n-weak bg-n-alpha-1 px-3 py-2 text-sm text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-brand"
               @change="onFilterChange"
             >
-              <option value="">{{ t('CAPTAIN_REPORTS.ALL_UNITS') }}</option>
-              <optgroup :label="t('CAPTAIN_REPORTS.UNITS_GROUP')">
-                <option
-                  v-for="unit in units"
-                  :key="unit.id"
-                  :value="`unit:${unit.id}`"
-                >
-                  {{ unit.name }}
-                </option>
-              </optgroup>
-              <optgroup :label="t('CAPTAIN_REPORTS.INBOXES_GROUP')">
-                <option
-                  v-for="inbox in inboxes"
-                  :key="inbox.id"
-                  :value="`inbox:${inbox.id}`"
-                >
-                  {{ inbox.name }}
-                </option>
-              </optgroup>
+              <option value="">
+                {{ t('CAPTAIN_REPORTS.ALL_INBOXES') }}
+              </option>
+              <option
+                v-for="inbox in inboxes"
+                :key="inbox.id"
+                :value="inbox.id"
+              >
+                {{ inbox.name }}
+              </option>
             </select>
 
             <Button

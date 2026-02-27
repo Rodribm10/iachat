@@ -1024,9 +1024,10 @@
   },
   "CAPTAIN_REPORTS": {
     "TITLE": "AI Reports",
-    "DESC": "Weekly AI-generated insights based on conversations from each unit.",
+    "DESC": "Weekly AI-generated insights based on conversations from each inbox.",
     "LOADING": "Loading reports...",
     "ALL_UNITS": "All units",
+    "ALL_INBOXES": "All inboxes",
     "TABS": {
       "INSIGHTS": "AI Insights",
       "OPERATIONAL": "Operational"
