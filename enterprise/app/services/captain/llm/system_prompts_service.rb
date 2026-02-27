@@ -205,6 +205,13 @@ class Captain::Llm::SystemPromptsService
         ```
         - If the answer is not provided in context sections, Respond to the customer and ask whether they want to talk to another support agent . If they ask to Chat with another agent, return `conversation_handoff' as the response in JSON response
         #{'- You MUST provide numbered citations at the appropriate places in the text.' if config['feature_citation']}
+
+        [Galeria de Fotos - Regras Importantes]
+        Quando o cliente pedir fotos de suítes:
+        - Se mencionar um NOME ou TIPO (ex: "suite Alexa", "suite hidromassagem", "suite STILO"), use o parâmetro suite_category
+        - Se mencionar um NÚMERO específico (ex: "suite 101", "quarto 202"), use o parâmetro suite_number
+        - Em caso de dúvida, priorize interpretar como suite_category, pois clientes geralmente se referem ao tipo da suíte
+        - NÃO peça confirmação ao cliente sobre categoria vs número - infira do contexto e chame a ferramenta diretamente
       SYSTEM_PROMPT_MESSAGE
     end
 
@@ -287,6 +294,58 @@ class Captain::Llm::SystemPromptsService
           - The section contains no meaningful content
         • Do NOT include "page_range_processed" in the output
         • Do NOT mention page numbers anywhere in questions or answers
+      PROMPT
+    end
+
+    def conversation_insights_analyzer(unit_name, language = 'português')
+      <<~PROMPT
+        Você é um analista especializado em experiência de cliente para hotelaria.
+        Analise as conversas fornecidas entre clientes e o assistente de IA de uma unidade hoteleira chamada "#{unit_name}".
+
+        Gere o relatório EXCLUSIVAMENTE em #{language} e APENAS com base nas conversas fornecidas.
+        NÃO invente dados, NÃO use conhecimento externo.
+
+        Retorne SOMENTE um JSON válido com a estrutura abaixo, sem texto extra:
+
+        ```json
+        {
+          "top_topics": [
+            { "topic": "Nome do tópico", "count": 5, "description": "Breve descrição" }
+          ],
+          "ai_failures": [
+            { "description": "Descrição do problema", "example": "Exemplo da conversa", "frequency": 3 }
+          ],
+          "faq_gaps": [
+            { "question": "Pergunta sem cobertura no FAQ", "frequency": 2 }
+          ],
+          "sentiment": {
+            "positive_count": 10,
+            "negative_count": 3,
+            "neutral_count": 7,
+            "summary": "Resumo geral do sentimento dos clientes"
+          },
+          "highlights": {
+            "praises": ["Elogio 1 capturado textualmente", "Elogio 2"],
+            "complaints": ["Reclamação 1", "Reclamação 2"]
+          },
+          "most_requested_suites": [
+            { "suite": "Nome ou categoria da suíte", "count": 4 }
+          ],
+          "price_reactions": {
+            "summary": "Como os clientes reagiram aos preços informados",
+            "objections_count": 2
+          },
+          "recommendations": [
+            "Recomendação acionável baseada nos dados"
+          ],
+          "period_summary": "Resumo executivo de 2-3 linhas sobre a semana"
+        }
+        ```
+
+        Regras obrigatórias:
+        - Se não houver dados suficientes para algum campo, retorne arrays vazios ou strings vazias
+        - Nunca fabrique exemplos ou números
+        - O JSON deve ser válido e parseável
       PROMPT
     end
     # rubocop:enable Metrics/MethodLength

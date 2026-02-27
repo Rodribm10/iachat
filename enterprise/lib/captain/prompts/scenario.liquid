@@ -53,12 +53,16 @@ You have access to these tools:
 
 {% assign has_faq_lookup = false %}
 {% assign has_check_pix_payment = false %}
+{% assign has_send_suite_images = false %}
 {% for tool in tools -%}
 {% if tool.id == 'faq_lookup' -%}
 {% assign has_faq_lookup = true %}
 {% endif -%}
 {% if tool.id == 'check_pix_payment' -%}
 {% assign has_check_pix_payment = true %}
+{% endif -%}
+{% if tool.id == 'send_suite_images' -%}
+{% assign has_send_suite_images = true %}
 {% endif -%}
 {% endfor -%}
 
@@ -73,6 +77,15 @@ Only say the information is unavailable if `faq_lookup` does not return relevant
 # Payment Verification Requirement
 If the customer says they already paid the Pix ("já paguei", "paguei o pix", "acabei de pagar", "segue comprovante"), call `check_pix_payment` before saying payment is pending or before handing off.
 Use the tool response as the source of truth for payment status in that turn.
+{% endif -%}
+
+{% if has_send_suite_images -%}
+# Galeria de Fotos — Regras de Busca
+- Se o cliente mencionar um NOME ou TIPO de suíte (ex: "Alexa", "hidromassagem", "STILO"), use o parâmetro `suite_category` na ferramenta `send_suite_images`.
+- Se mencionar um NÚMERO específico (ex: "suite 101", "quarto 202"), use o parâmetro `suite_number`.
+- Em caso de dúvida, priorize `suite_category` — clientes geralmente citam o tipo da suíte, não o número.
+- NÃO peça confirmação ao cliente — infira do contexto e chame `send_suite_images` diretamente.
+- Aguarde o resultado da ferramenta. Se retornar "Não encontrei fotos", informe o cliente que as fotos não estão disponíveis no momento. NUNCA anuncie o envio de fotos antes de confirmar que a ferramenta as encontrou.
 {% endif -%}
 
 # Orchestrator Boundary

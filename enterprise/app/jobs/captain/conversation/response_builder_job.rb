@@ -1,10 +1,23 @@
 require_dependency 'captain/conversation/reaction_policy'
+require_dependency 'captain/errors/system_prompt_leak_error'
 
+# rubocop:disable Metrics/ClassLength
 class Captain::Conversation::ResponseBuilderJob < ApplicationJob
   include Captain::Conversation::ReactionPolicy
 
   MAX_MESSAGE_LENGTH = 10_000
   REACTION_SAMPLE_RATE = Captain::Conversation::ReactionPolicy::REACTION_SAMPLE_RATE
+
+  # Padrões que indicam que o LLM retornou o system prompt em vez de uma resposta ao cliente.
+  # Qualquer mensagem que comece com esses padrões deve ser bloqueada e redirecionar para handoff humano.
+  SYSTEM_PROMPT_LEAK_PATTERNS = [
+    /\A\[Contexto\]/i,
+    /\A<contexto>/i,
+    /\A#\s*System Context/i,
+    /\A\[Identity\]/i,
+    /\A\[Context\]/i,
+    /\AYou are part of Captain,/i
+  ].freeze
 
   retry_on ActiveStorage::FileNotFoundError, attempts: 3, wait: 2.seconds
   retry_on Faraday::BadRequestError, attempts: 3, wait: 2.seconds
@@ -44,6 +57,9 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     else
       generate_and_process_response
     end
+  rescue Captain::Errors::SystemPromptLeakError => e
+    Rails.logger.error("[CAPTAIN][ResponseBuilderJob] #{e.message} — transferindo para humano")
+    process_action('handoff')
   rescue StandardError => e
     raise e if e.is_a?(ActiveStorage::FileNotFoundError) || e.is_a?(Faraday::BadRequestError)
 
@@ -125,6 +141,7 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     end
   end
 
+  # rubocop:disable Metrics/AbcSize
   def humanized_delay(response_text)
     return if response_text.blank?
 
@@ -157,15 +174,24 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     )
     sleep(remaining_delay)
   end
+  # rubocop:enable Metrics/AbcSize
 
   def collect_previous_messages
     @conversation
       .messages
       .where(message_type: [:incoming, :outgoing])
       .where(private: false)
-      .map do |message|
+      .filter_map do |message|
+      content = prepare_multimodal_message_content(message)
+
+      # Ignorar mensagens contaminadas por vazamento de system prompt no histórico
+      if message.message_type == 'outgoing' && system_prompt_leak?(content)
+        Rails.logger.warn("[CAPTAIN][ResponseBuilderJob] Skipping leaked system-prompt message id=#{message.id} from history")
+        next
+      end
+
       message_hash = {
-        content: prepare_multimodal_message_content(message),
+        content: content,
         role: determine_role(message)
       }
 
@@ -238,6 +264,20 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
 
   def validate_message_content!(content)
     raise ArgumentError, 'Message content cannot be blank' if content.blank?
+
+    return unless system_prompt_leak?(content)
+
+    Rails.logger.error(
+      '[CAPTAIN][ResponseBuilderJob] SYSTEM PROMPT LEAK DETECTADO — ' \
+      "bloqueando mensagem pública. Prévia: #{content.to_s.truncate(300)}"
+    )
+    raise Captain::Errors::SystemPromptLeakError,
+          'Resposta do LLM contém conteúdo do system prompt — transferindo para humano'
+  end
+
+  def system_prompt_leak?(content)
+    text = content.is_a?(String) ? content.strip : content.to_s.strip
+    SYSTEM_PROMPT_LEAK_PATTERNS.any? { |pattern| text.match?(pattern) }
   end
 
   def create_outgoing_message(message_content, agent_name: nil)
@@ -268,3 +308,4 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     account.feature_enabled?('captain_integration_v2')
   end
 end
+# rubocop:enable Metrics/ClassLength

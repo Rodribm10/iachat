@@ -408,6 +408,12 @@ const menuItems = computed(() => {
           activeOn: ['captain_reservations_index'],
           to: accountScopedRoute('captain_reservations_index'),
         },
+        {
+          name: 'Reports',
+          label: t('SIDEBAR.CAPTAIN_REPORTS'),
+          activeOn: ['captain_settings_reports'],
+          to: accountScopedRoute('captain_settings_reports'),
+        },
       ],
     },
     {
