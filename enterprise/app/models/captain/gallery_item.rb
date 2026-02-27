@@ -68,7 +68,7 @@ class Captain::GalleryItem < ApplicationRecord
   def infer_inbox_from_unit
     return if inbox_id.present? || captain_unit.blank?
 
-    self.inbox_id = captain_unit.inbox_id
+    self.inbox_id = captain_unit.inboxes.first&.id
   end
 
   def normalize_scope

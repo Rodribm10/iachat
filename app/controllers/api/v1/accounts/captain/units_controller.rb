@@ -3,7 +3,7 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
   before_action :set_unit, only: [:show, :update, :destroy]
 
   def index
-    @units = Current.account.captain_units
+    @units = Current.account.captain_units.includes(:inboxes)
     render json: @units.map { |u| format_unit(u) }
   end
 
@@ -16,7 +16,7 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
     @unit.captain_brand_id ||= default_brand.id
     ActiveRecord::Base.transaction do
       @unit.save!
-      sync_inbox_link!(@unit)
+      sync_inboxes!(@unit, inbox_ids_param)
     end
     render json: format_unit(@unit), status: :created
   rescue ActiveRecord::RecordInvalid
@@ -26,7 +26,7 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
   def update
     ActiveRecord::Base.transaction do
       @unit.update!(unit_params)
-      sync_inbox_link!(@unit)
+      sync_inboxes!(@unit, inbox_ids_param) if params[:captain_unit].key?(:inbox_ids)
     end
     render json: format_unit(@unit)
   rescue ActiveRecord::RecordInvalid
@@ -53,7 +53,7 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
   end
 
   def set_unit
-    @unit = Current.account.captain_units.find(params[:id])
+    @unit = Current.account.captain_units.includes(:inboxes).find(params[:id])
   end
 
   def unit_params
@@ -63,47 +63,50 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
       :inter_client_secret,
       :inter_pix_key,
       :inter_account_number,
-      :inbox_id,
       :inter_cert_content,
       :inter_key_content,
       :proactive_pix_polling_enabled
     )
   end
 
+  def inbox_ids_param
+    return [] unless params[:captain_unit].key?(:inbox_ids)
+
+    Array(params[:captain_unit][:inbox_ids]).map(&:to_i).select(&:positive?)
+  end
+
+  # Sincroniza a lista de inboxes de uma unit: adiciona novas, remove ausentes.
+  # Garante que apenas inboxes da mesma conta sejam aceitas.
+  def sync_inboxes!(unit, ids)
+    valid_ids = Current.account.inboxes.where(id: ids).pluck(:id)
+
+    # Remove vínculos não presentes na nova lista
+    unit.unit_inboxes.where.not(inbox_id: valid_ids).destroy_all
+
+    # Adiciona novos vínculos (ignora duplicatas via uniqueness)
+    existing_ids = unit.unit_inboxes.pluck(:inbox_id)
+    (valid_ids - existing_ids).each do |inbox_id|
+      unit.unit_inboxes.create!(inbox_id: inbox_id)
+    end
+  end
+
   def format_unit(unit)
+    inboxes = unit.inboxes.to_a
     {
       id: unit.id,
       name: unit.name,
       inter_client_id: unit.inter_client_id,
       inter_pix_key: unit.inter_pix_key,
       inter_account_number: unit.inter_account_number,
-      inbox_id: unit.inbox_id,
-      inbox_name: unit.inbox_id.present? ? Inbox.find_by(id: unit.inbox_id)&.name : nil,
+      inbox_ids: inboxes.map(&:id),
+      inbox_names: inboxes.map(&:name),
+      # Mantém inbox_id e inbox_name como atalho para compatibilidade com código legado
+      inbox_id: inboxes.first&.id,
+      inbox_name: inboxes.first&.name,
       has_cert: unit.inter_cert_content.present? || unit.resolved_inter_cert_path.present?,
       has_key: unit.inter_key_content.present? || unit.resolved_inter_key_path.present?,
       has_client_secret: unit.inter_client_secret.present?,
       proactive_pix_polling_enabled: unit.proactive_pix_polling_enabled
-      # Obviamente não enviando secrets ou contents aqui!
     }
-  end
-
-  def sync_inbox_link!(unit)
-    if unit.inbox_id.present?
-      Current.account.captain_units
-             .where(inbox_id: unit.inbox_id)
-             .where.not(id: unit.id)
-             .find_each { |existing_unit| existing_unit.update!(inbox_id: nil) }
-    end
-
-    return unless defined?(CaptainInbox)
-
-    CaptainInbox.where(captain_unit_id: unit.id).find_each do |existing_link|
-      existing_link.update!(captain_unit_id: nil)
-    end
-
-    return if unit.inbox_id.blank?
-
-    inbox_link = CaptainInbox.find_by(inbox_id: unit.inbox_id)
-    inbox_link&.update!(captain_unit_id: unit.id)
   end
 end

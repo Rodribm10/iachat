@@ -22,7 +22,7 @@ export default {
       inter_cert_content: '',
       inter_key_content: '',
       proactive_pix_polling_enabled: false,
-      inbox_id: null,
+      inbox_ids: [],
       hasInitialCert: false,
       hasInitialKey: false,
       hasInitialClientSecret: false,
@@ -35,13 +35,7 @@ export default {
       inboxes: 'inboxes/getInboxes',
     }),
     inboxOptions() {
-      return [
-        {
-          id: null,
-          name: this.$t('CAPTAIN_SETTINGS.UNITS.INBOX.NO_UNIT'),
-        },
-        ...this.inboxes.map(inbox => ({ id: inbox.id, name: inbox.name })),
-      ];
+      return this.inboxes.map(inbox => ({ id: inbox.id, name: inbox.name }));
     },
     isNew() {
       return this.$route.params.id === 'new';
@@ -91,11 +85,9 @@ export default {
         this.inter_account_number = unit.inter_account_number;
         this.inter_pix_key = unit.inter_pix_key;
         this.inter_client_id = unit.inter_client_id;
-        this.inbox_id = unit.inbox_id || null;
+        this.inbox_ids = unit.inbox_ids || [];
         this.proactive_pix_polling_enabled =
           !!unit.proactive_pix_polling_enabled;
-        // Secret and cert contents are generally not returned by the API for security reasons,
-        // so we leave them blank to only update if the user types something new.
         this.hasInitialCert = unit.has_cert;
         this.hasInitialKey = unit.has_key;
         this.hasInitialClientSecret = unit.has_client_secret;
@@ -111,7 +103,7 @@ export default {
         inter_pix_key: this.inter_pix_key,
         inter_client_id: this.inter_client_id,
         inter_client_secret: this.inter_client_secret,
-        inbox_id: this.inbox_id,
+        inbox_ids: this.inbox_ids,
         inter_cert_content: this.inter_cert_content,
         inter_key_content: this.inter_key_content,
         proactive_pix_polling_enabled: this.isInterCredentialsReady
@@ -223,15 +215,16 @@ export default {
       <div class="small-12 columns">
         <label>
           {{ $t('CAPTAIN_SETTINGS.UNITS.INBOX.CONNECT_UNIT_LABEL') }}
-          <select v-model="inbox_id">
-            <option
+          <div class="inbox-multiselect">
+            <label
               v-for="option in inboxOptions"
-              :key="option.id === null ? 'no-inbox' : option.id"
-              :value="option.id"
+              :key="option.id"
+              class="inbox-option"
             >
+              <input v-model="inbox_ids" type="checkbox" :value="option.id" />
               {{ option.name }}
-            </option>
-          </select>
+            </label>
+          </div>
           <p class="help-text">
             {{ $t('CAPTAIN_SETTINGS.UNITS.INBOX.CONNECT_UNIT_HELP') }}
           </p>
@@ -401,36 +394,23 @@ export default {
 </template>
 
 <style scoped>
-.content-box {
-  padding: var(--space-large);
-}
-.button-wrapper {
+.inbox-multiselect {
   display: flex;
-  justify-content: flex-end;
-  gap: var(--space-small);
-  margin-top: var(--space-normal);
-}
-.help-text {
-  font-size: var(--font-size-mini);
-  color: var(--s-500);
+  flex-direction: column;
+  gap: var(--space-smaller);
   margin-top: var(--space-micro);
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--s-200);
+  border-radius: var(--border-radius-normal);
+  padding: var(--space-small);
 }
-.text-success {
-  color: var(--color-success);
-}
-.file-upload-wrapper {
-  margin-bottom: var(--space-small);
-  margin-top: var(--space-micro);
-}
-.hidden-file-input {
-  display: none;
-}
-.checkbox-wrapper {
+.inbox-option {
   display: flex;
   align-items: center;
   gap: var(--space-smaller);
-}
-.checkbox-label {
+  font-weight: normal;
   margin: 0;
+  cursor: pointer;
 }
 </style>
