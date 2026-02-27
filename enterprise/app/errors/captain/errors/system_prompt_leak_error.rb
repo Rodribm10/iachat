@@ -1,6 +1,3 @@
-p
-module Captain
-  module Errors
-    class SystemPromptLeakError < StandardError; end
-  end
-end
+# frozen_string_literal: true
+
+class Captain::Errors::SystemPromptLeakError < StandardError; end
