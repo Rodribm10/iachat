@@ -4,11 +4,13 @@ class Captain::PromptRenderer
   class << self
     def render(template_name, context = {})
       template = load_template(template_name)
-      liquid_template = Liquid::Template.parse(template)
-      liquid_template.render(stringify_keys(context))
+      render_string(template, context)
     end
 
-    private
+    def render_string(template_string, context = {})
+      liquid_template = Liquid::Template.parse(template_string)
+      liquid_template.render(stringify_keys(context))
+    end
 
     def load_template(template_name)
       template_path = Rails.root.join('enterprise', 'lib', 'captain', 'prompts', "#{template_name}.liquid")
@@ -17,6 +19,8 @@ class Captain::PromptRenderer
 
       File.read(template_path)
     end
+
+    private
 
     def stringify_keys(hash)
       hash.deep_stringify_keys

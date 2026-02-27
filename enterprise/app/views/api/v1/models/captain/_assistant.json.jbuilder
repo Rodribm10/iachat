@@ -1,9 +1,11 @@
 json.account_id resource.account_id
 json.config resource.config
 json.created_at resource.created_at.to_i
+json.default_orchestrator_prompt Captain::PromptRenderer.load_template('assistant')
 json.description resource.description
 json.guardrails resource.guardrails
 json.id resource.id
 json.name resource.name
+json.orchestrator_prompt resource.orchestrator_prompt
 json.response_guidelines resource.response_guidelines
 json.updated_at resource.updated_at.to_i

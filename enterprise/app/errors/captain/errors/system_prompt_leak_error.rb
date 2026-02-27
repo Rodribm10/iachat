@@ -1,7 +1,6 @@
-# rubocop:disable Style/ClassAndModuleChildren
+p
 module Captain
   module Errors
     class SystemPromptLeakError < StandardError; end
   end
 end
-# rubocop:enable Style/ClassAndModuleChildren

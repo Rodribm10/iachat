@@ -13,6 +13,7 @@ import SettingsHeader from 'dashboard/components-next/captain/pageComponents/set
 import AssistantBasicSettingsForm from 'dashboard/components-next/captain/pageComponents/assistant/settings/AssistantBasicSettingsForm.vue';
 import AssistantSystemSettingsForm from 'dashboard/components-next/captain/pageComponents/assistant/settings/AssistantSystemSettingsForm.vue';
 import AssistantControlItems from 'dashboard/components-next/captain/pageComponents/assistant/settings/AssistantControlItems.vue';
+import OrchestratorPromptEditor from 'dashboard/components-next/captain/pageComponents/assistant/settings/OrchestratorPromptEditor.vue';
 import DeleteDialog from 'dashboard/components-next/captain/pageComponents/DeleteDialog.vue';
 
 const { t } = useI18n();
@@ -139,6 +140,22 @@ const handleDeleteSuccess = () => {
               "
             />
             <AssistantSystemSettingsForm
+              :assistant="assistant"
+              @submit="handleSubmit"
+            />
+          </div>
+          <span class="h-px w-full bg-n-weak mt-2" />
+          <!-- Orchestrator Prompt -->
+          <div class="flex flex-col gap-6">
+            <SettingsHeader
+              :heading="
+                t('CAPTAIN.ASSISTANTS.ORCHESTRATOR_PROMPT.SECTION_TITLE')
+              "
+              :description="
+                t('CAPTAIN.ASSISTANTS.ORCHESTRATOR_PROMPT.SECTION_DESCRIPTION')
+              "
+            />
+            <OrchestratorPromptEditor
               :assistant="assistant"
               @submit="handleSubmit"
             />

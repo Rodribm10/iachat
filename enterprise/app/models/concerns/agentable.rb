@@ -25,13 +25,24 @@ module Concerns::Agentable
       )
     end
 
-    Captain::PromptRenderer.render(template_name, enhanced_context.with_indifferent_access)
+    ctx = enhanced_context.with_indifferent_access
+
+    custom = orchestrator_prompt_override
+    if custom.present?
+      Captain::PromptRenderer.render_string(custom, ctx)
+    else
+      Captain::PromptRenderer.render(template_name, ctx)
+    end
   end
 
   private
 
   def agent_name
     raise NotImplementedError, "#{self.class} must implement agent_name"
+  end
+
+  def orchestrator_prompt_override
+    respond_to?(:orchestrator_prompt) ? orchestrator_prompt.presence : nil
   end
 
   def template_name

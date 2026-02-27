@@ -11,6 +11,7 @@
 #  llm_model              :string           default("gpt-3.5-turbo")
 #  llm_provider           :string           default("openai")
 #  name                   :string           not null
+#  orchestrator_prompt    :text
 #  response_guidelines    :jsonb
 #  created_at             :datetime         not null
 #  updated_at             :datetime         not null
