@@ -105,6 +105,29 @@ class Whatsapp::Providers::Wuzapi::PayloadParser
     params.dig(:event, :Info, :IsGroup) || params.dig(:event, :IsGroup)
   end
 
+  def attachment_params
+    media_key = case message_type
+                when :image then :imageMessage
+                when :audio then :audioMessage
+                when :video then :videoMessage
+                when :document then :documentMessage
+                when :sticker then :stickerMessage
+                end
+    return nil unless media_key
+
+    msg = unwrap_ephemeral_message(params.dig(:event, :Message))
+    data = msg[media_key]
+    return nil unless data.is_a?(Hash)
+
+    {
+      external_url: data['URL'],
+      file_name: data['fileName'] || "file_#{external_id}",
+      mimetype: data['mimetype'],
+      thumbnail: data['JPEGThumbnail'],
+      media_key: data['mediaKey']
+    }
+  end
+
   def text_content
     # Direct text field (some WuzAPI versions)
     return params.dig(:event, :Text) if params.dig(:event, :Text).present?

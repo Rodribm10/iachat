@@ -14,7 +14,7 @@ class Whatsapp::Wuzapi::MediaHandler
       file: {
         io: file_io,
         filename: final_filename(attachment_data),
-        content_type: attachment_data[:mimetype] || 'application/octet-stream'
+        content_type: sanitize_content_type(attachment_data[:mimetype], @parser.message_type)
       }
     )
   end
@@ -68,12 +68,22 @@ class Whatsapp::Wuzapi::MediaHandler
     name = data[:file_name] || "wuzapi_#{Time.now.to_i}"
     ext = File.extname(name)
     ext = detect_extension(data[:mimetype], @parser.message_type) if ext.blank?
+    # Normalise audio extension: WhatsApp always sends OGG/Opus, never MP3
+    ext = '.ogg' if @parser.message_type == :audio && ext == '.mp3'
     "#{File.basename(name, '.*')}#{ext}"
+  end
+
+  def sanitize_content_type(mimetype, type)
+    # WhatsApp audio is OGG-wrapped Opus. audio/opus is raw Opus (wrong container header).
+    # Saving as audio/ogg ensures browsers can play via <audio> without issues.
+    return 'audio/ogg' if type == :audio && mimetype.to_s.include?('opus')
+
+    mimetype || 'application/octet-stream'
   end
 
   def detect_extension(mimetype, type)
     return '.jpg' if type == :image || type == :sticker
-    return '.mp3' if type == :audio
+    return '.ogg' if type == :audio
     return '.mp4' if type == :video
 
     case mimetype
