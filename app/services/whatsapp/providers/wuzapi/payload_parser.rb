@@ -73,98 +73,7 @@ class Whatsapp::Providers::Wuzapi::PayloadParser
     params.dig(:event, :State)
   end
 
-  def in_reply_to_external_id
-    msg = unwrap_ephemeral_message(params.dig(:event, :Message))
-    return nil unless msg.is_a?(Hash)
-
-    # DEBUG: Log the message structure to understand reply context
-    Rails.logger.info "WuzAPI Reply Debug: Message keys = #{msg.keys.inspect}"
-
-    # 1. Extended text
-    ctx = msg.dig(:extendedTextMessage, :contextInfo)
-    if ctx.present?
-      Rails.logger.info "WuzAPI Reply Debug: Found extendedTextMessage contextInfo = #{ctx.inspect}"
-      stanza = ctx[:stanzaID] || ctx[:stanzaId]
-      return stanza if stanza.present?
-    end
-
-    # 2. Media Types direct contextInfo
-    [:imageMessage, :videoMessage, :audioMessage, :stickerMessage, :documentMessage].each do |key|
-      ctx = msg.dig(key, :contextInfo)
-      next if ctx.blank?
-
-      Rails.logger.info "WuzAPI Reply Debug: Found #{key} contextInfo = #{ctx.inspect}"
-      stanza = ctx[:stanzaID] || ctx[:stanzaId]
-      return stanza if stanza.present?
-    end
-
-    # 3. Document With Caption
-    if msg.key?(:documentWithCaptionMessage)
-      ctx = msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :contextInfo)
-      if ctx.present?
-        Rails.logger.info "WuzAPI Reply Debug: Found documentWithCaptionMessage contextInfo = #{ctx.inspect}"
-        return ctx[:stanzaID] || ctx[:stanzaId]
-      end
-    end
-
-    # 4. Check for simple conversation with contextInfo (text reply without extendedTextMessage)
-    if msg[:conversation].present? && msg[:contextInfo].present?
-      ctx = msg[:contextInfo]
-      Rails.logger.info "WuzAPI Reply Debug: Found conversation contextInfo = #{ctx.inspect}"
-      stanza = ctx[:stanzaID] || ctx[:stanzaId]
-      return stanza if stanza.present?
-    end
-
-    Rails.logger.info 'WuzAPI Reply Debug: No reply context found'
-    nil
-  end
-
-  def text_content
-    msg = unwrap_ephemeral_message(params.dig(:event, :Message))
-    # Legacy fallback used by some WuzAPI payload variants
-    return params.dig(:event, :Text) if params.dig(:event, :Text).present?
-    return nil unless msg.is_a?(Hash)
-
-    # 1. Simple text
-    return msg[:conversation] if msg[:conversation].present?
-
-    # 2. Extended Text
-    return msg.dig(:extendedTextMessage, :text) if msg.dig(:extendedTextMessage, :text).present?
-
-    # 3. Media Captions (Image, Video, Document)
-    [:imageMessage, :videoMessage, :documentMessage].each do |media_key|
-      caption = msg.dig(media_key, :caption)
-      return caption if caption.present?
-    end
-
-    # 4. Document With Caption
-    return msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :caption) if msg.key?(:documentWithCaptionMessage)
-
-    nil
-  end
-
-  def attachment_params
-    media_key = case message_type
-                when :image then :imageMessage
-                when :audio then :audioMessage
-                when :video then :videoMessage
-                when :document then :documentMessage
-                when :sticker then :stickerMessage
-                end
-    return nil unless media_key
-
-    msg = unwrap_ephemeral_message(params.dig(:event, :Message))
-    data = msg[media_key]
-    return nil unless data.is_a?(Hash)
-
-    {
-      external_url: data['URL'],
-      file_name: data['fileName'] || "file_#{external_id}",
-      mimetype: data['mimetype'],
-      thumbnail: data['JPEGThumbnail'],
-      media_key: data['mediaKey']
-    }
-  end
+  include Whatsapp::Wuzapi::PayloadParserExtension
 
   def sender_phone_number
     jid = extract_jid
@@ -225,19 +134,16 @@ class Whatsapp::Providers::Wuzapi::PayloadParser
   end
 
   def fallback_message_type_from_payload
-    # Fallback: detect type from message body shape, even when Info.Type is missing or inconsistent.
     msg = unwrap_ephemeral_message(params.dig(:event, :Message))
-
-    if msg.is_a?(Hash)
-      return :text if msg[:conversation].present? || msg[:extendedTextMessage].present? || msg.dig(:extendedTextMessage, :text).present?
-      return :image if msg[:imageMessage].present?
-      return :audio if msg[:audioMessage].present?
-      return :video if msg[:videoMessage].present?
-      return :document if msg[:documentMessage].present? || msg[:documentWithCaptionMessage].present?
-      return :sticker if msg[:stickerMessage].present?
-    end
-
     return :text if params.dig(:event, :Text).present?
+    return :unknown unless msg.is_a?(Hash)
+
+    return :text if msg[:conversation].present? || msg[:extendedTextMessage].present?
+    return :image if msg[:imageMessage].present?
+    return :audio if msg[:audioMessage].present?
+    return :video if msg[:videoMessage].present?
+    return :sticker if msg[:stickerMessage].present?
+    return :document if msg[:documentMessage].present? || msg[:documentWithCaptionMessage].present?
 
     :unknown
   end
@@ -250,27 +156,24 @@ class Whatsapp::Providers::Wuzapi::PayloadParser
 
   def extract_jid
     if from_me?
-      # For outgoing messages, prefer Chat if it's a real number
-      chat = params.dig(:event, :Info, :Chat) || params.dig(:event, :Chat)
-      return chat if chat&.include?('@s.whatsapp.net')
-
-      # Fallback to RecipientAlt when Chat uses LID format
-      recipient_alt = params.dig(:event, :Info, :RecipientAlt) || params.dig(:event, :RecipientAlt)
-      return recipient_alt if recipient_alt&.include?('@s.whatsapp.net')
-
-      chat # Return original Chat even if LID (will be filtered later)
+      extract_recipient_jid
     else
-      sender = params.dig(:event, :Info, :Sender) || params.dig(:event, :Sender)
-      sender_alt = params.dig(:event, :Info, :SenderAlt) || params.dig(:event, :SenderAlt)
-
-      # Prefer @s.whatsapp.net over @lid
-      if sender&.include?('@s.whatsapp.net')
-        sender
-      elsif sender_alt&.include?('@s.whatsapp.net')
-        sender_alt
-      else
-        sender
-      end
+      extract_sender_jid
     end
+  end
+
+  def extract_recipient_jid
+    chat = params.dig(:event, :Info, :Chat) || params.dig(:event, :Chat)
+    return chat if chat&.include?('@s.whatsapp.net')
+
+    recipient_alt = params.dig(:event, :Info, :RecipientAlt) || params.dig(:event, :RecipientAlt)
+    recipient_alt&.include?('@s.whatsapp.net') ? recipient_alt : chat
+  end
+
+  def extract_sender_jid
+    sender = params.dig(:event, :Info, :Sender) || params.dig(:event, :Sender)
+    sender_alt = params.dig(:event, :Info, :SenderAlt) || params.dig(:event, :SenderAlt)
+
+    sender&.include?('@s.whatsapp.net') ? sender : (sender_alt || sender)
   end
 end

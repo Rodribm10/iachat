@@ -50,7 +50,13 @@ class Attachment < ApplicationRecord
 
   # NOTE: the URl returned does a 301 redirect to the actual file
   def file_url
-    file.attached? ? url_for(file) : ''
+    return '' unless file.attached?
+
+    if Rails.env.development?
+      rails_storage_proxy_url(file, **dev_url_options)
+    else
+      url_for(file)
+    end
   end
 
   # NOTE: for External services use this methods since redirect doesn't work effectively in a lot of cases
@@ -66,7 +72,12 @@ class Attachment < ApplicationRecord
     return '' unless file.attached? && image?
 
     begin
-      url_for(file.representation(resize_to_fill: [250, nil]))
+      representation = file.representation(resize_to_fill: [250, nil])
+      if Rails.env.development?
+        rails_storage_proxy_url(representation, **dev_url_options)
+      else
+        url_for(representation)
+      end
     rescue ActiveStorage::UnrepresentableError => e
       Rails.logger.warn "Unrepresentable image attachment: #{id} (#{file.filename}) - #{e.message}"
       ''
@@ -186,6 +197,12 @@ class Attachment < ApplicationRecord
 
   def media_file?(file_content_type)
     file_content_type.start_with?('image/', 'video/', 'audio/')
+  end
+
+  def dev_url_options
+    uri = URI.parse(ENV.fetch('FRONTEND_URL', 'http://localhost:3000').chomp('/'))
+    host = [80, 443].include?(uri.port) ? uri.host : "#{uri.host}:#{uri.port}"
+    { host: host, protocol: uri.scheme }
   end
 
   # Marcel gem may detect OGG/Opus files as audio/opus instead of audio/ogg.

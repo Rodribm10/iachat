@@ -32,6 +32,8 @@ Rails.application.configure do
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = ENV.fetch('ACTIVE_STORAGE_SERVICE', 'local').to_sym
 
+  config.active_storage.resolve_model_to_route = :rails_storage_proxy
+
   config.active_job.queue_adapter = :sidekiq
 
   Rails.application.routes.default_url_options = { host: ENV['FRONTEND_URL'].to_s.chomp('/') }

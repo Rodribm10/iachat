@@ -114,4 +114,12 @@ export default defineConfig({
     mockReset: true,
     clearMocks: true,
   },
+  server: {
+    proxy: {
+      '/rails': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
+    },
+  },
 });
