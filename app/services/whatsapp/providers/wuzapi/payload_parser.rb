@@ -105,6 +105,28 @@ class Whatsapp::Providers::Wuzapi::PayloadParser
     params.dig(:event, :Info, :IsGroup) || params.dig(:event, :IsGroup)
   end
 
+  def text_content
+    # Direct text field (some WuzAPI versions)
+    return params.dig(:event, :Text) if params.dig(:event, :Text).present?
+
+    msg = unwrap_ephemeral_message(params.dig(:event, :Message))
+    return nil unless msg.is_a?(Hash)
+
+    # Standard conversation text
+    return msg[:conversation] if msg[:conversation].present?
+
+    # Extended text message (links, mentions, formatting)
+    return msg.dig(:extendedTextMessage, :text) if msg.dig(:extendedTextMessage, :text).present?
+
+    # Media captions
+    %i[imageMessage videoMessage documentMessage audioMessage stickerMessage].each do |key|
+      caption = msg.dig(key, :caption)
+      return caption if caption.present?
+    end
+
+    nil
+  end
+
   private
 
   def webhook_event_type
@@ -128,6 +150,7 @@ class Whatsapp::Providers::Wuzapi::PayloadParser
       Presence
       PresenceUpdate
       Ack
+      UndecryptableMessage
     ]
 
     ignorable.include?(webhook_event_type)
