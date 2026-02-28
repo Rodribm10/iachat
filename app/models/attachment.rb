@@ -53,7 +53,8 @@ class Attachment < ApplicationRecord
     return '' unless file.attached?
 
     if Rails.env.development?
-      rails_storage_proxy_url(file, **dev_url_options)
+      # Use relative path so browser loads directly from local server (avoids ngrok interstitial)
+      rails_storage_proxy_path(file)
     else
       url_for(file)
     end
@@ -74,7 +75,7 @@ class Attachment < ApplicationRecord
     begin
       representation = file.representation(resize_to_fill: [250, nil])
       if Rails.env.development?
-        rails_storage_proxy_url(representation, **dev_url_options)
+        rails_storage_proxy_path(representation)
       else
         url_for(representation)
       end
