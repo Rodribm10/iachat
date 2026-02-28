@@ -52,7 +52,7 @@ class Whatsapp::IncomingMessageWuzapiService < Whatsapp::IncomingMessageBaseServ
       @contact = find_or_create_contact(parser)
       return if @contact.nil? # If contact couldn't be determined, stop processing
 
-      @conversation = find_or_create_conversation(@contact)
+      @conversation = find_or_create_conversation(@contact, parser)
 
       # 5. Echo/AI Deduplication Logic
       # ------------------------------
@@ -124,7 +124,7 @@ class Whatsapp::IncomingMessageWuzapiService < Whatsapp::IncomingMessageBaseServ
     contact
   end
 
-  def find_or_create_conversation(contact)
+  def find_or_create_conversation(contact, parser = nil)
     # Find the LAST open conversation for this contact to append to
     conversation = inbox.conversations.where(contact_id: contact.id)
                         .where.not(status: :resolved)
@@ -136,12 +136,26 @@ class Whatsapp::IncomingMessageWuzapiService < Whatsapp::IncomingMessageBaseServ
     # Find the ContactInbox association to linking
     contact_inbox = ContactInbox.find_by(contact_id: contact.id, inbox_id: inbox.id)
 
+    # Build additional_attributes — include referral info from Click-to-WhatsApp ads if present
+    extra_attrs = {}
+    if parser
+      referral = parser.referral_info
+      if referral.present?
+        # "referer" is the field Chatwoot automations use for "Link de origem" condition
+        extra_attrs['referer'] = referral[:source_url].presence || 'meta_ads'
+        extra_attrs['source_type'] = referral[:source_type] if referral[:source_type].present?
+        extra_attrs['ctwa_clid'] = referral[:ctwa_clid] if referral[:ctwa_clid].present?
+        Rails.logger.info "WuzAPI: Setting conversation referer='#{extra_attrs['referer']}' from ad referral"
+      end
+    end
+
     # If no open conversation, create a new one
     inbox.conversations.create!(
       contact: contact,
       contact_inbox: contact_inbox, # Explicitly required by Chatwoot validation
       status: :open,
-      account_id: inbox.account_id
+      account_id: inbox.account_id,
+      additional_attributes: extra_attrs
     )
   end
 
@@ -261,28 +275,30 @@ class Whatsapp::IncomingMessageWuzapiService < Whatsapp::IncomingMessageBaseServ
       Rails.logger.warn "WuzAPI: Endpoint download failed - #{e.message}"
     end
 
-    # METHOD 2: Try local decryption if we have mediaKey
-    if attachment_data[:media_key].present?
-      Rails.logger.info 'WuzAPI: Attempting local decryption (mediaKey present)...'
-      decrypted = Whatsapp::DecryptionService.new(
-        media_url,
-        attachment_data[:media_key],
-        file_content_type(message_type)
-      ).decrypt
-
-      return decrypted if decrypted
-
-      Rails.logger.warn 'WuzAPI: Local decryption failed...'
-    end
-
-    # METHOD 3: Direct download (only works for non-encrypted or already-decrypted URLs)
-    Rails.logger.info "WuzAPI: Direct download from #{media_url}"
-    Down.download(
+    # METHOD 2+3: Download from CDN (follows redirects) then decrypt if mediaKey available
+    Rails.logger.info "WuzAPI: Downloading from CDN #{media_url}"
+    encrypted_tempfile = Down.download(
       media_url,
       open_timeout: 10,
       read_timeout: 30,
       ssl_verify_mode: OpenSSL::SSL::VERIFY_NONE
     )
+    encrypted_bytes = encrypted_tempfile.read.b
+    Rails.logger.info "WuzAPI: Downloaded #{encrypted_bytes.bytesize} bytes from CDN"
+
+    if attachment_data[:media_key].present?
+      Rails.logger.info 'WuzAPI: Attempting local decryption (mediaKey present)...'
+      decrypted = Whatsapp::DecryptionService.new(
+        attachment_data[:media_key],
+        file_content_type(message_type)
+      ).decrypt_bytes(encrypted_bytes)
+
+      return decrypted if decrypted
+
+      Rails.logger.warn 'WuzAPI: Local decryption failed, returning raw bytes'
+    end
+
+    StringIO.new(encrypted_bytes)
   rescue StandardError => e
     Rails.logger.error "WuzAPI: All download methods failed - #{e.message}"
     nil

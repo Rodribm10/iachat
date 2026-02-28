@@ -1,7 +1,6 @@
 class Whatsapp::DecryptionService
   require 'openssl'
   require 'base64'
-  require 'net/http'
 
   # HKDF Info strings for different media types (WhatsApp protocol)
   INFO_STRINGS = {
@@ -12,55 +11,42 @@ class Whatsapp::DecryptionService
     sticker: 'WhatsApp Image Keys'
   }.freeze
 
-  def initialize(media_url, media_key, media_type)
-    @media_url = media_url
+  def initialize(media_key, media_type)
     @media_key = Base64.decode64(media_key)
     @media_type = media_type.to_sym
     @info = INFO_STRINGS[@media_type] || INFO_STRINGS[:document]
   end
 
-  def decrypt
-    return nil unless @media_url && @media_key
+  def decrypt_bytes(encrypted_bytes)
+    return nil unless @media_key && encrypted_bytes && encrypted_bytes.bytesize > 10
 
-    # 1. Download encrypted bytes
-    encrypted_bytes = download_content
-    return nil unless encrypted_bytes && encrypted_bytes.bytesize > 10
+    Rails.logger.info "WuzAPI Decrypt: Processing #{encrypted_bytes.bytesize} bytes"
 
-    Rails.logger.info "WuzAPI Decrypt: Downloaded #{encrypted_bytes.bytesize} bytes"
-
-    # 2. Derive keys using HKDF SHA-256 (112 bytes total)
+    # Derive keys using HKDF SHA-256 (112 bytes total)
     expanded_key = OpenSSL::KDF.hkdf(
       @media_key,
-      salt: ''.b,  # Empty binary string
+      salt: ''.b,
       info: @info,
       length: 112,
       hash: 'sha256'
     )
 
-    # 3. Split derived key
     iv = expanded_key[0...16]
     cipher_key = expanded_key[16...48]
-    # mac_key = expanded_key[48...80]  # For verification (optional)
-    # ref_key = expanded_key[80...112] # Not used
 
-    # 4. WhatsApp file structure: [Encrypted Content] + [MAC (10 bytes)]
-    # Remove the last 10 bytes (MAC)
+    # WhatsApp file structure: [Encrypted Content] + [MAC (10 bytes)]
     cipher_text = encrypted_bytes[0...-10]
 
-    # 5. Try AES-256-CBC first (older WhatsApp versions)
     decrypted = try_aes_cbc(cipher_key, iv, cipher_text)
-
-    # 6. If CBC fails, try CTR mode (some implementations use this)
     decrypted ||= try_aes_ctr(cipher_key, iv, cipher_text)
 
     return nil unless decrypted
 
-    # 7. Validate that we got a valid image (check magic bytes)
     if valid_media?(decrypted)
       Rails.logger.info 'WuzAPI Decrypt: SUCCESS - Valid media detected'
       StringIO.new(decrypted)
     else
-      Rails.logger.warn 'WuzAPI Decrypt: Decrypted but invalid media format'
+      Rails.logger.warn "WuzAPI Decrypt: Decrypted but invalid format (first bytes: #{decrypted.bytes[0..3].map { |b| format('%02X', b) }.join(' ')})"
       nil
     end
   rescue StandardError => e
@@ -77,7 +63,7 @@ class Whatsapp::DecryptionService
     decipher.iv = iv
     decipher.padding = 0  # WhatsApp doesn't use PKCS7 padding
 
-    decipher.update!(data) + decipher.final
+    decipher.update(data) + decipher.final
 
   rescue OpenSSL::Cipher::CipherError => e
     Rails.logger.debug { "AES-CBC failed: #{e.message}" }
@@ -90,7 +76,7 @@ class Whatsapp::DecryptionService
     decipher.key = key
     decipher.iv = iv
 
-    decipher.update!(data) + decipher.final
+    decipher.update(data) + decipher.final
 
   rescue OpenSSL::Cipher::CipherError => e
     Rails.logger.debug { "AES-CTR failed: #{e.message}" }
@@ -126,20 +112,4 @@ class Whatsapp::DecryptionService
     false
   end
 
-  def download_content
-    uri = URI.parse(@media_url)
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = (uri.scheme == 'https')
-    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-    http.open_timeout = 10
-    http.read_timeout = 30
-
-    request = Net::HTTP::Get.new(uri.request_uri)
-    response = http.request(request)
-
-    response.is_a?(Net::HTTPSuccess) ? response.body.b : nil
-  rescue StandardError => e
-    Rails.logger.error "WuzAPI Decrypt Download Error: #{e.message}"
-    nil
-  end
 end

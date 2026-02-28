@@ -1,8 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
-import { useLoadWithRetry } from 'dashboard/composables/loadWithRetry';
 import BaseBubble from './Base.vue';
 import Button from 'next/button/Button.vue';
 import Icon from 'next/icon/Icon.vue';
@@ -20,18 +19,10 @@ const attachment = computed(() => {
   return attachments.value[0];
 });
 
-const { isLoaded, hasError, loadWithRetry } = useLoadWithRetry({
-  type: 'image',
-});
+const hasError = ref(false);
 
 const showGallery = ref(false);
 const isDownloading = ref(false);
-
-onMounted(() => {
-  if (attachment.value?.dataUrl) {
-    loadWithRetry(attachment.value.dataUrl);
-  }
-});
 
 const downloadAttachment = async () => {
   const { fileType, dataUrl, extension } = attachment.value;
@@ -62,12 +53,13 @@ const handleImageError = () => {
         {{ $t('COMPONENTS.MEDIA.IMAGE_UNAVAILABLE') }}
       </p>
     </div>
-    <div v-else-if="isLoaded" class="relative group rounded-lg overflow-hidden">
+    <div v-else class="relative group rounded-lg overflow-hidden">
       <img
         class="skip-context-menu"
         :src="attachment.dataUrl"
         :width="attachment.width"
         :height="attachment.height"
+        @error="handleImageError"
       />
       <div
         class="inset-0 p-2 pointer-events-none absolute bg-gradient-to-tl from-n-slate-12/30 dark:from-n-slate-1/50 via-transparent to-transparent hidden group-hover:flex"

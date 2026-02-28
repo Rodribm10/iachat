@@ -1,13 +1,6 @@
 <script setup>
-import {
-  computed,
-  onMounted,
-  useTemplateRef,
-  ref,
-  getCurrentInstance,
-} from 'vue';
+import { computed, useTemplateRef, ref, getCurrentInstance } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useLoadWithRetry } from 'dashboard/composables/loadWithRetry';
 import Icon from 'next/icon/Icon.vue';
 import { timeStampAppendedURL } from 'dashboard/helper/URLHelper';
 import { downloadFile } from '@chatwoot/utils';
@@ -30,9 +23,7 @@ defineOptions({
 });
 
 const { t } = useI18n();
-const { isLoaded, hasError, loadWithRetry } = useLoadWithRetry({
-  type: 'audio',
-});
+const hasError = ref(false);
 
 const timeStampURL = computed(() => {
   return timeStampAppendedURL(attachment.dataUrl);
@@ -59,11 +50,9 @@ const playbackSpeedLabel = computed(() => {
   return `${playbackSpeed.value}x`;
 });
 
-onMounted(() => {
-  if (attachment.dataUrl) {
-    loadWithRetry(attachment.dataUrl);
-  }
-});
+const handleAudioError = () => {
+  hasError.value = true;
+};
 
 // Listen for global audio play events and pause if it's not this audio
 useEmitter('pause_playing_audio', currentPlayingId => {
@@ -143,7 +132,7 @@ const downloadAudio = async () => {
       {{ t('COMPONENTS.MEDIA.AUDIO_UNAVAILABLE') }}
     </p>
   </div>
-  <template v-else-if="isLoaded">
+  <template v-else>
     <audio
       ref="audioPlayer"
       controls
@@ -152,6 +141,7 @@ const downloadAudio = async () => {
       @loadedmetadata="onLoadedMetadata"
       @timeupdate="onTimeUpdate"
       @ended="onEnd"
+      @error="handleAudioError"
     >
       <source :src="timeStampURL" />
     </audio>

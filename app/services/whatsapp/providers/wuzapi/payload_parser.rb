@@ -166,6 +166,40 @@ class Whatsapp::Providers::Wuzapi::PayloadParser
     }
   end
 
+  # Returns referral/ad tracking info for Click-to-WhatsApp Meta Ads messages.
+  # WuzAPI/whatsmeow may include this in extendedTextMessage.contextInfo.externalAdReply
+  # or via Info.Category = "business". Returns nil if no referral data found.
+  def referral_info
+    msg = unwrap_ephemeral_message(params.dig(:event, :Message))
+
+    # Check externalAdReply in extendedTextMessage (Click-to-WhatsApp ad flow)
+    if msg.is_a?(Hash)
+      ad_reply = msg.dig(:extendedTextMessage, :contextInfo, :externalAdReply)
+      ad_reply ||= msg.dig('extendedTextMessage', 'contextInfo', 'externalAdReply')
+
+      if ad_reply.is_a?(Hash) && ad_reply.present?
+        Rails.logger.info "WuzAPI: Click-to-WhatsApp referral detected: #{ad_reply.inspect}"
+        return {
+          source_url: ad_reply['sourceUrl'] || ad_reply[:sourceUrl],
+          source_id: ad_reply['sourceId'] || ad_reply[:sourceId],
+          source_type: 'ad',
+          ctwa_clid: ad_reply['ctwaClid'] || ad_reply[:ctwaClid],
+          headline: ad_reply['title'] || ad_reply[:title],
+          body: ad_reply['body'] || ad_reply[:body]
+        }
+      end
+    end
+
+    # Check Info.Category — some WuzAPI versions mark business-initiated as "business"
+    category = params.dig(:event, :Info, :Category).to_s.downcase
+    if category == 'business'
+      Rails.logger.info 'WuzAPI: Business category message detected (possible CTWA ad)'
+      return { source_type: 'ad', source_url: nil }
+    end
+
+    nil
+  end
+
   def sender_phone_number
     jid = extract_jid
 

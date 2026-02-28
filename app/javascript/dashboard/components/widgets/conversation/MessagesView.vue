@@ -366,6 +366,9 @@ export default {
       this.conversationPanel.removeEventListener('scroll', this.handleScroll);
     },
     scrollToBottom() {
+      if (!this.conversationPanel) {
+        return;
+      }
       this.isProgrammaticScroll = true;
       let relevantMessages = [];
 
