@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
@@ -27,7 +27,12 @@ const { t } = useI18n();
 const units = useMapGetter('captainUnits/getUnits');
 const inboxes = useMapGetter('inboxes/getInboxes');
 
+const dialogRef = ref(null);
 const isLoading = ref(false);
+
+onMounted(() => {
+  dialogRef.value?.open();
+});
 
 const form = ref({
   contact_id: '',
@@ -95,6 +100,7 @@ const submitReservation = async () => {
 
 <template>
   <Dialog
+    ref="dialogRef"
     :title="$t('CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.TITLE')"
     :confirm-button-label="
       $t('CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.CONFIRM')
