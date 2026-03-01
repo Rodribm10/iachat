@@ -1,4 +1,4 @@
-import * as MutationTypes from '../mutation-types';
+import MutationTypes from '../mutation-types';
 import CaptainReportsAPI from '../../api/captain/reports';
 
 export const getters = {

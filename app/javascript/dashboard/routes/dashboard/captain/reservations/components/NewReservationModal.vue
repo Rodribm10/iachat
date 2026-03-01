@@ -76,8 +76,8 @@ const statusOptions = computed(() => [
     value: 'pending_payment',
   },
   {
-    label: t('CAPTAIN_RESERVATIONS.STATUS.ACTIVE'),
-    value: 'active',
+    label: t('CAPTAIN_RESERVATIONS.STATUS.CONFIRMED'),
+    value: 'confirmed',
   },
 ]);
 

@@ -54,10 +54,13 @@
       "ACTIONS": "Ações"
     },
     "STATUS": {
-      "DRAFT": "Rascunho",
+      "SCHEDULED": "Agendado",
       "PENDING_PAYMENT": "Aguardando pagamento",
+      "ACTIVE": "Ativa",
       "CONFIRMED": "Confirmada",
-      "CANCELLED": "Cancelada"
+      "COMPLETED": "Concluída",
+      "CANCELLED": "Cancelada",
+      "DRAFT": "Rascunho"
     },
     "ACTIONS": {
       "OPEN_CONVERSATION": "Abrir conversa",

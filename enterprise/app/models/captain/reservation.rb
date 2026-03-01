@@ -60,11 +60,11 @@ class Captain::Reservation < ApplicationRecord
   belongs_to :contact
   belongs_to :contact_inbox
   belongs_to :conversation, class_name: '::Conversation', optional: true
-  belongs_to :brand, class_name: 'Captain::Brand', foreign_key: 'captain_brand_id', optional: true
-  belongs_to :unit, class_name: 'Captain::Unit', foreign_key: 'captain_unit_id', optional: true
+  belongs_to :brand, class_name: 'Captain::Brand', foreign_key: 'captain_brand_id', optional: true, inverse_of: false
+  belongs_to :unit, class_name: 'Captain::Unit', foreign_key: 'captain_unit_id', optional: true, inverse_of: false
   belongs_to :current_pix_charge, class_name: 'Captain::PixCharge', optional: true
 
-  enum status: { scheduled: 0, active: 1, completed: 2, cancelled: 3, pending_payment: 4, draft: 5 }
+  enum status: { scheduled: 0, active: 1, completed: 2, cancelled: 3, pending_payment: 4, draft: 5, confirmed: 6 }
 
   validates :suite_identifier, presence: true
   validates :check_in_at, presence: true

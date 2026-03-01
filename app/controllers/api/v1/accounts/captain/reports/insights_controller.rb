@@ -32,6 +32,10 @@ class Api::V1::Accounts::Captain::Reports::InsightsController < Api::V1::Account
     unit_id      = params[:unit_id].present? ? params[:unit_id].to_i : nil
     inbox_id     = params[:inbox_id].present? ? params[:inbox_id].to_i : nil
 
+    # Log parameters to help debugging
+    Rails.logger.info '[Captain::Reports::InsightsController] Generating insight ' \
+                      "for Unit: #{unit_id}, Inbox: #{inbox_id}, Period: #{period_start} to #{period_end}"
+
     enqueue_insight(unit_id, inbox_id, period_start, period_end)
   end
   # rubocop:enable Metrics/AbcSize
@@ -69,8 +73,10 @@ class Api::V1::Accounts::Captain::Reports::InsightsController < Api::V1::Account
   end
 
   def parse_date(param, default)
-    param.present? ? Date.parse(param) : default
-  rescue ArgumentError
+    return default if param.blank?
+
+    Date.parse(param.to_s)
+  rescue ArgumentError, TypeError
     default
   end
 

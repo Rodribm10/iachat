@@ -33,13 +33,16 @@ const onFilterChange = async event => {
 };
 
 const onGenerateInsight = async () => {
+  if (uiFlags.value.isGenerating) return;
   try {
     await store.dispatch('captainReports/generateInsight', {
       inbox_id: selectedInboxId.value,
     });
     useAlert(t('CAPTAIN_REPORTS.GENERATE.SUCCESS'));
-  } catch {
-    useAlert(t('CAPTAIN_REPORTS.GENERATE.ERROR'));
+  } catch (error) {
+    const errorMessage =
+      error?.response?.data?.message || t('CAPTAIN_REPORTS.GENERATE.ERROR');
+    useAlert(errorMessage);
   }
 };
 
@@ -103,6 +106,7 @@ const periodLabel = insight =>
             <Button
               :label="t('CAPTAIN_REPORTS.GENERATE.BUTTON')"
               icon="i-lucide-sparkles"
+              color="blue"
               :is-loading="uiFlags.isGenerating"
               @click="onGenerateInsight"
             />
@@ -240,6 +244,7 @@ const periodLabel = insight =>
             <Button
               :label="t('CAPTAIN_REPORTS.GENERATE.BUTTON')"
               icon="i-lucide-sparkles"
+              color="blue"
               :is-loading="uiFlags.isGenerating"
               @click="onGenerateInsight"
             />

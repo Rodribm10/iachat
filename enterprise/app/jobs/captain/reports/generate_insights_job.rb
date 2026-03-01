@@ -4,6 +4,10 @@ class Captain::Reports::GenerateInsightsJob < ApplicationJob
   # Gera insights de IA para uma unidade ou inbox específica em um período.
   # Pode ser disparado on-demand (botão na UI) ou pelo WeeklyInsightsJob.
   def perform(account_id, unit_id, period_start, period_end, inbox_id = nil)
+    # Ensure dates are Date objects as they might be serialized as strings in Sidekiq
+    period_start = period_start.is_a?(String) ? Date.parse(period_start) : period_start
+    period_end   = period_end.is_a?(String) ? Date.parse(period_end) : period_end
+
     account = Account.find_by(id: account_id)
     return unless account
 
