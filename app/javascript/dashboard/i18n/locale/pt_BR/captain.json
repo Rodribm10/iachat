@@ -13,6 +13,8 @@
         "CONTACT_ID_PLACEHOLDER": "Digite o ID do contato",
         "INBOX": "Canal (Caixa de Entrada)",
         "INBOX_PLACEHOLDER": "Selecione a caixa de entrada",
+        "STATUS": "Status da Reserva",
+        "STATUS_PLACEHOLDER": "Selecione o status",
         "SUITE_IDENTIFIER": "Identificador da Suíte (Ex: 101, Suíte Master)",
         "CHECK_IN": "Check-in",
         "CHECK_OUT": "Check-out",

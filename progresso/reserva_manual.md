@@ -23,6 +23,8 @@ Antes, a rotina de criação de reservas ocorria exclusivamente de forma automat
 4. **Integração nas Telas (Views):**
    - **`Index.vue`** (Reservas em Lista Geral): Renderiza o subcomponente modal em overlay disparado pelo Header Button "Nova Reserva", onde recarrega as reservas (`fetchReservations(1)`) após inserção de sucesso.
    - **`ReservationSummary.vue`** (Painel lateral das conversas): Disponibilizado um novo botão que repassa diretamente os identificadores do Contato Atual e a Inbox Atual para que o formulário da Reserva seja gerado já pré-povoado e associado devidamente, exibido caso `!hasMarker`.
+- **Simplificação do Modal:** O campo de seleção de 'Unidade' foi removido do modal de criação manual, pois o sistema vincula a unidade automaticamente com base na Caixa de Entrada (Inbox) selecionada. Isso evita erros de preenchimento e facilita a operação.
+- **Traduções:** Atualizadas as chaves de tradução para tornar os campos mais descritivos (ex: Identificador da Suíte).
 
 **Principais Códigos e Arquivos Alterados:**
 - `app/javascript/dashboard/routes/dashboard/captain/reservations/components/NewReservationModal.vue`

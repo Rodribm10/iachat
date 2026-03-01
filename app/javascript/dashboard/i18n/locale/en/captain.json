@@ -13,6 +13,8 @@
         "CONTACT_ID_PLACEHOLDER": "Enter the contact ID",
         "INBOX": "Inbox",
         "INBOX_PLACEHOLDER": "Select an inbox",
+        "STATUS": "Reservation Status",
+        "STATUS_PLACEHOLDER": "Select status",
         "SUITE_IDENTIFIER": "Suite Identifier (Ex: 101, Master Suite)",
         "CHECK_IN": "Check-in",
         "CHECK_OUT": "Check-out",

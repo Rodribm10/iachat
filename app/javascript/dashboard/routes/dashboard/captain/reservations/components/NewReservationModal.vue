@@ -40,6 +40,7 @@ const form = ref({
   check_in_at: '',
   check_out_at: '',
   total_amount: '',
+  status: 'scheduled',
 });
 
 watch(
@@ -64,6 +65,21 @@ const inboxOptions = computed(() => {
     value: inbox.id,
   }));
 });
+
+const statusOptions = computed(() => [
+  {
+    label: t('CAPTAIN_RESERVATIONS.STATUS.SCHEDULED'),
+    value: 'scheduled',
+  },
+  {
+    label: t('CAPTAIN_RESERVATIONS.STATUS.PENDING_PAYMENT'),
+    value: 'pending_payment',
+  },
+  {
+    label: t('CAPTAIN_RESERVATIONS.STATUS.ACTIVE'),
+    value: 'active',
+  },
+]);
 
 const closeModal = () => {
   emit('close');
@@ -131,6 +147,22 @@ const submitReservation = async () => {
           :placeholder="
             $t(
               'CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.FIELDS.INBOX_PLACEHOLDER'
+            )
+          "
+        />
+      </div>
+
+      <!-- Status -->
+      <div>
+        <label class="block mb-1 text-sm font-medium text-n-slate-12">
+          {{ $t('CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.FIELDS.STATUS') }}
+        </label>
+        <ComboBox
+          v-model="form.status"
+          :options="statusOptions"
+          :placeholder="
+            $t(
+              'CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.FIELDS.STATUS_PLACEHOLDER'
             )
           "
         />
