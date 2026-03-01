@@ -277,5 +277,107 @@
         }
       }
     }
+  },
+  "CAPTAIN": {
+    "BANNER": {
+      "RESPONSES": "Você usou mais de 80% do seu limite de respostas. Para continuar usando o Captain AI, faça um upgrade.",
+      "DOCUMENTS": "Limite de documentos atingido. Faça um upgrade para continuar usando o Captain AI."
+    },
+    "FORM": {
+      "CANCEL": "Cancelar",
+      "CREATE": "Criar",
+      "EDIT": "Atualizar"
+    },
+    "RESPONSES": {
+      "HEADER": "FAQs",
+      "PENDING_FAQS": "Pending FAQs",
+      "ADD_NEW": "Criar nova FAQ",
+      "DOCUMENTABLE": {
+        "CONVERSATION": "Conversação #{id}"
+      },
+      "SELECTED": "{count} selecionado",
+      "SELECT_ALL": "Selecionar todos ({count})",
+      "UNSELECT_ALL": "Desmarcar todos ({count})",
+      "SEARCH_PLACEHOLDER": "Pesquisar FAQs...",
+      "BULK_APPROVE_BUTTON": "Aprovar",
+      "BULK_DELETE_BUTTON": "Excluir",
+      "BULK_APPROVE": {
+        "SUCCESS_MESSAGE": "Perguntas Frequentes aprovadas com sucesso",
+        "ERROR_MESSAGE": "Ocorreu um erro ao aprovar as Perguntas Frequentes. Tente novamente."
+      },
+      "BULK_DELETE": {
+        "TITLE": "Excluir as Perguntas Frequentes?",
+        "DESCRIPTION": "Tem certeza que deseja excluir as Perguntas Frequentes selecionadas? Esta ação não pode ser desfeita.",
+        "CONFIRM": "Sim, excluir todas",
+        "SUCCESS_MESSAGE": "Perguntas Frequentes excluídas com sucesso/",
+        "ERROR_MESSAGE": "Ocorreu um erro ao excluir as Perguntas Frequentes, por favor tente novamente."
+      },
+      "DELETE": {
+        "TITLE": "Tem certeza que deseja excluir o FAQ?",
+        "DESCRIPTION": "",
+        "CONFIRM": "Sim, excluir",
+        "SUCCESS_MESSAGE": "FAQ excluída com sucesso",
+        "ERROR_MESSAGE": "Ocorreu um erro ao excluir a FAQ, por favor tente novamente."
+      },
+      "FILTER": {
+        "ASSISTANT": "Assistente: {selected}",
+        "STATUS": "Status: {selected}",
+        "ALL_ASSISTANTS": "Todos"
+      },
+      "STATUS": {
+        "TITLE": "Status",
+        "PENDING": "Pendentes",
+        "APPROVED": "Aceito",
+        "ALL": "Todos"
+      },
+      "PENDING_BANNER": {
+        "TITLE": "Captain has found some FAQs your customers were looking for.",
+        "ACTION": "Click here to review"
+      },
+      "FORM_DESCRIPTION": "Adicione uma pergunta e sua resposta correspondente à base de conhecimento e selecione o assistente ao qual deve estar associado.",
+      "CREATE": {
+        "TITLE": "Adicionar uma FAQ",
+        "SUCCESS_MESSAGE": "A resposta foi adicionada com sucesso.",
+        "ERROR_MESSAGE": "Ocorreu um erro ao adicionar a resposta. Por favor, tente novamente."
+      },
+      "FORM": {
+        "QUESTION": {
+          "LABEL": "Pergunta",
+          "PLACEHOLDER": "Digite a pergunta aqui",
+          "ERROR": "Por favor, forneça uma pergunta válida."
+        },
+        "ANSWER": {
+          "LABEL": "Responder",
+          "PLACEHOLDER": "Digite a resposta aqui",
+          "ERROR": "Por favor, forneça uma resposta válida."
+        },
+        "ASSISTANT": {
+          "LABEL": "Assistente",
+          "PLACEHOLDER": "Selecione um assistente",
+          "ERROR": "Por favor, selecione um assistente."
+        }
+      },
+      "EDIT": {
+        "TITLE": "Atualizar as Perguntas Frequentes",
+        "SUCCESS_MESSAGE": "As Perguntas Frequentes foram atualizadas com sucesso",
+        "ERROR_MESSAGE": "Ocorreu um erro ao atualizar as Perguntas Frequentes, por favor tente novamente",
+        "APPROVE_SUCCESS_MESSAGE": "As Perguntas Frequentes foram marcadas como aprovadas"
+      },
+      "OPTIONS": {
+        "APPROVE": "Aprovar",
+        "EDIT_RESPONSE": "Alterar",
+        "DELETE_RESPONSE": "Excluir"
+      },
+      "EMPTY_STATE": {
+        "TITLE": "Nenhuma FAQ encontrada",
+        "NO_PENDING_TITLE": "There are no more pending FAQs to review",
+        "SUBTITLE": "Perguntas Frequentes ajudam seu assistente a fornecer respostas rápidas e precisas para perguntas de seus clientes. Eles podem ser gerados automaticamente a partir do seu conteúdo ou podem ser adicionados manualmente.",
+        "CLEAR_SEARCH": "Clear active filters",
+        "FEATURE_SPOTLIGHT": {
+          "TITLE": "Captain FAQ",
+          "NOTE": "Captain FAQs detects common customer questions—whether missing from your knowledge base or frequently asked—and generates relevant FAQs to improve support. You can review each suggestion and decide whether to approve or reject it."
+        }
+      }
+    }
   }
 }

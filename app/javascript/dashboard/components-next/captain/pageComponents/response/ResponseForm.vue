@@ -8,6 +8,7 @@ import { useMapGetter } from 'dashboard/composables/store';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Editor from 'dashboard/components-next/Editor/Editor.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
+import ComboBox from 'dashboard/components-next/combobox/ComboBox.vue';
 
 const props = defineProps({
   mode: {
@@ -18,6 +19,10 @@ const props = defineProps({
   response: {
     type: Object,
     default: () => ({}),
+  },
+  assistants: {
+    type: Array,
+    default: () => [],
   },
 });
 
@@ -31,14 +36,23 @@ const formState = {
 const initialState = {
   question: '',
   answer: '',
+  assistant_id: '',
 };
 
 const state = reactive({ ...initialState });
 
-const validationRules = {
-  question: { required, minLength: minLength(1) },
-  answer: { required, minLength: minLength(1) },
-};
+const validationRules = computed(() => {
+  const rules = {
+    question: { required, minLength: minLength(1) },
+    answer: { required, minLength: minLength(1) },
+  };
+
+  if (props.assistants && props.assistants.length > 0) {
+    rules.assistant_id = { required };
+  }
+
+  return rules;
+});
 
 const v$ = useVuelidate(validationRules, state);
 
@@ -53,6 +67,12 @@ const getErrorMessage = (field, errorKey) => {
 const formErrors = computed(() => ({
   question: getErrorMessage('question', 'QUESTION'),
   answer: getErrorMessage('answer', 'ANSWER'),
+  assistant_id: v$.value.assistant_id?.$error
+    ? t(
+        'CAPTAIN.RESPONSES.FORM.ASSISTANT.ERROR',
+        'Por favor, selecione um assistente.'
+      )
+    : '',
 }));
 
 const handleCancel = () => emit('cancel');
@@ -60,6 +80,7 @@ const handleCancel = () => emit('cancel');
 const prepareDocumentDetails = () => ({
   question: state.question,
   answer: state.answer,
+  ...(state.assistant_id ? { assistant_id: state.assistant_id } : {}),
 });
 
 const handleSubmit = async () => {
@@ -74,18 +95,19 @@ const handleSubmit = async () => {
 const updateStateFromResponse = response => {
   if (!response) return;
 
-  const { question, answer } = response;
+  const { question, answer, assistant_id } = response;
 
   Object.assign(state, {
     question,
     answer,
+    assistant_id: assistant_id || '',
   });
 };
 
 watch(
   () => props.response,
   newResponse => {
-    if (props.mode === 'edit' && newResponse) {
+    if (newResponse) {
       updateStateFromResponse(newResponse);
     }
   },
@@ -110,7 +132,27 @@ watch(
       :max-length="10000"
       :message-type="formErrors.answer ? 'error' : 'info'"
     />
-    <div class="flex items-center justify-between w-full gap-3">
+    <div
+      v-if="assistants && assistants.length > 0"
+      class="flex flex-col w-full gap-2"
+    >
+      <label class="text-sm font-medium text-n-slate-11">
+        {{ t('CAPTAIN.RESPONSES.FORM.ASSISTANT.LABEL', 'Assistente') }}
+      </label>
+      <ComboBox
+        v-model="state.assistant_id"
+        :options="assistants"
+        :has-error="!!formErrors.assistant_id"
+        :message="formErrors.assistant_id"
+        :placeholder="
+          t(
+            'CAPTAIN.RESPONSES.FORM.ASSISTANT.PLACEHOLDER',
+            'Por favor selecione o Assistente'
+          )
+        "
+      />
+    </div>
+    <div class="flex items-center justify-between w-full gap-3 mt-2">
       <Button
         type="button"
         variant="faded"

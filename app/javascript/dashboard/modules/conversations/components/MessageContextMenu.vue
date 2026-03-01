@@ -4,6 +4,7 @@ import { mapGetters } from 'vuex';
 import { useMessageFormatter } from 'shared/composables/useMessageFormatter';
 import ContextMenu from 'dashboard/components/ui/ContextMenu.vue';
 import AddCannedModal from 'dashboard/routes/dashboard/settings/canned/AddCanned.vue';
+import CreateResponseDialog from 'dashboard/components-next/captain/pageComponents/response/CreateResponseDialog.vue';
 import { useSnakeCase } from 'dashboard/composables/useTransformKeys';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
 import { conversationUrl, frontendURL } from '../../../helper/URLHelper';
@@ -20,6 +21,7 @@ import { useUISettings } from 'dashboard/composables/useUISettings';
 export default {
   components: {
     AddCannedModal,
+    CreateResponseDialog,
     MenuItem,
     ContextMenu,
     NextButton,
@@ -60,6 +62,7 @@ export default {
   data() {
     return {
       isCannedResponseModalOpen: false,
+      isFaqModalOpen: false,
       showDeleteModal: false,
       showEditModal: false,
       editedContent: '',
@@ -71,6 +74,7 @@ export default {
       getAccount: 'accounts/getAccount',
       currentAccountId: 'getCurrentAccountId',
       getUISettings: 'getUISettings',
+      copilotAssistant: 'getCopilotAssistant',
     }),
     plainTextContent() {
       return this.getPlainText(this.messageContent);
@@ -125,10 +129,29 @@ export default {
     showCannedResponseModal() {
       useTrack(ACCOUNT_EVENTS.ADDED_TO_CANNED_RESPONSE);
       this.isCannedResponseModalOpen = true;
+      this.handleClose();
     },
     hideCannedResponseModal() {
       this.isCannedResponseModalOpen = false;
+    },
+    async showFaqModal() {
+      useTrack(ACCOUNT_EVENTS.ADDED_TO_CANNED_RESPONSE);
+      try {
+        await this.$store.dispatch(
+          'getInboxCaptainAssistantById',
+          this.conversationId
+        );
+      } catch (error) {
+        // Silence error, we can still open the modal
+      }
+      this.isFaqModalOpen = true;
       this.handleClose();
+      this.$nextTick(() => {
+        this.$refs.faqDialog?.dialogRef?.open();
+      });
+    },
+    hideFaqModal() {
+      this.isFaqModalOpen = false;
     },
     handleOpen(e) {
       this.$emit('open', e);
@@ -163,7 +186,7 @@ export default {
           messageId: this.messageId,
         });
         useAlert(this.$t('CONVERSATION.SUCCESS_DELETE_MESSAGE'));
-        this.handleClose();
+        this.showDeleteModal = false;
       } catch (error) {
         useAlert(this.$t('CONVERSATION.FAIL_DELETE_MESSSAGE'));
       }
@@ -213,7 +236,7 @@ export default {
   <div class="context-menu">
     <!-- Add To Canned Responses -->
     <woot-modal
-      v-if="isCannedResponseModalOpen && enabledOptions['cannedResponse']"
+      v-if="isCannedResponseModalOpen"
       v-model:show="isCannedResponseModalOpen"
       :on-close="hideCannedResponseModal"
     >
@@ -222,9 +245,20 @@ export default {
         :on-close="hideCannedResponseModal"
       />
     </woot-modal>
+    <!-- Add To FAQ -->
+    <CreateResponseDialog
+      v-if="isFaqModalOpen"
+      ref="faqDialog"
+      type="create"
+      :selected-response="{
+        question: plainTextContent,
+        assistant_id: copilotAssistant?.id,
+      }"
+      @close="hideFaqModal"
+    />
     <!-- Confirm Deletion -->
     <woot-delete-modal
-      v-if="showDeleteModal && enabledOptions['delete']"
+      v-if="showDeleteModal"
       v-model:show="showDeleteModal"
       class="context-menu--delete-modal"
       :on-close="closeDeleteModal"
@@ -280,6 +314,7 @@ export default {
         </form>
       </div>
     </woot-modal>
+
     <NextButton
       v-if="!hideButton"
       ghost
@@ -289,8 +324,9 @@ export default {
       class="invisible group-hover/context-menu:visible"
       @click="handleOpen"
     />
+
     <ContextMenu
-      v-if="isOpen && !isCannedResponseModalOpen"
+      v-if="isOpen"
       :x="contextMenuPosition.x"
       :y="contextMenuPosition.y"
       @close="handleClose"
@@ -337,10 +373,10 @@ export default {
           v-if="enabledOptions['cannedResponse']"
           :option="{
             icon: 'comment-add',
-            label: $t('CONVERSATION.CONTEXT_MENU.CREATE_A_CANNED_RESPONSE'),
+            label: 'Criar FAQ',
           }"
           variant="icon"
-          @click.stop="showCannedResponseModal"
+          @click.stop="showFaqModal"
         />
         <MenuItem
           v-if="enabledOptions['edit']"

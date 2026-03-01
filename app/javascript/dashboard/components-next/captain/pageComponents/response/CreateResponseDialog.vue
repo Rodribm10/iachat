@@ -1,6 +1,6 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { useStore } from 'dashboard/composables/store';
+import { ref, computed, onMounted } from 'vue';
+import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
@@ -27,6 +27,22 @@ const route = useRoute();
 const dialogRef = ref(null);
 const responseForm = ref(null);
 
+const assistants = useMapGetter('captainAssistants/getRecords');
+
+const assistantOptions = computed(() => {
+  if (route.params.assistantId) return [];
+  return assistants.value.map(assistant => ({
+    label: assistant.name,
+    value: assistant.id,
+  }));
+});
+
+onMounted(() => {
+  if (!route.params.assistantId && !assistants.value.length) {
+    store.dispatch('captainAssistants/get');
+  }
+});
+
 const updateResponse = responseDetails =>
   store.dispatch('captainResponses/update', {
     id: props.selectedResponse.id,
@@ -40,15 +56,17 @@ const createResponse = responseDetails =>
 
 const handleSubmit = async updatedResponse => {
   try {
+    const assistantId =
+      route.params.assistantId || updatedResponse.assistant_id;
     if (props.type === 'edit') {
       await updateResponse({
         ...updatedResponse,
-        assistant_id: route.params.assistantId,
+        assistant_id: assistantId,
       });
     } else {
       await createResponse({
         ...updatedResponse,
-        assistant_id: route.params.assistantId,
+        assistant_id: assistantId,
       });
     }
     useAlert(t(`${i18nKey.value}.SUCCESS_MESSAGE`));
@@ -84,6 +102,7 @@ defineExpose({ dialogRef });
       ref="responseForm"
       :mode="type"
       :response="selectedResponse"
+      :assistants="assistantOptions"
       @submit="handleSubmit"
       @cancel="handleCancel"
     />
