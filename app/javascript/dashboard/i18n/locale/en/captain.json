@@ -12,10 +12,8 @@
         "CONTACT_ID": "Contact ID",
         "CONTACT_ID_PLACEHOLDER": "Enter the contact ID",
         "INBOX": "Inbox",
-        "INBOX_PLACEHOLDER": "Select inbox",
-        "UNIT": "Unit",
-        "UNIT_PLACEHOLDER": "Select unit",
-        "SUITE_IDENTIFIER": "Suite Identifier",
+        "INBOX_PLACEHOLDER": "Select an inbox",
+        "SUITE_IDENTIFIER": "Suite Identifier (Ex: 101, Master Suite)",
         "CHECK_IN": "Check-in",
         "CHECK_OUT": "Check-out",
         "TOTAL_AMOUNT": "Total Amount"

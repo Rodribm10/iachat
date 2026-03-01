@@ -271,7 +271,6 @@ const statusColor = reservationStatus => {
 
 onMounted(() => {
   readFiltersFromRoute();
-  store.dispatch('captainUnits/get');
   if (isRevenueView.value) {
     fetchRevenue();
     return;

@@ -12,10 +12,8 @@
         "CONTACT_ID": "ID do Contato",
         "CONTACT_ID_PLACEHOLDER": "Digite o ID do contato",
         "INBOX": "Canal (Caixa de Entrada)",
-        "INBOX_PLACEHOLDER": "Selecione a caixa",
-        "UNIT": "Unidade",
-        "UNIT_PLACEHOLDER": "Selecione a unidade",
-        "SUITE_IDENTIFIER": "Identificador da Suíte",
+        "INBOX_PLACEHOLDER": "Selecione a caixa de entrada",
+        "SUITE_IDENTIFIER": "Identificador da Suíte (Ex: 101, Suíte Master)",
         "CHECK_IN": "Check-in",
         "CHECK_OUT": "Check-out",
         "TOTAL_AMOUNT": "Valor Total"

@@ -24,7 +24,6 @@ const emit = defineEmits(['close', 'success']);
 const store = useStore();
 const { t } = useI18n();
 
-const units = useMapGetter('captainUnits/getUnits');
 const inboxes = useMapGetter('inboxes/getInboxes');
 
 const dialogRef = ref(null);
@@ -37,7 +36,6 @@ onMounted(() => {
 const form = ref({
   contact_id: '',
   inbox_id: '',
-  captain_unit_id: '',
   suite_identifier: '',
   check_in_at: '',
   check_out_at: '',
@@ -59,13 +57,6 @@ watch(
   },
   { immediate: true }
 );
-
-const unitOptions = computed(() => {
-  return (units.value || []).map(unit => ({
-    label: unit.name,
-    value: unit.id,
-  }));
-});
 
 const inboxOptions = computed(() => {
   return (inboxes.value || []).map(inbox => ({
@@ -140,22 +131,6 @@ const submitReservation = async () => {
           :placeholder="
             $t(
               'CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.FIELDS.INBOX_PLACEHOLDER'
-            )
-          "
-        />
-      </div>
-
-      <!-- Unit -->
-      <div>
-        <label class="block mb-1 text-sm font-medium text-n-slate-12">
-          {{ $t('CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.FIELDS.UNIT') }}
-        </label>
-        <ComboBox
-          v-model="form.captain_unit_id"
-          :options="unitOptions"
-          :placeholder="
-            $t(
-              'CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.FIELDS.UNIT_PLACEHOLDER'
             )
           "
         />
