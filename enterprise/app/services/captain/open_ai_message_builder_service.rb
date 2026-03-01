@@ -91,6 +91,9 @@ class Captain::OpenAiMessageBuilderService
     audio_attachments.map do |attachment|
       result = Messages::AudioTranscriptionService.new(attachment).perform
       result[:success] ? result[:transcriptions] : ''
+    rescue StandardError => e
+      Rails.logger.error "[Captain::OpenAiMessageBuilderService] Failed to extract audio transcription: #{e.message}"
+      ''
     end.join
   end
 end

@@ -27,27 +27,39 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     @inbox = conversation.inbox
     @assistant = assistant
 
-    # Cancel if there are newer messages after the provided message
     return if debounce_requested?(message)
 
-    # Simulate reading the message before starting to type
-    delay_before_typing(message)
+    with_concurrency_lock do
+      # Pre-typing phase: Wait 1 second before showing the typing indicator
+      sleep(1.0)
+      return if debounce_requested?(message)
 
-    # Re-check debounce to avoid race condition where another message arrived during reading sleep
-    return if debounce_requested?(message)
-
-    # Trigger typing on before processing
-    simulate_typing('typing_on')
-    @start_time = Time.zone.now
-
-    begin
-      execute_agent_response
-    ensure
-      simulate_typing('typing_off')
+      simulate_typing_and_execute
     end
   end
 
   private
+
+  def with_concurrency_lock
+    lock_key = "captain_response_lock_#{@conversation.id}"
+    return unless Rails.cache.write(lock_key, true, unless_exist: true, expires_in: 60.seconds)
+
+    begin
+      yield
+    ensure
+      Rails.cache.delete(lock_key)
+    end
+  end
+
+  def simulate_typing_and_execute
+    # Trigger typing on before processing
+    simulate_typing('typing_on')
+    @start_time = Time.zone.now
+
+    execute_agent_response
+  ensure
+    simulate_typing('typing_off')
+  end
 
   def execute_agent_response
     Current.executed_by = @assistant
@@ -72,29 +84,14 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     return false if message.blank?
 
     last_incoming = @conversation.messages.where(message_type: :incoming).last
-    last_incoming.present? && last_incoming.id != message.id
-  end
-
-  def delay_before_typing(message)
-    return if message.blank? || message.content.blank?
-
-    chars_count = message.content.to_s.length
-    configured_delay = @inbox.typing_delay.to_i
-
-    # Simulate reading time proportional to configured delay. Max reading is ~40% of configured delay.
-    max_reading = configured_delay.positive? ? (configured_delay * 0.4) : 4.0
-    min_reading = [1.0, max_reading].min
-    reading_time = (chars_count / 25.0).clamp(min_reading, max_reading)
-
-    # Add jitter (randomness between 85% and 120%)
-    jitter = 0.85 + (rand * 0.35)
-    delay = reading_time * jitter
-
-    Rails.logger.info(
-      "[CAPTAIN][ResponseBuilderJob] Simulating reading delay of #{delay.round(2)}s " \
-      "for message of #{chars_count} chars"
-    )
-    sleep(delay)
+    is_debounce = last_incoming.present? && last_incoming.id != message.id
+    if is_debounce
+      Rails.logger.info(
+        '[CAPTAIN][ResponseBuilderJob] Debounce requested! ' \
+        "Current message ID: #{message.id}, Last incoming ID: #{last_incoming.id}"
+      )
+    end
+    is_debounce
   end
 
   def simulate_typing(status)
@@ -148,29 +145,25 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     text = response_text.to_s
     chars_count = text.length
     punctuation_pauses = text.count(',.!?;:')
-    configured_delay = @inbox.typing_delay.to_i
 
-    # Modela tempo de digitação de forma mais humana no WhatsApp:
-    # - Velocidade média de digitação: ~15 a 20 caracteres por segundo
-    # - Pequenas pausas por pontuação
+    # Velocidade média de digitação: ~15 a 20 caracteres por segundo
     base_time = (chars_count / 15.0) + (punctuation_pauses * 0.25)
 
-    # Se configurado, max_typing é o valor escolhido, senão, 12s
-    max_typing = configured_delay.positive? ? configured_delay.to_f : 12.0
-    min_delay = [2.0, max_typing].min
-
-    # Adicionando uma ligeira variação humana
+    # Variação humana (jitter)
     jitter = 0.85 + (rand * 0.35)
-    target_delay = (base_time * jitter).clamp(min_delay, max_typing)
+    target_delay = (base_time * jitter).clamp(2.0, 15.0)
 
     elapsed_time = Time.zone.now - @start_time
-    remaining_delay = target_delay - elapsed_time
+
+    # Para de digitar exatamente 1 segundo antes de disparar a mensagem final
+    # Limitamos para não ficar negativo se o processamento do LLM demorar mais do que a digitação calculada
+    remaining_delay = [target_delay - elapsed_time - 1.0, 0].max
 
     return unless remaining_delay.positive?
 
     Rails.logger.info(
       "[CAPTAIN][ResponseBuilderJob] Simulating typing delay of #{remaining_delay.round(2)}s " \
-      "(target: #{target_delay.round(2)}s, total elapsed: #{elapsed_time.round(2)}s, configured_max: #{max_typing}s)"
+      "(target: #{target_delay.round(2)}s, total elapsed: #{elapsed_time.round(2)}s, stopping 1s early)"
     )
     sleep(remaining_delay)
   end

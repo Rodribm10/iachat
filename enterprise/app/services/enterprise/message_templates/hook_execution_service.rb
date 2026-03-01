@@ -31,12 +31,19 @@ module Enterprise::MessageTemplates::HookExecutionService
 
   def schedule_captain_response
     job_args = [conversation, conversation.inbox.captain_assistant, message]
+    base_wait = conversation.inbox.typing_delay.to_i.seconds
 
     if message.attachments.blank?
-      Captain::Conversation::ResponseBuilderJob.perform_later(*job_args)
+      total_wait = base_wait
+      if total_wait.positive?
+        Captain::Conversation::ResponseBuilderJob.set(wait: total_wait).perform_later(*job_args)
+      else
+        Captain::Conversation::ResponseBuilderJob.perform_later(*job_args)
+      end
     else
-      wait_time = calculate_attachment_wait_time
-      Captain::Conversation::ResponseBuilderJob.set(wait: wait_time).perform_later(*job_args)
+      attachment_wait = calculate_attachment_wait_time
+      total_wait = base_wait + attachment_wait
+      Captain::Conversation::ResponseBuilderJob.set(wait: total_wait).perform_later(*job_args)
     end
   end
 
