@@ -27,6 +27,23 @@ class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::Ba
     @marker = Captain::Reservations::MarkerBuilder.build_for(@reservation)
   end
 
+  def create
+    ActiveRecord::Base.transaction do
+      @reservation = @reservations_scope.new(create_params)
+      @reservation.created_by = current_user
+      @reservation.metadata ||= {}
+
+      ensure_contact_inbox!
+
+      if @reservation.save
+        @marker = Captain::Reservations::MarkerBuilder.build_for(@reservation)
+        render 'api/v1/accounts/captain/reservations/show'
+      else
+        render json: { error: @reservation.errors.full_messages.join(', ') }, status: :unprocessable_entity
+      end
+    end
+  end
+
   def pix
     marker = Captain::Reservations::MarkerBuilder.build_for(@reservation)
     render json: {
@@ -152,5 +169,25 @@ class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::Ba
       :id, :account_id, :status, :date_from, :date_to, :unit_id, :suite, :q,
       :page, :per_page, :sort, :direction
     )
+  end
+
+  def create_params
+    params.require(:reservation).permit(
+      :contact_id, :inbox_id, :captain_unit_id, :suite_identifier,
+      :check_in_at, :check_out_at, :total_amount
+    )
+  end
+
+  def ensure_contact_inbox!
+    return if @reservation.contact_inbox_id.present? || @reservation.contact_id.blank? || @reservation.inbox_id.blank?
+
+    contact_inbox = ContactInbox.find_or_create_by!(
+      contact_id: @reservation.contact_id,
+      inbox_id: @reservation.inbox_id
+    ) do |ci|
+      ci.source_id = SecureRandom.uuid
+    end
+
+    @reservation.contact_inbox_id = contact_inbox.id
   end
 end

@@ -14,6 +14,14 @@ export default createStore({
         return throwErrorMessage(error);
       }
     },
+    create: async function create(_, data) {
+      try {
+        const response = await CaptainReservationsAPI.create(data);
+        return response.data;
+      } catch (error) {
+        return throwErrorMessage(error);
+      }
+    },
     fetchPix: async function fetchPix({ commit }, reservationId) {
       commit(mutations.SET_UI_FLAG, { fetchingItem: true });
       try {

@@ -75,7 +75,7 @@ Rails.application.routes.draw do
             resources :custom_tools
             resources :documents, only: [:index, :show, :create, :destroy]
             resources :gallery_items
-            resources :reservations, only: [:index, :show] do
+            resources :reservations, only: [:index, :show, :create] do
               collection do
                 get :revenue
               end

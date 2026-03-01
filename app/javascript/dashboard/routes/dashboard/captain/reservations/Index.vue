@@ -12,6 +12,7 @@ import Button from 'dashboard/components-next/button/Button.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import BarChart from 'shared/components/charts/BarChart.vue';
+import NewReservationModal from './components/NewReservationModal.vue';
 
 const store = useStore();
 const route = useRoute();
@@ -34,6 +35,7 @@ const unitId = ref('');
 const suite = ref('');
 const sort = ref('');
 const isFetchingRevenue = ref(false);
+const showNewReservationModal = ref(false);
 
 const emptyRevenue = () => ({
   summary: {
@@ -281,6 +283,7 @@ onMounted(() => {
 <template>
   <PageLayout
     :header-title="$t('CAPTAIN_RESERVATIONS.HEADER')"
+    :button-label="$t('CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.TITLE')"
     :feature-flag="FEATURE_FLAGS.CAPTAIN"
     :is-fetching="isPageFetching"
     :is-empty="isRevenueView ? !hasRevenueData : !reservations.length"
@@ -295,6 +298,7 @@ onMounted(() => {
     :current-page="isRevenueView ? 1 : reservationsMeta.page"
     :show-know-more="false"
     :show-assistant-switcher="false"
+    @click="showNewReservationModal = true"
     @update:current-page="onPageChange"
   >
     <template #controls>
@@ -634,4 +638,9 @@ onMounted(() => {
       </div>
     </template>
   </PageLayout>
+  <NewReservationModal
+    v-if="showNewReservationModal"
+    @close="showNewReservationModal = false"
+    @success="fetchReservations(1)"
+  />
 </template>

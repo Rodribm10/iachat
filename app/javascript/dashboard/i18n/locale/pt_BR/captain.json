@@ -2,6 +2,25 @@
   "CAPTAIN_RESERVATIONS": {
     "HEADER": "Reservas",
     "EMPTY": "Nenhuma reserva encontrada.",
+    "CREATE_SUCCESS": "Reserva criada com sucesso.",
+    "CREATE_ERROR": "Erro ao criar reserva.",
+    "NEW_RESERVATION_MODAL": {
+      "TITLE": "Nova Reserva",
+      "CONFIRM": "Criar Reserva",
+      "CANCEL": "Cancelar",
+      "FIELDS": {
+        "CONTACT_ID": "ID do Contato",
+        "CONTACT_ID_PLACEHOLDER": "Digite o ID do contato",
+        "INBOX": "Canal (Caixa de Entrada)",
+        "INBOX_PLACEHOLDER": "Selecione a caixa",
+        "UNIT": "Unidade",
+        "UNIT_PLACEHOLDER": "Selecione a unidade",
+        "SUITE_IDENTIFIER": "Identificador da Suíte",
+        "CHECK_IN": "Check-in",
+        "CHECK_OUT": "Check-out",
+        "TOTAL_AMOUNT": "Valor Total"
+      }
+    },
     "VIEW": {
       "LIST": "Lista",
       "KANBAN": "Kanban",

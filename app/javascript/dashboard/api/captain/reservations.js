@@ -10,6 +10,10 @@ class CaptainReservations extends ApiClient {
     return axios.get(this.url, { params });
   }
 
+  create(data) {
+    return axios.post(this.url, { reservation: data });
+  }
+
   show(id) {
     return axios.get(`${this.url}/${id}`);
   }

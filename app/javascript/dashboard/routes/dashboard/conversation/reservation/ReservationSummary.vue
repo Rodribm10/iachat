@@ -5,11 +5,20 @@ import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
 import Button from 'dashboard/components-next/button/Button.vue';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
+import NewReservationModal from 'dashboard/routes/dashboard/captain/reservations/components/NewReservationModal.vue';
 
 const props = defineProps({
   marker: {
     type: Object,
     default: () => ({}),
+  },
+  contactId: {
+    type: [Number, String],
+    default: null,
+  },
+  inboxId: {
+    type: [Number, String],
+    default: null,
   },
 });
 
@@ -18,6 +27,7 @@ const { t } = useI18n();
 
 const reservation = ref(null);
 const isLoading = ref(false);
+const showNewReservationModal = ref(false);
 
 const reservationId = computed(() => props.marker?.reservation_id);
 const hasMarker = computed(() => !!props.marker?.visible);
@@ -106,9 +116,18 @@ const onCopyPix = async () => {
 
 <template>
   <div class="flex flex-col gap-2 text-sm">
-    <p v-if="!hasMarker" class="text-n-slate-11">
-      {{ $t('CAPTAIN_RESERVATIONS.SIDEBAR.NO_RESERVATION') }}
-    </p>
+    <div v-if="!hasMarker" class="flex flex-col gap-3 py-1">
+      <p class="text-n-slate-11">
+        {{ $t('CAPTAIN_RESERVATIONS.SIDEBAR.NO_RESERVATION') }}
+      </p>
+      <Button
+        size="xs"
+        variant="outline"
+        icon="plus"
+        :label="$t('CAPTAIN_RESERVATIONS.NEW_RESERVATION_MODAL.TITLE')"
+        @click="showNewReservationModal = true"
+      />
+    </div>
 
     <div v-else-if="isLoading" class="text-n-slate-11">
       {{ $t('CAPTAIN_RESERVATIONS.SIDEBAR.LOADING') }}
@@ -177,4 +196,12 @@ const onCopyPix = async () => {
       </div>
     </template>
   </div>
+
+  <NewReservationModal
+    v-if="showNewReservationModal"
+    :prefilled-contact-id="contactId"
+    :prefilled-inbox-id="inboxId"
+    @close="showNewReservationModal = false"
+    @success="showNewReservationModal = false"
+  />
 </template>

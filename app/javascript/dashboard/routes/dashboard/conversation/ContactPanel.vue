@@ -232,7 +232,11 @@ onMounted(() => {
                   toggleSidebarUIState('is_reservation_summary_open', value)
               "
             >
-              <ReservationSummary :marker="reservationMarker" />
+              <ReservationSummary
+                :marker="reservationMarker"
+                :contact-id="contactId"
+                :inbox-id="inboxId"
+              />
             </AccordionItem>
           </div>
           <div v-else-if="element.name === 'contact_attributes'">
