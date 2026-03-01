@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
 import { useI18n } from 'vue-i18n';
@@ -16,12 +16,83 @@ const uiFlags = useMapGetter('captainReports/getUIFlags');
 
 const activeTab = ref('insights');
 const selectedInboxId = ref(null);
+const selectedPeriod = ref('last_week');
+const customStartDate = ref('');
+const customEndDate = ref('');
 
 const tabs = [{ key: 'insights' }, { key: 'operational' }];
+
+const getPeriodDates = period => {
+  const end = new Date();
+  const start = new Date();
+
+  switch (period) {
+    case 'last_7_days':
+      start.setDate(end.getDate() - 7);
+      break;
+    case 'last_week': {
+      // Segunda a Domingo da semana passada
+      const day = end.getDay();
+      const diffToLastSunday = day === 0 ? 7 : day;
+      end.setDate(end.getDate() - diffToLastSunday);
+      start.setDate(end.getDate() - 6);
+      break;
+    }
+    case 'current_month':
+      start.setDate(1);
+      break;
+    case 'custom':
+      return {
+        period_start: customStartDate.value,
+        period_end: customEndDate.value,
+      };
+    default:
+      start.setDate(end.getDate() - 7);
+  }
+
+  return {
+    period_start: start.toISOString().split('T')[0],
+    period_end: end.toISOString().split('T')[0],
+  };
+};
+
+let pollInterval = null;
+
+const startPolling = () => {
+  if (pollInterval) return;
+  pollInterval = setInterval(async () => {
+    await store.dispatch('captainReports/fetchInsights', {
+      inbox_id: selectedInboxId.value,
+    });
+  }, 10000);
+};
+
+const stopPolling = () => {
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+};
+
+const hasProcessingInsights = computed(() => {
+  return insights.value?.some(
+    i => i.status === 'pending' || i.status === 'processing'
+  );
+});
+
+watch(hasProcessingInsights, newVal => {
+  if (newVal) startPolling();
+  else stopPolling();
+});
 
 onMounted(async () => {
   await store.dispatch('inboxes/get');
   await store.dispatch('captainReports/fetchInsights', {});
+  if (hasProcessingInsights.value) startPolling();
+});
+
+onUnmounted(() => {
+  stopPolling();
 });
 
 const onFilterChange = async event => {
@@ -32,11 +103,24 @@ const onFilterChange = async event => {
   });
 };
 
+const onPeriodChange = event => {
+  selectedPeriod.value = event.target.value;
+};
+
 const onGenerateInsight = async () => {
   if (uiFlags.value.isGenerating) return;
+  const { period_start, period_end } = getPeriodDates(selectedPeriod.value);
+
+  if (!period_start || !period_end) {
+    useAlert(t('CAPTAIN_REPORTS.GENERATE.DATE_REQUIRED'));
+    return;
+  }
+
   try {
     await store.dispatch('captainReports/generateInsight', {
       inbox_id: selectedInboxId.value,
+      period_start,
+      period_end,
     });
     useAlert(t('CAPTAIN_REPORTS.GENERATE.SUCCESS'));
   } catch (error) {
@@ -45,7 +129,6 @@ const onGenerateInsight = async () => {
     useAlert(errorMessage);
   }
 };
-
 const statusLabel = status => {
   const map = {
     pending: t('CAPTAIN_REPORTS.STATUS.PENDING'),
@@ -68,6 +151,12 @@ const statusClass = status => {
 
 const formatDate = dateStr => {
   if (!dateStr) return '-';
+  // Use YYYY, MM, DD bits to avoid timezone shift from standard Date parsing
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts;
+    return `${day}/${month}/${year}`;
+  }
   return new Date(dateStr).toLocaleDateString('pt-BR');
 };
 
@@ -87,6 +176,46 @@ const periodLabel = insight =>
       >
         <template #actions>
           <div class="flex items-center gap-3">
+            <select
+              class="rounded-lg border border-n-weak bg-n-alpha-1 px-3 py-2 text-sm text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-brand"
+              :value="selectedPeriod"
+              @change="onPeriodChange"
+            >
+              <option value="last_7_days">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.LAST_7_DAYS') }}
+              </option>
+              <option value="last_week">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.LAST_WEEK') }}
+              </option>
+              <option value="current_month">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.CURRENT_MONTH') }}
+              </option>
+              <option value="custom">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.CUSTOM') }}
+              </option>
+            </select>
+
+            <div
+              v-if="selectedPeriod === 'custom'"
+              class="flex items-center gap-2"
+            >
+              <input
+                v-model="customStartDate"
+                type="date"
+                class="rounded-lg border border-n-weak bg-n-alpha-1 px-3 py-2 text-sm text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-brand"
+                :placeholder="t('CAPTAIN_REPORTS.FILTER_DATE.START')"
+              />
+              <span class="text-n-slate-9 mx-1">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.SEPARATOR') }}
+              </span>
+              <input
+                v-model="customEndDate"
+                type="date"
+                class="rounded-lg border border-n-weak bg-n-alpha-1 px-3 py-2 text-sm text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-brand"
+                :placeholder="t('CAPTAIN_REPORTS.FILTER_DATE.END')"
+              />
+            </div>
+
             <select
               class="rounded-lg border border-n-weak bg-n-alpha-1 px-3 py-2 text-sm text-n-slate-12 focus:outline-none focus:ring-2 focus:ring-n-brand"
               @change="onFilterChange"

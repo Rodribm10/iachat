@@ -57,6 +57,7 @@
       "SCHEDULED": "Scheduled",
       "PENDING_PAYMENT": "Awaiting payment",
       "ACTIVE": "Active",
+      "CONFIRMED": "Confirmed",
       "COMPLETED": "Completed",
       "CANCELLED": "Cancelled",
       "DRAFT": "Draft"
@@ -297,6 +298,101 @@
           "LABEL": "Available for agent sending"
         }
       }
+    }
+  },
+  "CAPTAIN": {
+    "BANNER": {
+      "RESPONSES": "You have used more than 80% of your responses limit. To continue using Captain AI, please upgrade.",
+      "DOCUMENTS": "Documents limit reached. Please upgrade to continue using Captain AI."
+    },
+    "FORM": {
+      "CANCEL": "Cancel",
+      "CREATE": "Create",
+      "EDIT": "Update"
+    },
+    "RESPONSES": {
+      "HEADER": "FAQs",
+      "PENDING_FAQS": "Pending FAQs",
+      "ADD_NEW": "Create new FAQ",
+      "DOCUMENTABLE": {
+        "CONVERSATION": "Conversation #{id}"
+      },
+      "SELECTED": "{count} selected",
+      "SELECT_ALL": "Select all ({count})",
+      "UNSELECT_ALL": "Unselect all ({count})",
+      "SEARCH_PLACEHOLDER": "Search FAQs...",
+      "BULK_APPROVE_BUTTON": "Approve",
+      "BULK_DELETE_BUTTON": "Delete",
+      "BULK_APPROVE": {
+        "SUCCESS_MESSAGE": "FAQs approved successfully",
+        "ERROR_MESSAGE": "An error occurred while approving FAQs. Try again."
+      },
+      "BULK_DELETE": {
+        "TITLE": "Delete FAQs?",
+        "DESCRIPTION": "Are you sure you want to delete selected FAQs? This action cannot be undone.",
+        "CONFIRM": "Yes, delete all",
+        "SUCCESS_MESSAGE": "FAQs deleted successfully",
+        "ERROR_MESSAGE": "An error occurred while deleting FAQs, please try again."
+      },
+      "DELETE": {
+        "TITLE": "Are you sure you want to delete this FAQ?",
+        "DESCRIPTION": "",
+        "CONFIRM": "Yes, delete",
+        "SUCCESS_MESSAGE": "FAQ deleted successfully",
+        "ERROR_MESSAGE": "An error occurred while deleting FAQ, please try again."
+      }
+    }
+  },
+  "CAPTAIN_REPORTS": {
+    "TITLE": "AI Reports",
+    "DESC": "Weekly AI-generated insights based on each unit's conversations.",
+    "LOADING": "Loading reports...",
+    "ALL_UNITS": "All units",
+    "ALL_INBOXES": "All inboxes",
+    "UNITS_GROUP": "Pix Units",
+    "INBOXES_GROUP": "Inboxes",
+    "TABS": {
+      "INSIGHTS": "AI Insights",
+      "OPERATIONAL": "Operational"
+    },
+    "FILTER_DATE": {
+      "LABEL": "Period:",
+      "START": "Start Date",
+      "END": "End Date",
+      "LAST_7_DAYS": "Last 7 days",
+      "LAST_WEEK": "Last Week",
+      "CURRENT_MONTH": "Current Month",
+      "CUSTOM": "Custom",
+      "SEPARATOR": "-"
+    },
+    "INSIGHT": {
+      "CONVERSATIONS": "conversations",
+      "MESSAGES": "messages",
+      "TOP_TOPICS": "Top Topics",
+      "AI_FAILURES": "AI Failures",
+      "BULLET": "•",
+      "COUNT_PREFIX": "(",
+      "COUNT_SUFFIX": ")"
+    },
+    "EMPTY": {
+      "TITLE": "No reports generated",
+      "MESSAGE": "Generate a new report to analyze support performance."
+    },
+    "GENERATE": {
+      "BUTTON": "Generate Analysis",
+      "SUCCESS": "Report requested successfully! It may take a few minutes.",
+      "ERROR": "Error requesting report generation.",
+      "DATE_REQUIRED": "Please select start and end dates."
+    },
+    "STATUS": {
+      "PENDING": "Pending",
+      "PROCESSING": "Processing",
+      "DONE": "Completed",
+      "FAILED": "Failed"
+    },
+    "OPERATIONAL": {
+      "COMING_SOON": "Coming soon",
+      "COMING_SOON_DESC": "Real-time operational data (reservations, Pix charges, etc.) will be available here soon."
     }
   }
 }

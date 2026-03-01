@@ -361,12 +361,12 @@
   },
   "CAPTAIN": {
     "NAME": "Capitão",
-    "HEADER_KNOW_MORE": "Know more",
+    "HEADER_KNOW_MORE": "Saiba mais",
     "ASSISTANT_SWITCHER": {
       "ASSISTANTS": "Assistentes",
-      "SWITCH_ASSISTANT": "Switch between assistants",
-      "NEW_ASSISTANT": "Create Assistant",
-      "EMPTY_LIST": "No assistants found, please create one to get started"
+      "SWITCH_ASSISTANT": "Alternar entre assistentes",
+      "NEW_ASSISTANT": "Criar Assistente",
+      "EMPTY_LIST": "Nenhum assistente encontrado, crie um para começar"
     },
     "COPILOT": {
       "TITLE": "Copiloto",
@@ -558,8 +558,8 @@
         "TITLE": "Não há assistentes disponíveis",
         "SUBTITLE": "Crie um assistente para fornecer respostas rápidas e precisas aos seus usuários. Ele pode aprender com seus artigos de ajuda e conversas passadas.",
         "FEATURE_SPOTLIGHT": {
-          "TITLE": "Captain Assistant",
-          "NOTE": "Captain Assistant engages directly with customers, learns from your help docs and past conversations, and delivers instant, accurate responses. It handles the initial queries, providing quick resolutions before  transferring to an agent when needed."
+          "TITLE": "Assistente Capitão",
+          "NOTE": "O Assistente Capitão interage diretamente com os clientes, aprende com seus documentos de ajuda e conversas passadas, e entrega respostas instantâneas e precisas. Ele lida com as perguntas iniciais, fornecendo resoluções rápidas antes de transferir para um agente quando necessário."
         }
       },
       "GUARDRAILS": {
@@ -769,8 +769,8 @@
         "TITLE": "Nenhum documento disponível",
         "SUBTITLE": "Os documentos são usados pelo seu assistente para gerar perguntas frequentes. Pode importar documentos para fornecer um contexto para seu assistente.",
         "FEATURE_SPOTLIGHT": {
-          "TITLE": "Captain Document",
-          "NOTE": "A document in Captain serves as a knowledge resource for the assistant. By connecting your help center or guides, Captain can analyze the content and provide accurate responses for customer inquiries."
+          "TITLE": "Documento do Capitão",
+          "NOTE": "Um documento no Capitão serve como um recurso de conhecimento para o assistente. Ao conectar sua central de ajuda ou guias, o Capitão pode analisar o conteúdo e fornecer respostas precisas para as consultas dos clientes."
         }
       }
     },
@@ -782,110 +782,118 @@
         "SUBTITLE": "Crie ferramentas personalizadas para conectar com APIs e serviços externos, permitindo obter dados e agir por você.",
         "FEATURE_SPOTLIGHT": {
           "TITLE": "Ferramentas Personalizadas",
-          "NOTE": "Ferramentas personalizadas permitem seu assistente interagir com APIs e serviços externos. Crie ferramentas para obter dados, realizar ações ou integre com seus sistemas existentes para melhorar as capacidades do seu assistente."
+          "NOTE": "As ferramentas personalizadas permitem que seu assistente interaja com APIs e serviços externos. Crie ferramentas para buscar dados, realizar ações ou integrar-se aos seus sistemas existentes para aprimorar as capacidades do seu assistente."
         }
       },
-      "FORM_DESCRIPTION": "Configure your custom tool to connect with external APIs",
+      "FORM_DESCRIPTION": "Configure sua ferramenta personalizada para conectar-se a APIs externas",
       "OPTIONS": {
-        "EDIT_TOOL": "Edit tool",
-        "DELETE_TOOL": "Delete tool"
+        "EDIT_TOOL": "Editar ferramenta",
+        "DELETE_TOOL": "Excluir ferramenta"
       },
       "CREATE": {
-        "TITLE": "Create Custom Tool",
-        "SUCCESS_MESSAGE": "Custom tool created successfully",
-        "ERROR_MESSAGE": "Failed to create custom tool"
+        "TITLE": "Criar Ferramenta Personalizada",
+        "SUCCESS_MESSAGE": "Ferramenta personalizada criada com sucesso",
+        "ERROR_MESSAGE": "Falha ao criar ferramenta personalizada"
       },
       "EDIT": {
-        "TITLE": "Edit Custom Tool",
-        "SUCCESS_MESSAGE": "Custom tool updated successfully",
-        "ERROR_MESSAGE": "Failed to update custom tool"
+        "TITLE": "Editar Ferramenta Personalizada",
+        "SUCCESS_MESSAGE": "Ferramenta personalizada atualizada com sucesso",
+        "ERROR_MESSAGE": "Falha ao atualizar ferramenta personalizada"
       },
       "DELETE": {
-        "TITLE": "Delete Custom Tool",
+        "TITLE": "Excluir Ferramenta Personalizada",
         "DESCRIPTION": "Tem certeza que deseja excluir está ferramenta customizável? Está ação não pode ser desfeita.",
         "CONFIRM": "Sim, excluir",
-        "SUCCESS_MESSAGE": "Custom tool deleted successfully",
-        "ERROR_MESSAGE": "Failed to delete custom tool"
+        "SUCCESS_MESSAGE": "Ferramenta personalizada excluída com sucesso",
+        "ERROR_MESSAGE": "Falha ao excluir ferramenta personalizada"
       },
       "FORM": {
         "TITLE": {
           "LABEL": "Nome da Ferramenta",
-          "PLACEHOLDER": "Order Lookup",
-          "ERROR": "Nome da ferramente obrigatória"
+          "PLACEHOLDER": "Ex: Busca de Pedidos",
+          "ERROR": "O nome da ferramenta é obrigatório"
         },
         "DESCRIPTION": {
           "LABEL": "Descrição",
-          "PLACEHOLDER": "Looks up order details by order ID"
+          "PLACEHOLDER": "Descreva o que a ferramenta faz (ex: Busca detalhes do pedido pelo ID)"
         },
         "HTTP_METHOD": {
-          "LABEL": "Method"
+          "LABEL": "Método HTTP"
         },
         "ENDPOINT_URL": {
-          "LABEL": "Endpoint URL",
-          "PLACEHOLDER": "https://api.example.com/orders/{'{{'} order_id {'}}'}",
-          "ERROR": "Valid URL is required"
+          "LABEL": "URL do Endpoint",
+          "PLACEHOLDER": "https://api.exemplo.com/pedidos/{'{{'} order_id {'}}'}",
+          "ERROR": "Uma URL válida é obrigatória"
         },
         "AUTH_TYPE": {
-          "LABEL": "Authentication Type"
+          "LABEL": "Tipo de Autenticação"
         },
         "AUTH_TYPES": {
           "NONE": "Nenhuma",
-          "BEARER": "Bearer Token",
-          "BASIC": "Basic Auth",
-          "API_KEY": "Chave API"
+          "BEARER": "Token Bearer",
+          "BASIC": "Autenticação Básica (Basic Auth)",
+          "API_KEY": "Chave de API",
+          "CUSTOM_HEADERS": "Cabeçalhos Personalizados"
         },
         "AUTH_CONFIG": {
-          "BEARER_TOKEN": "Bearer Token",
-          "BEARER_TOKEN_PLACEHOLDER": "Enter your bearer token",
-          "USERNAME": "Username",
-          "USERNAME_PLACEHOLDER": "Enter username",
+          "BEARER_TOKEN": "Token Bearer",
+          "BEARER_TOKEN_PLACEHOLDER": "Digite seu token bearer",
+          "USERNAME": "Usuário",
+          "USERNAME_PLACEHOLDER": "Digite o usuário",
           "PASSWORD": "Senha",
-          "PASSWORD_PLACEHOLDER": "Enter password",
-          "API_KEY": "Header Name",
+          "PASSWORD_PLACEHOLDER": "Digite a senha",
+          "API_KEY": "Nome do Cabeçalho",
           "API_KEY_PLACEHOLDER": "X-API-Key",
-          "API_VALUE": "Header Value",
-          "API_VALUE_PLACEHOLDER": "Enter API key value"
+          "API_VALUE": "Valor do Cabeçalho",
+          "API_VALUE_PLACEHOLDER": "Digite o valor da chave de API",
+          "CUSTOM_HEADERS": "Cabeçalhos Personalizados",
+          "CUSTOM_HEADERS_HELP": "Adicione um ou mais cabeçalhos HTTP enviados em cada solicitação (ex: IDs de API, tokens).",
+          "HEADER_NAME": "Nome do Cabeçalho",
+          "HEADER_NAME_PLACEHOLDER": "ex: PLUG-PLAY-ID",
+          "HEADER_VALUE": "Valor do Cabeçalho",
+          "HEADER_VALUE_PLACEHOLDER": "ex: 198",
+          "ADD_HEADER": "Adicionar Cabeçalho"
         },
         "PARAMETERS": {
-          "LABEL": "Parameters",
-          "HELP_TEXT": "Define the parameters that will be extracted from user queries"
+          "LABEL": "Parâmetros",
+          "HELP_TEXT": "Defina os parâmetros que serão extraídos das perguntas dos usuários"
         },
-        "ADD_PARAMETER": "Add Parameter",
+        "ADD_PARAMETER": "Adicionar Parâmetro",
         "PARAM_NAME": {
-          "PLACEHOLDER": "Parameter name (e.g., order_id)"
+          "PLACEHOLDER": "Nome do parâmetro (ex: order_id)"
         },
         "PARAM_TYPE": {
           "PLACEHOLDER": "Tipo"
         },
         "PARAM_TYPES": {
-          "STRING": "String",
+          "STRING": "Texto (String)",
           "NUMBER": "Número",
-          "BOOLEAN": "Boolean",
-          "ARRAY": "Array",
-          "OBJECT": "Object"
+          "BOOLEAN": "Booleano",
+          "ARRAY": "Lista (Array)",
+          "OBJECT": "Objeto"
         },
         "PARAM_DESCRIPTION": {
-          "PLACEHOLDER": "Description of the parameter"
+          "PLACEHOLDER": "Descrição do parâmetro"
         },
         "PARAM_REQUIRED": {
           "LABEL": "Obrigatório"
         },
         "REQUEST_TEMPLATE": {
-          "LABEL": "Request Body Template (Optional)",
+          "LABEL": "Modelo do Corpo da Requisição (Opcional)",
           "PLACEHOLDER": "{'{'}\n  \"order_id\": \"{'{{'} order_id {'}}'}\"\n{'}'}"
         },
         "RESPONSE_TEMPLATE": {
-          "LABEL": "Response Template (Optional)",
-          "PLACEHOLDER": "Order {'{{'} order_id {'}}'} status: {'{{'} status {'}}'}"
+          "LABEL": "Modelo de Resposta (Opcional)",
+          "PLACEHOLDER": "Status do pedido {'{{'} order_id {'}}'}: {'{{'} status {'}}'}"
         },
         "ERRORS": {
-          "PARAM_NAME_REQUIRED": "Parameter name is required"
+          "PARAM_NAME_REQUIRED": "O nome do parâmetro é obrigatório"
         }
       }
     },
     "RESPONSES": {
-      "HEADER": "FAQs",
-      "PENDING_FAQS": "Pending FAQs",
+      "HEADER": "Perguntas Frequentes (FAQs)",
+      "PENDING_FAQS": "FAQs Pendentes",
       "ADD_NEW": "Criar nova FAQ",
       "DOCUMENTABLE": {
         "CONVERSATION": "Conversação #{id}"
@@ -904,11 +912,11 @@
         "TITLE": "Excluir as Perguntas Frequentes?",
         "DESCRIPTION": "Tem certeza que deseja excluir as Perguntas Frequentes selecionadas? Esta ação não pode ser desfeita.",
         "CONFIRM": "Sim, excluir todas",
-        "SUCCESS_MESSAGE": "Perguntas Frequentes excluídas com sucesso/",
+        "SUCCESS_MESSAGE": "Perguntas Frequentes excluídas com sucesso",
         "ERROR_MESSAGE": "Ocorreu um erro ao excluir as Perguntas Frequentes, por favor tente novamente."
       },
       "DELETE": {
-        "TITLE": "Tem certeza que deseja excluir o FAQ?",
+        "TITLE": "Tem certeza que deseja excluir a FAQ?",
         "DESCRIPTION": "",
         "CONFIRM": "Sim, excluir",
         "SUCCESS_MESSAGE": "FAQ excluída com sucesso",
@@ -922,12 +930,12 @@
       "STATUS": {
         "TITLE": "Status",
         "PENDING": "Pendentes",
-        "APPROVED": "Aceito",
+        "APPROVED": "Aprovadas",
         "ALL": "Todos"
       },
       "PENDING_BANNER": {
-        "TITLE": "Captain has found some FAQs your customers were looking for.",
-        "ACTION": "Click here to review"
+        "TITLE": "O Capitão encontrou algumas FAQs que seus clientes estavam procurando.",
+        "ACTION": "Clique aqui para revisar"
       },
       "FORM_DESCRIPTION": "Adicione uma pergunta e sua resposta correspondente à base de conhecimento e selecione o assistente ao qual deve estar associado.",
       "CREATE": {
@@ -942,13 +950,13 @@
           "ERROR": "Por favor, forneça uma pergunta válida."
         },
         "ANSWER": {
-          "LABEL": "Responder",
+          "LABEL": "Resposta",
           "PLACEHOLDER": "Digite a resposta aqui",
           "ERROR": "Por favor, forneça uma resposta válida."
         }
       },
       "EDIT": {
-        "TITLE": "Atualizar as Perguntas Frequentes",
+        "TITLE": "Atualizar a FAQ",
         "SUCCESS_MESSAGE": "As Perguntas Frequentes foram atualizadas com sucesso",
         "ERROR_MESSAGE": "Ocorreu um erro ao atualizar as Perguntas Frequentes, por favor tente novamente",
         "APPROVE_SUCCESS_MESSAGE": "As Perguntas Frequentes foram marcadas como aprovadas"
@@ -960,12 +968,12 @@
       },
       "EMPTY_STATE": {
         "TITLE": "Nenhuma FAQ encontrada",
-        "NO_PENDING_TITLE": "There are no more pending FAQs to review",
-        "SUBTITLE": "Perguntas Frequentes ajudam seu assistente a fornecer respostas rápidas e precisas para perguntas de seus clientes. Eles podem ser gerados automaticamente a partir do seu conteúdo ou podem ser adicionados manualmente.",
-        "CLEAR_SEARCH": "Clear active filters",
+        "NO_PENDING_TITLE": "Não há mais FAQs pendentes para revisar",
+        "SUBTITLE": "As Perguntas Frequentes ajudam seu assistente a fornecer respostas rápidas e precisas para as perguntas de seus clientes. Elas podem ser geradas automaticamente a partir do seu conteúdo ou adicionadas manualmente.",
+        "CLEAR_SEARCH": "Limpar filtros ativos",
         "FEATURE_SPOTLIGHT": {
-          "TITLE": "Captain FAQ",
-          "NOTE": "Captain FAQs detects common customer questions—whether missing from your knowledge base or frequently asked—and generates relevant FAQs to improve support. You can review each suggestion and decide whether to approve or reject it."
+          "TITLE": "FAQ do Capitão",
+          "NOTE": "O Capitão FAQ detecta perguntas comuns dos clientes — sejam elas ausentes na sua base de conhecimento ou frequentemente perguntadas — e gera FAQs relevantes para melhorar o suporte. Você pode revisar cada sugestão e decidir se a aprova ou rejeita."
         }
       }
     },
@@ -1002,3 +1010,4 @@
     }
   }
 }
+

@@ -1,5 +1,4 @@
 class Api::V1::Accounts::Captain::Reports::InsightsController < Api::V1::Accounts::BaseController
-  # rubocop:disable Metrics/AbcSize
   def index
     unit_id = params[:unit_id].present? ? params[:unit_id].to_i : nil
     inbox_id = params[:inbox_id].present? ? params[:inbox_id].to_i : nil
@@ -7,13 +6,11 @@ class Api::V1::Accounts::Captain::Reports::InsightsController < Api::V1::Account
     scope = Captain::ConversationInsight.where(account_id: Current.account.id)
     scope = scope.where(captain_unit_id: unit_id) if unit_id
     scope = scope.where(inbox_id: inbox_id) if inbox_id
-    scope = scope.where(captain_unit_id: nil, inbox_id: nil) if !unit_id && !inbox_id
 
     insights = scope.order(period_start: :desc).limit(12)
 
     render json: insights.map { |i| format_insight(i) }
   end
-  # rubocop:enable Metrics/AbcSize
 
   def show
     insight = Captain::ConversationInsight.find_by!(
