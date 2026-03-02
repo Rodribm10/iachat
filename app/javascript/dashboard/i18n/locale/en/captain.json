@@ -109,6 +109,7 @@
       "ADD_UNIT": "Add Unit",
       "EDIT_UNIT": "Edit Unit",
       "DELETE_UNIT": "Delete Unit",
+      "NOTIFICATIONS_UNIT": "Notifications",
       "LIST": {
         "TABLE_HEADER": [
           "Pix Key",

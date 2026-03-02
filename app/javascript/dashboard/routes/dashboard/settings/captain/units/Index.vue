@@ -39,6 +39,13 @@ const goToEdit = unit => {
   });
 };
 
+const goToNotifications = unit => {
+  router.push({
+    name: 'captain_settings_notifications',
+    params: { unitId: unit.id },
+  });
+};
+
 const openDeleteDialog = unit => {
   unitToDelete.value = unit;
   deleteDialogRef.value?.open();
@@ -176,6 +183,13 @@ const confirmDelete = async () => {
                 </td>
                 <td class="py-4">
                   <div class="flex justify-end gap-2">
+                    <Button
+                      icon="i-lucide-bell"
+                      variant="ghost"
+                      size="sm"
+                      :label="t('CAPTAIN_SETTINGS.UNITS.NOTIFICATIONS_UNIT')"
+                      @click="goToNotifications(unit)"
+                    />
                     <Button
                       icon="i-lucide-pencil"
                       variant="ghost"
