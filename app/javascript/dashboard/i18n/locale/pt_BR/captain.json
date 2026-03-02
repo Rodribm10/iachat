@@ -477,6 +477,13 @@
       "DELETE": {
         "SUCCESS": "Notificação removida.",
         "ERROR": "Erro ao remover notificação."
+      },
+      "INBOX_LABEL": "Selecione a caixa de entrada",
+      "NO_CAPTAIN_INBOXES": "Nenhuma caixa de entrada com Captain configurado.",
+      "SELECT_INBOX_HINT": "Clique em uma caixa de entrada acima para ver e configurar os templates.",
+      "EMPTY": {
+        "TITLE": "Nenhum template configurado",
+        "DESC": "Crie templates de mensagem automática para esta caixa de entrada."
       }
     }
   }

@@ -79,7 +79,7 @@ export default {
           },
         },
         {
-          path: 'units/:unitId/notifications',
+          path: 'notifications',
           name: 'captain_settings_notifications',
           component: NotificationsIndex,
           meta: {

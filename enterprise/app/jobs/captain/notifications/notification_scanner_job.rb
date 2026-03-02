@@ -20,12 +20,13 @@ class Captain::Notifications::NotificationScannerJob < ApplicationJob
     window_end   = target_time + WINDOW_MINUTES.minutes
 
     Captain::Reservation
-      .where(captain_unit_id: template.captain_unit_id)
+      .joins(:conversation)
+      .where(conversations: { inbox_id: template.inbox_id })
       .where(status: Captain::Reservation.statuses.slice(:confirmed, :active).values)
       .where(check_in_at: window_start..window_end)
       .where.not(conversation_id: nil)
       .where(
-        "NOT (metadata->'notified_templates' @> ?::jsonb)",
+        "NOT (captain_reservations.metadata->'notified_templates' @> ?::jsonb)",
         "[#{template.id}]"
       )
   end

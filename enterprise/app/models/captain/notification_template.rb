@@ -11,21 +11,20 @@
 #  timing_minutes   :integer          default(10), not null
 #  created_at       :datetime         not null
 #  updated_at       :datetime         not null
-#  captain_unit_id  :bigint           not null
+#  inbox_id         :bigint           not null
 #
 # Indexes
 #
-#  idx_notif_templates_unit_active                          (captain_unit_id,active)
-#  index_captain_notification_templates_on_captain_unit_id  (captain_unit_id)
+#  idx_notif_templates_inbox_active  (inbox_id,active)
 #
 # Foreign Keys
 #
-#  fk_rails_...  (captain_unit_id => captain_units.id)
+#  fk_rails_...  (inbox_id => inboxes.id)
 #
 class Captain::NotificationTemplate < ApplicationRecord
   self.table_name = 'captain_notification_templates'
 
-  belongs_to :unit, class_name: 'Captain::Unit', foreign_key: 'captain_unit_id', inverse_of: :notification_templates
+  belongs_to :inbox, inverse_of: :captain_notification_templates
 
   enum timing_direction: { before: 0, after: 1 }
 
@@ -33,9 +32,9 @@ class Captain::NotificationTemplate < ApplicationRecord
   validates :content, presence: true
   validates :timing_minutes, presence: true, numericality: { greater_than: 0 }
   validates :timing_direction, presence: true
-  validates :captain_unit_id, presence: true
+  validates :inbox_id, presence: true
 
   scope :active, -> { where(active: true) }
   scope :ordered, -> { order(:position, :id) }
-  scope :for_unit, ->(unit_id) { where(captain_unit_id: unit_id) }
+  scope :for_inbox, ->(inbox_id) { where(inbox_id: inbox_id) }
 end

@@ -90,9 +90,7 @@ Rails.application.routes.draw do
               post :label_suggestion
               post :follow_up
             end
-            resources :units do
-              resources :notification_templates, only: [:index, :create, :update, :destroy]
-            end
+            resources :units
             namespace :reports do
               resource :operational, only: [:show], controller: 'reports/operational'
               resources :insights, only: [:index, :show] do
@@ -242,6 +240,8 @@ Rails.application.routes.draw do
             post :sync_templates, on: :member
             get :health, on: :member
             post :on_whatsapp, on: :member
+            resources :notification_templates, only: [:index, :create, :update, :destroy],
+                                               module: 'captain'
             if ChatwootApp.enterprise?
               resource :conference, only: %i[create destroy], controller: 'conference' do
                 get :token, on: :member

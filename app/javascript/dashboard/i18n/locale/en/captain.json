@@ -476,6 +476,13 @@
       "DELETE": {
         "SUCCESS": "Notification removed.",
         "ERROR": "Error removing notification."
+      },
+      "INBOX_LABEL": "Select inbox",
+      "NO_CAPTAIN_INBOXES": "No inboxes with Captain configured.",
+      "SELECT_INBOX_HINT": "Click an inbox above to view and configure its templates.",
+      "EMPTY": {
+        "TITLE": "No templates configured",
+        "DESC": "Create automatic message templates for this inbox."
       }
     }
   }
