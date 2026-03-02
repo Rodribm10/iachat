@@ -90,7 +90,9 @@ Rails.application.routes.draw do
               post :label_suggestion
               post :follow_up
             end
-            resources :units
+            resources :units do
+              resources :notification_templates, only: [:index, :create, :update, :destroy]
+            end
             namespace :reports do
               resource :operational, only: [:show], controller: 'reports/operational'
               resources :insights, only: [:index, :show] do

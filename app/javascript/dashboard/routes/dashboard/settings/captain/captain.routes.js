@@ -8,6 +8,7 @@ import UnitEdit from './units/Edit.vue';
 import GalleryIndex from './gallery/Index.vue';
 import GalleryEdit from './gallery/Edit.vue';
 const ReportsIndex = () => import('./reports/Index.vue');
+const NotificationsIndex = () => import('./notifications/Index.vue');
 
 export default {
   routes: [
@@ -73,6 +74,14 @@ export default {
           path: 'reports',
           name: 'captain_settings_reports',
           component: ReportsIndex,
+          meta: {
+            permissions: ['administrator'],
+          },
+        },
+        {
+          path: 'units/:unitId/notifications',
+          name: 'captain_settings_notifications',
+          component: NotificationsIndex,
           meta: {
             permissions: ['administrator'],
           },

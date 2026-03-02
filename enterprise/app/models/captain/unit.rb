@@ -54,6 +54,8 @@ class Captain::Unit < ApplicationRecord
   has_many :pix_charges, class_name: 'Captain::PixCharge', dependent: :restrict_with_error
   has_many :gallery_items, class_name: 'Captain::GalleryItem', foreign_key: :captain_unit_id, inverse_of: :captain_unit,
                            dependent: :destroy
+  has_many :notification_templates, class_name: 'Captain::NotificationTemplate', foreign_key: :captain_unit_id,
+                                    inverse_of: :unit, dependent: :destroy
 
   encrypts :inter_client_secret
   encrypts :inter_account_number

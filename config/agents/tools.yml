@@ -49,3 +49,8 @@
   title: 'Enviar Fotos de Suíte'
   description: 'Envia fotos da galeria da unidade para o cliente, com filtros por categoria/suíte'
   icon: 'image'
+
+- id: create_reservation_intent
+  title: 'Criar Reserva'
+  description: 'Cria uma reserva draft quando o cliente confirmar suíte, preço e horário de chegada'
+  icon: 'calendar-add'

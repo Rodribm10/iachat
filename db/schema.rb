@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_02_27_120000) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_01_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -532,6 +532,20 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_27_120000) do
     t.index ["captain_assistant_id"], name: "index_captain_inboxes_on_captain_assistant_id"
     t.index ["captain_unit_id"], name: "index_captain_inboxes_on_captain_unit_id"
     t.index ["inbox_id"], name: "index_captain_inboxes_on_inbox_id"
+  end
+
+  create_table "captain_notification_templates", force: :cascade do |t|
+    t.bigint "captain_unit_id", null: false
+    t.string "label", null: false
+    t.text "content", null: false
+    t.integer "timing_minutes", default: 10, null: false
+    t.integer "timing_direction", default: 0, null: false
+    t.boolean "active", default: true, null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["captain_unit_id", "active"], name: "idx_notif_templates_unit_active"
+    t.index ["captain_unit_id"], name: "index_captain_notification_templates_on_captain_unit_id"
   end
 
   create_table "captain_pix_charges", force: :cascade do |t|
@@ -1964,6 +1978,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_02_27_120000) do
   add_foreign_key "captain_inbox_reminder_settings", "accounts"
   add_foreign_key "captain_inbox_reminder_settings", "inboxes"
   add_foreign_key "captain_inboxes", "captain_units"
+  add_foreign_key "captain_notification_templates", "captain_units"
   add_foreign_key "captain_pix_charges", "captain_reservations", column: "reservation_id"
   add_foreign_key "captain_pix_charges", "captain_units", column: "unit_id"
   add_foreign_key "captain_pricings", "accounts"

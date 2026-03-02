@@ -352,6 +352,7 @@
     "UNITS_GROUP": "Pix Units",
     "INBOXES_GROUP": "Inboxes",
     "TABS": {
+      "DASHBOARD": "Dashboard",
       "INSIGHTS": "AI Insights",
       "OPERATIONAL": "Operational"
     },
@@ -372,7 +373,22 @@
       "AI_FAILURES": "AI Failures",
       "BULLET": "•",
       "COUNT_PREFIX": "(",
-      "COUNT_SUFFIX": ")"
+      "COUNT_SUFFIX": ")",
+      "TIMES": "x",
+      "SENTIMENT": "Sentiment",
+      "SENTIMENT_POSITIVE": "Positive",
+      "SENTIMENT_NEGATIVE": "Negative",
+      "SENTIMENT_NEUTRAL": "Neutral",
+      "PRAISES": "Customer Praises",
+      "COMPLAINTS": "Complaints",
+      "FAQ_GAPS": "FAQ Gaps",
+      "FAQ_GAPS_HINT": "Questions customers ask that the agent doesn't cover",
+      "MOST_REQUESTED_SUITES": "Most Requested Suites",
+      "PRICE_REACTIONS": "Price Reactions",
+      "PRICE_OBJECTIONS": "price objections",
+      "RECOMMENDATIONS": "Recommendations",
+      "SHOW_DETAILS": "View full analysis",
+      "HIDE_DETAILS": "Hide details"
     },
     "EMPTY": {
       "TITLE": "No reports generated",
@@ -393,6 +409,74 @@
     "OPERATIONAL": {
       "COMING_SOON": "Coming soon",
       "COMING_SOON_DESC": "Real-time operational data (reservations, Pix charges, etc.) will be available here soon."
+    },
+    "DASHBOARD": {
+      "TOTAL_CONVERSATIONS": "Analyzed conversations",
+      "AVG_SENTIMENT": "Avg. positive sentiment",
+      "FAQ_GAPS_TOTAL": "FAQ gaps identified",
+      "WEEKS_ANALYZED": "weeks analyzed",
+      "NO_DATA": "Not enough data. Generate more AI reports to see the dashboard.",
+      "SENTIMENT_TREND": "Sentiment trend by week",
+      "FAILURES_RANKING": "Agent failure ranking",
+      "FAILURES_RANKING_HINT": "Most frequent situations where the AI couldn't respond well",
+      "FAQ_PRIORITY": "Priority FAQs to create",
+      "FAQ_PRIORITY_HINT": "Questions customers ask most that aren't in the FAQ yet",
+      "CUSTOMER_BEHAVIOR": "Customer behavior",
+      "TOP_TOPICS_TITLE": "Most discussed topics",
+      "SUITES_TITLE": "Most requested suites",
+      "COMPLAINTS_TREND": "Complaints volume by week",
+      "HANDOFFS_TITLE": "Estimated handoffs to human",
+      "HANDOFFS_HINT": "Based on AI failure frequency. Direct handoff tracking coming soon.",
+      "TREND_UP": "rising",
+      "TREND_DOWN": "falling",
+      "TREND_STABLE": "stable",
+      "WEEKS": "weeks"
+    },
+    "FAQ_QUICK_ADD": {
+      "BUTTON": "Create FAQ",
+      "TITLE": "Create FAQ from AI suggestion",
+      "QUESTION_LABEL": "Question (suggested by AI)",
+      "ANSWER_LABEL": "Answer",
+      "ANSWER_PLACEHOLDER": "Write the answer to this question...",
+      "ASSISTANT_LABEL": "AI Agent",
+      "ASSISTANT_PLACEHOLDER": "Select the agent",
+      "CANCEL": "Cancel",
+      "SAVE": "Save FAQ",
+      "SUCCESS": "FAQ created successfully!",
+      "ERROR": "Error creating FAQ. Please try again."
+    },
+    "NOTIFICATIONS": {
+      "TITLE": "Automatic Notifications",
+      "DESCRIPTION": "Configure messages sent automatically before or after the guest's arrival.",
+      "LOADING": "Loading notifications...",
+      "ADD": "Add notification",
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "DIRECTION": {
+        "BEFORE": "before",
+        "AFTER": "after",
+        "OF_ARRIVAL": "arrival"
+      },
+      "FORM": {
+        "LABEL_PLACEHOLDER": "Template name (e.g. Arrival Instructions)",
+        "CONTENT_PLACEHOLDER": "Message to send... Use {{guest_name}}, {{check_in_time}}, {{suite_name}}",
+        "SEND": "Send",
+        "MINUTES": "min",
+        "CANCEL": "Cancel",
+        "SAVE": "Save"
+      },
+      "CREATE": {
+        "SUCCESS": "Notification created successfully!",
+        "ERROR": "Error creating notification. Please try again."
+      },
+      "UPDATE": {
+        "SUCCESS": "Notification updated!",
+        "ERROR": "Error updating notification."
+      },
+      "DELETE": {
+        "SUCCESS": "Notification removed.",
+        "ERROR": "Error removing notification."
+      }
     }
   }
 }

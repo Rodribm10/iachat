@@ -352,6 +352,7 @@
     "UNITS_GROUP": "Unidades Pix",
     "INBOXES_GROUP": "Caixas de Entrada",
     "TABS": {
+      "DASHBOARD": "Dashboard",
       "INSIGHTS": "Insights IA",
       "OPERATIONAL": "Operacional"
     },
@@ -372,7 +373,22 @@
       "AI_FAILURES": "Falhas da IA",
       "BULLET": "•",
       "COUNT_PREFIX": "(",
-      "COUNT_SUFFIX": ")"
+      "COUNT_SUFFIX": ")",
+      "TIMES": "x",
+      "SENTIMENT": "Sentimento",
+      "SENTIMENT_POSITIVE": "Positivo",
+      "SENTIMENT_NEGATIVE": "Negativo",
+      "SENTIMENT_NEUTRAL": "Neutro",
+      "PRAISES": "Elogios dos clientes",
+      "COMPLAINTS": "Reclamações",
+      "FAQ_GAPS": "Lacunas no FAQ",
+      "FAQ_GAPS_HINT": "Perguntas que os clientes fazem mas o agente não cobre",
+      "MOST_REQUESTED_SUITES": "Suítes mais pedidas",
+      "PRICE_REACTIONS": "Reação a preços",
+      "PRICE_OBJECTIONS": "objeções de preço",
+      "RECOMMENDATIONS": "Recomendações",
+      "SHOW_DETAILS": "Ver análise completa",
+      "HIDE_DETAILS": "Ocultar detalhes"
     },
     "EMPTY": {
       "TITLE": "Nenhum relatório gerado",
@@ -393,6 +409,75 @@
     "OPERATIONAL": {
       "COMING_SOON": "Em breve",
       "COMING_SOON_DESC": "Os dados operacionais em tempo real (reservas, cobranças Pix, etc.) estarão disponíveis aqui em breve."
+    },
+    "DASHBOARD": {
+      "TOTAL_CONVERSATIONS": "Conversas analisadas",
+      "AVG_SENTIMENT": "Sentimento positivo médio",
+      "FAQ_GAPS_TOTAL": "Lacunas de FAQ identificadas",
+      "WEEKS_ANALYZED": "semanas analisadas",
+      "NO_DATA": "Dados insuficientes. Gere mais relatórios de IA para ver o dashboard.",
+      "SENTIMENT_TREND": "Tendência de sentimento por semana",
+      "FAILURES_RANKING": "Ranking de falhas do agente",
+      "FAILURES_RANKING_HINT": "Situações mais frequentes em que a IA não conseguiu responder bem",
+      "FAQ_PRIORITY": "FAQ prioritário para criar",
+      "FAQ_PRIORITY_HINT": "Perguntas que os clientes mais fazem e ainda não estão no FAQ",
+      "CUSTOMER_BEHAVIOR": "Comportamento dos clientes",
+      "TOP_TOPICS_TITLE": "Assuntos mais discutidos",
+      "SUITES_TITLE": "Suítes mais solicitadas",
+      "COMPLAINTS_TREND": "Volume de reclamações por semana",
+      "HANDOFFS_TITLE": "Estimativa de transferências para humano",
+      "HANDOFFS_HINT": "Baseado na frequência de falhas do agente. Rastreamento direto de transferências em breve.",
+      "TREND_UP": "em alta",
+      "TREND_DOWN": "em queda",
+      "TREND_STABLE": "estável",
+      "WEEKS": "semanas"
+    },
+    "FAQ_QUICK_ADD": {
+      "BUTTON": "Criar FAQ",
+      "TITLE": "Criar FAQ a partir da sugestão da IA",
+      "QUESTION_LABEL": "Pergunta (sugerida pela IA)",
+      "ANSWER_LABEL": "Resposta",
+      "ANSWER_PLACEHOLDER": "Escreva a resposta para esta pergunta...",
+      "ASSISTANT_LABEL": "Agente de IA",
+      "ASSISTANT_PLACEHOLDER": "Selecione o agente",
+      "CANCEL": "Cancelar",
+      "SAVE": "Salvar FAQ",
+      "SUCCESS": "FAQ criado com sucesso!",
+      "ERROR": "Erro ao criar FAQ. Tente novamente."
+    },
+    "NOTIFICATIONS": {
+      "TITLE": "Notificações Automáticas",
+      "DESCRIPTION": "Configure mensagens automáticas enviadas antes ou depois da chegada do hóspede.",
+      "LOADING": "Carregando notificações...",
+      "ADD": "Adicionar notificação",
+      "ACTIVE": "Ativo",
+      "INACTIVE": "Inativo",
+      "DIRECTION": {
+        "BEFORE": "antes",
+        "AFTER": "depois",
+        "OF_ARRIVAL": "da chegada"
+      },
+      "TIMING_LABEL": "da chegada",
+      "FORM": {
+        "LABEL_PLACEHOLDER": "Nome do template (ex: Orientações de Chegada)",
+        "CONTENT_PLACEHOLDER": "Mensagem a enviar... Use {{guest_name}}, {{check_in_time}}, {{suite_name}}",
+        "SEND": "Enviar",
+        "MINUTES": "min",
+        "CANCEL": "Cancelar",
+        "SAVE": "Salvar"
+      },
+      "CREATE": {
+        "SUCCESS": "Notificação criada com sucesso!",
+        "ERROR": "Erro ao criar notificação. Tente novamente."
+      },
+      "UPDATE": {
+        "SUCCESS": "Notificação atualizada!",
+        "ERROR": "Erro ao atualizar notificação."
+      },
+      "DELETE": {
+        "SUCCESS": "Notificação removida.",
+        "ERROR": "Erro ao remover notificação."
+      }
     }
   }
 }
