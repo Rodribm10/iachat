@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atendimento WhatsApp</title>
+    <style>
+      :root {
+        --bg-1: #040b18;
+        --bg-2: #031325;
+        --card: #0f1729;
+        --card-border: #1f2c43;
+        --text-1: #e7ecf6;
+        --text-2: #96a2b5;
+        --btn: #27c15b;
+        --btn-text: #f4fff7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--text-1);
+        background:
+          radial-gradient(circle at 50% 52%, rgba(31, 150, 91, 0.18), transparent 34%),
+          radial-gradient(circle at 30% 30%, rgba(16, 92, 172, 0.16), transparent 46%),
+          linear-gradient(170deg, var(--bg-2), var(--bg-1));
+      }
+
+      .page {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 20px;
+      }
+
+      .card {
+        width: min(100%, 480px);
+        border: 1px solid var(--card-border);
+        background: rgba(15, 23, 41, 0.9);
+        border-radius: 20px;
+        padding: 34px 28px;
+        text-align: center;
+        box-shadow: 0 24px 56px rgba(0, 0, 0, 0.35);
+      }
+
+      .logo-wrap {
+        width: 82px;
+        height: 82px;
+        margin: 0 auto 18px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: rgba(40, 215, 122, 0.16);
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .logo-wrap img {
+        width: 58px;
+        height: 58px;
+        border-radius: 8px;
+        object-fit: cover;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(29px, 4.2vw, 40px);
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+      }
+
+      p.subtitle {
+        margin: 14px 0 26px;
+        font-size: 18px;
+        color: var(--text-2);
+      }
+
+      .wa-button {
+        width: 100%;
+        border: 0;
+        border-radius: 14px;
+        padding: 18px 22px;
+        font-size: 34px;
+        font-weight: 800;
+        color: var(--btn-text);
+        background: var(--btn);
+        cursor: pointer;
+        transition: transform 0.14s ease, opacity 0.14s ease;
+      }
+
+      .wa-button:hover {
+        transform: translateY(-1px);
+      }
+
+      .wa-button:active {
+        transform: translateY(0);
+        opacity: 0.9;
+      }
+
+      .foot {
+        margin-top: 14px;
+        font-size: 14px;
+        color: #647086;
+      }
+
+      .admin-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(4, 10, 22, 0.78);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+        z-index: 9999;
+      }
+
+      .admin-overlay.open {
+        display: flex;
+      }
+
+      .admin-modal {
+        width: min(100%, 560px);
+        max-height: 94vh;
+        overflow: auto;
+        border-radius: 16px;
+        border: 1px solid var(--card-border);
+        background: #10192d;
+        padding: 18px;
+      }
+
+      .admin-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      .admin-head h2 {
+        margin: 0;
+      }
+
+      .close-btn {
+        border: 0;
+        border-radius: 10px;
+        width: 36px;
+        height: 36px;
+        font-size: 20px;
+        cursor: pointer;
+        background: #1a2840;
+        color: #c8d3e6;
+      }
+
+      .field {
+        margin: 8px 0;
+      }
+
+      .field label {
+        display: block;
+        font-size: 13px;
+        color: #8fa1bd;
+        margin-bottom: 4px;
+      }
+
+      .field input,
+      .field textarea {
+        width: 100%;
+        border: 1px solid #2a3b58;
+        border-radius: 10px;
+        background: #182338;
+        color: #e4ecf8;
+        padding: 10px 11px;
+        font-size: 14px;
+      }
+
+      .field textarea {
+        min-height: 70px;
+        resize: vertical;
+      }
+
+      .preview {
+        margin-top: 10px;
+        background: #111b2d;
+        border: 1px solid #253750;
+        border-radius: 10px;
+        padding: 10px;
+        font-size: 13px;
+        color: #c8d3e6;
+        word-break: break-word;
+      }
+
+      .actions {
+        margin-top: 12px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .actions button {
+        flex: 1;
+        border: 0;
+        border-radius: 12px;
+        padding: 11px 14px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .save-btn {
+        background: #27c15b;
+        color: #f4fff7;
+      }
+
+      .reset-btn {
+        background: #22324e;
+        color: #d1daea;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="card">
+        <div id="logoTapArea" class="logo-wrap" title="logo">
+          <img id="logoImage" alt="logo" />
+        </div>
+        <h1 id="titleText"></h1>
+        <p id="subtitleText" class="subtitle"></p>
+        <button id="whatsButton" class="wa-button" type="button">Falar no WhatsApp</button>
+        <div class="foot">Pagina segura · atendimento humano</div>
+      </div>
+    </div>
+
+    <div id="adminOverlay" class="admin-overlay">
+      <div class="admin-modal">
+        <div class="admin-head">
+          <h2>Painel Admin</h2>
+          <button id="closeAdmin" class="close-btn" type="button">×</button>
+        </div>
+
+        <div class="field"><label>Nome da unidade</label><input id="f_unit_name" /></div>
+        <div class="field"><label>Titulo</label><input id="f_title" /></div>
+        <div class="field"><label>Subtitulo</label><input id="f_subtitle" /></div>
+        <div class="field"><label>Telefone WhatsApp</label><input id="f_phone" /></div>
+        <div class="field"><label>Mensagem inicial (WhatsApp)</label><textarea id="f_message"></textarea></div>
+
+        <div class="field"><label>Source</label><input id="f_source" /></div>
+        <div class="field"><label>Campanha</label><input id="f_campanha" /></div>
+        <div class="field"><label>Unidade (tag)</label><input id="f_unidade" /></div>
+        <div class="field"><label>Inbox (tag)</label><input id="f_inbox" /></div>
+        <div class="field"><label>Cor do botao</label><input id="f_button_color" type="color" /></div>
+        <div class="field"><label>Logo (URL ou base64)</label><input id="f_logo_url" /></div>
+        <div class="field"><label>Enviar logo (arquivo)</label><input id="f_logo_file" type="file" accept="image/*" /></div>
+
+        <div class="preview">
+          <strong>Mensagem que sera enviada:</strong>
+          <div id="messagePreview"></div>
+        </div>
+
+        <div class="actions">
+          <button id="saveAdmin" class="save-btn" type="button">Salvar</button>
+          <button id="resetAdmin" class="reset-btn" type="button">Resetar</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const defaults = {
+          unit_name: "Hotel",
+          title: "Atendimento imediato no WhatsApp",
+          subtitle: "Clique e fale direto com a recepcao agora",
+          phone: "556136131003",
+          message: "Ola! Tenho interesse.",
+          source: "direto",
+          campanha: "site",
+          unidade: "express",
+          inbox: "EXPRESS",
+          button_color: "#27c15b",
+          logo_url: "https://iachat.hoteis1001noites.com.br/assets/images/dashboard/captain/logo.svg",
+        };
+
+        const params = new URLSearchParams(window.location.search);
+        const storageKey = "lp_config_" + window.location.hostname;
+        const clickKey = "lp_click_id_" + window.location.hostname;
+
+        const toConfig = (raw) => {
+          try {
+            return { ...defaults, ...(JSON.parse(raw || "{}")) };
+          } catch (_) {
+            return { ...defaults };
+          }
+        };
+
+        let config = toConfig(localStorage.getItem(storageKey));
+
+        const $ = (id) => document.getElementById(id);
+        const inputs = {
+          unit_name: $("f_unit_name"),
+          title: $("f_title"),
+          subtitle: $("f_subtitle"),
+          phone: $("f_phone"),
+          message: $("f_message"),
+          source: $("f_source"),
+          campanha: $("f_campanha"),
+          unidade: $("f_unidade"),
+          inbox: $("f_inbox"),
+          button_color: $("f_button_color"),
+          logo_url: $("f_logo_url"),
+        };
+
+        function getClickId() {
+          const fromUrl = params.get("click_id") || params.get("clickid") || params.get("utm_id") || params.get("gclid");
+          if (fromUrl) {
+            localStorage.setItem(clickKey, fromUrl);
+            return fromUrl;
+          }
+          const existing = localStorage.getItem(clickKey);
+          if (existing) return existing;
+          const generated = `lp-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+          localStorage.setItem(clickKey, generated);
+          return generated;
+        }
+
+        function currentSource() {
+          return params.get("utm_source") || params.get("source") || config.source || "direto";
+        }
+
+        function currentCampanha() {
+          return params.get("utm_campaign") || params.get("campanha") || config.campanha || "site";
+        }
+
+        function whatsappText() {
+          return config.message || "";
+        }
+
+        function syncView() {
+          $("titleText").textContent = config.title;
+          $("subtitleText").textContent = config.subtitle;
+          $("logoImage").src = config.logo_url;
+          $("whatsButton").style.background = config.button_color || "#27c15b";
+          $("messagePreview").textContent = whatsappText();
+
+          Object.keys(inputs).forEach((key) => {
+            if (inputs[key]) inputs[key].value = config[key] || "";
+          });
+        }
+
+        async function sendTrack() {
+          const payload = {
+            hostname: window.location.hostname,
+            lp: window.location.href,
+            click_id: getClickId(),
+            source: currentSource(),
+            campanha: currentCampanha(),
+          };
+
+          try {
+            await fetch("/track/click", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              keepalive: true,
+            });
+          } catch (_) {}
+        }
+
+        async function openWhatsapp() {
+          await sendTrack();
+          const phone = (config.phone || "").replace(/[^\d]/g, "");
+          const text = encodeURIComponent(whatsappText());
+          window.location.href = `https://wa.me/${phone}?text=${text}`;
+        }
+
+        let logoTapCount = 0;
+        let logoTapTimer = null;
+
+        $("logoTapArea").addEventListener("click", () => {
+          logoTapCount += 1;
+          clearTimeout(logoTapTimer);
+          logoTapTimer = setTimeout(() => {
+            logoTapCount = 0;
+          }, 1500);
+
+          if (logoTapCount >= 5) {
+            logoTapCount = 0;
+            $("adminOverlay").classList.add("open");
+          }
+        });
+
+        $("closeAdmin").addEventListener("click", () => {
+          $("adminOverlay").classList.remove("open");
+        });
+
+        $("adminOverlay").addEventListener("click", (e) => {
+          if (e.target === $("adminOverlay")) $("adminOverlay").classList.remove("open");
+        });
+
+        Object.keys(inputs).forEach((key) => {
+          if (!inputs[key]) return;
+          inputs[key].addEventListener("input", () => {
+            config[key] = inputs[key].value;
+            syncView();
+          });
+        });
+
+        $("f_logo_file").addEventListener("change", (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            config.logo_url = String(reader.result || "");
+            syncView();
+          };
+          reader.readAsDataURL(file);
+        });
+
+        $("saveAdmin").addEventListener("click", () => {
+          localStorage.setItem(storageKey, JSON.stringify(config));
+          $("adminOverlay").classList.remove("open");
+        });
+
+        $("resetAdmin").addEventListener("click", () => {
+          localStorage.removeItem(storageKey);
+          config = { ...defaults };
+          syncView();
+        });
+
+        $("whatsButton").addEventListener("click", openWhatsapp);
+        syncView();
+      })();
+    </script>
+  </body>
+</html>

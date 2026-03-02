@@ -39,6 +39,6 @@ class Api::V1::Accounts::LandingHostsController < Api::V1::Accounts::BaseControl
   end
 
   def landing_host_params
-    params.require(:landing_host).permit(:hostname, :unit_code, :active)
+    params.require(:landing_host).permit(:hostname, :unit_code, :active, :auto_label)
   end
 end

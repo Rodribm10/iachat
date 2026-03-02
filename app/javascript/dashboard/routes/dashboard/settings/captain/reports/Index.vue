@@ -18,7 +18,7 @@ const assistants = useMapGetter('captainAssistants/getRecords');
 
 const activeTab = ref('dashboard');
 const selectedInboxId = ref(null);
-const selectedPeriod = ref('last_week');
+const selectedPeriod = ref('last_7_days');
 const customStartDate = ref('');
 const customEndDate = ref('');
 const expandedInsights = ref({});
@@ -33,32 +33,32 @@ const tabs = [
 const lpStats = ref(null);
 const lpLoading = ref(false);
 
-const fetchLpStats = async () => {
-  const user = store.getters['auth/getCurrentUser'];
-  const accountId =
-    user?.account_id || window.location.pathname.match(/accounts\/(\d+)/)?.[1];
-  if (!accountId) return;
-  lpLoading.value = true;
-  try {
-    const { data } = await axios.get(
-      `/api/v1/accounts/${accountId}/lead_click_stats`
-    );
-    lpStats.value = data;
-  } catch {
-    // silent
-  } finally {
-    lpLoading.value = false;
-  }
-};
-
-const getPeriodDates = period => {
+function getPeriodDates(period) {
   const end = new Date();
   const start = new Date();
+  const now = new Date();
 
   switch (period) {
+    case 'today':
+      start.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+      end.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case 'yesterday':
+      start.setFullYear(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      end.setFullYear(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+      break;
     case 'last_7_days':
       start.setDate(end.getDate() - 7);
       break;
+    case 'last_30_days':
+      start.setDate(end.getDate() - 30);
+      break;
+    case 'this_week': {
+      const day = now.getDay();
+      const diffToMonday = day === 0 ? 6 : day - 1;
+      start.setDate(now.getDate() - diffToMonday);
+      break;
+    }
     case 'last_week': {
       const day = end.getDay();
       const diffToLastSunday = day === 0 ? 7 : day;
@@ -68,6 +68,10 @@ const getPeriodDates = period => {
     }
     case 'current_month':
       start.setDate(1);
+      break;
+    case 'last_month':
+      start.setMonth(start.getMonth() - 1, 1);
+      end.setDate(0);
       break;
     case 'custom':
       return {
@@ -82,6 +86,30 @@ const getPeriodDates = period => {
     period_start: start.toISOString().split('T')[0],
     period_end: end.toISOString().split('T')[0],
   };
+}
+
+const fetchLpStats = async () => {
+  const user = store.getters['auth/getCurrentUser'];
+  const accountId =
+    user?.account_id || window.location.pathname.match(/accounts\/(\d+)/)?.[1];
+  if (!accountId) return;
+  const { period_start, period_end } = getPeriodDates(selectedPeriod.value);
+  const params = {
+    ...(selectedInboxId.value && { inbox_id: selectedInboxId.value }),
+    ...(period_start && period_end && { period_start, period_end }),
+  };
+  lpLoading.value = true;
+  try {
+    const { data } = await axios.get(
+      `/api/v1/accounts/${accountId}/lead_click_stats`,
+      { params }
+    );
+    lpStats.value = data;
+  } catch {
+    // silent
+  } finally {
+    lpLoading.value = false;
+  }
 };
 
 let pollInterval = null;
@@ -113,6 +141,17 @@ watch(hasProcessingInsights, newVal => {
   else stopPolling();
 });
 
+watch(activeTab, async tab => {
+  if (tab === 'landing_pages') await fetchLpStats();
+});
+
+watch([customStartDate, customEndDate], async () => {
+  if (selectedPeriod.value !== 'custom') return;
+  if (activeTab.value !== 'landing_pages') return;
+  if (!customStartDate.value || !customEndDate.value) return;
+  await fetchLpStats();
+});
+
 // Auto-expand first done insight when loaded
 watch(
   insights,
@@ -142,10 +181,12 @@ const onFilterChange = async event => {
   await store.dispatch('captainReports/fetchInsights', {
     inbox_id: selectedInboxId.value,
   });
+  if (activeTab.value === 'landing_pages') await fetchLpStats();
 };
 
-const onPeriodChange = event => {
+const onPeriodChange = async event => {
   selectedPeriod.value = event.target.value;
+  if (activeTab.value === 'landing_pages') await fetchLpStats();
 };
 
 const onGenerateInsight = async () => {
@@ -252,6 +293,11 @@ const lpMaxClicks = computed(() => {
     ...(lpStats.value.by_hostname || []),
   ];
   return Math.max(...all.map(r => r.clicks), 1);
+});
+
+const lpDailyMax = computed(() => {
+  if (!lpStats.value?.daily?.length) return 1;
+  return Math.max(...lpStats.value.daily.map(r => r.clicks), 1);
 });
 
 // ── FAQ Quick-Add ──
@@ -485,14 +531,29 @@ const maxHandoffCount = computed(() =>
               :value="selectedPeriod"
               @change="onPeriodChange"
             >
+              <option value="today">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.TODAY') }}
+              </option>
+              <option value="yesterday">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.YESTERDAY') }}
+              </option>
               <option value="last_7_days">
                 {{ t('CAPTAIN_REPORTS.FILTER_DATE.LAST_7_DAYS') }}
+              </option>
+              <option value="last_30_days">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.LAST_30_DAYS') }}
+              </option>
+              <option value="this_week">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.THIS_WEEK') }}
               </option>
               <option value="last_week">
                 {{ t('CAPTAIN_REPORTS.FILTER_DATE.LAST_WEEK') }}
               </option>
               <option value="current_month">
                 {{ t('CAPTAIN_REPORTS.FILTER_DATE.CURRENT_MONTH') }}
+              </option>
+              <option value="last_month">
+                {{ t('CAPTAIN_REPORTS.FILTER_DATE.LAST_MONTH') }}
               </option>
               <option value="custom">
                 {{ t('CAPTAIN_REPORTS.FILTER_DATE.CUSTOM') }}
@@ -1457,7 +1518,7 @@ const maxHandoffCount = computed(() =>
           <!-- dados -->
           <div v-else class="space-y-6">
             <!-- KPI Cards -->
-            <div class="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
               <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
                 <p class="text-2xl font-bold text-n-slate-12">
                   {{ lpStats.total_clicks?.toLocaleString() ?? 0 }}
@@ -1481,6 +1542,126 @@ const maxHandoffCount = computed(() =>
                 <p class="mt-1 text-xs text-n-slate-9">
                   {{ t('CAPTAIN_REPORTS.LP.CONVERSION_RATE') }}
                 </p>
+              </div>
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-ruby-11">
+                  {{ lpStats.total_non_converted?.toLocaleString() ?? 0 }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.LP.TOTAL_DROPOFF') }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-amber-11">
+                  {{ lpStats.drop_off_rate ?? 0 }}{{ '%' }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.LP.DROPOFF_RATE') }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-slate-12">
+                  {{ lpStats.unique_converted_contacts?.toLocaleString() ?? 0 }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.LP.UNIQUE_CONTACTS') }}
+                </p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5">
+                <p
+                  class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                >
+                  {{ t('CAPTAIN_REPORTS.LP.FUNNEL_TITLE') }}
+                </p>
+                <div class="space-y-3">
+                  <div>
+                    <div class="mb-1 flex items-center justify-between text-xs">
+                      <span class="text-n-slate-11">{{
+                        t('CAPTAIN_REPORTS.LP.TOTAL_CLICKS')
+                      }}</span>
+                      <span class="text-n-slate-9">{{
+                        lpStats.total_clicks ?? 0
+                      }}</span>
+                    </div>
+                    <div class="h-2 rounded-full bg-n-slate-3">
+                      <div class="h-2 rounded-full bg-n-blue-8 w-full" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="mb-1 flex items-center justify-between text-xs">
+                      <span class="text-n-slate-11">{{
+                        t('CAPTAIN_REPORTS.LP.TOTAL_CONVERSIONS')
+                      }}</span>
+                      <span class="text-n-slate-9">
+                        {{ lpStats.total_conversions ?? 0 }} {{ '·' }}
+                        {{ lpStats.conversion_rate ?? 0 }}%
+                      </span>
+                    </div>
+                    <div class="h-2 rounded-full bg-n-slate-3">
+                      <div
+                        class="h-2 rounded-full bg-n-teal-8 transition-all"
+                        :style="{ width: `${lpStats.conversion_rate ?? 0}%` }"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="mb-1 flex items-center justify-between text-xs">
+                      <span class="text-n-slate-11">{{
+                        t('CAPTAIN_REPORTS.LP.TOTAL_DROPOFF')
+                      }}</span>
+                      <span class="text-n-slate-9">
+                        {{ lpStats.total_non_converted ?? 0 }} {{ '·' }}
+                        {{ lpStats.drop_off_rate ?? 0 }}%
+                      </span>
+                    </div>
+                    <div class="h-2 rounded-full bg-n-slate-3">
+                      <div
+                        class="h-2 rounded-full bg-n-ruby-8 transition-all"
+                        :style="{ width: `${lpStats.drop_off_rate ?? 0}%` }"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-if="lpStats.daily?.length"
+                class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+              >
+                <p
+                  class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                >
+                  {{ t('CAPTAIN_REPORTS.LP.DAILY_TREND') }}
+                </p>
+                <div class="space-y-2">
+                  <div
+                    v-for="row in lpStats.daily"
+                    :key="row.day"
+                    class="flex items-center gap-3"
+                  >
+                    <span class="w-20 shrink-0 text-xs text-n-slate-9">
+                      {{ formatDate(row.day) }}
+                    </span>
+                    <div class="h-2 flex-1 rounded-full bg-n-slate-3">
+                      <div
+                        class="h-2 rounded-full bg-n-blue-8 transition-all"
+                        :style="{
+                          width: `${Math.round((row.clicks / lpDailyMax) * 100)}%`,
+                        }"
+                      />
+                    </div>
+                    <span
+                      class="w-20 shrink-0 text-right text-xs text-n-slate-8"
+                    >
+                      {{ row.clicks }} {{ t('CAPTAIN_REPORTS.LP.CLICKS') }}
+                      {{ '·' }} {{ row.conversions }}
+                      {{ t('CAPTAIN_REPORTS.LP.CONV') }}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 

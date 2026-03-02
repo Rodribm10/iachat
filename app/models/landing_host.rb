@@ -4,6 +4,7 @@
 #
 #  id         :bigint           not null, primary key
 #  active     :boolean
+#  auto_label :string
 #  hostname   :string
 #  unit_code  :string
 #  created_at :datetime         not null

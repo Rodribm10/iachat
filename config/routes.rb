@@ -37,6 +37,7 @@ Rails.application.routes.draw do
 
   get '/health', to: 'health#show'
   get '/api', to: 'api#index'
+  get '/lp', to: 'public/landing_pages#show'
   post '/track/click', to: 'api/v1/tracking#click'
   namespace :api, defaults: { format: 'json' } do
     namespace :v1 do

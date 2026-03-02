@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_02_154737) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_02_211000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1560,6 +1560,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_02_154737) do
     t.boolean "active"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "auto_label"
     t.index ["hostname"], name: "index_landing_hosts_on_hostname", unique: true
   end
 
@@ -1576,6 +1577,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_02_154737) do
     t.integer "contact_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "click_id"
     t.index ["inbox_id", "ip", "status", "created_at"], name: "index_lead_clicks_on_inbox_id_and_ip_and_status_and_created_at"
   end
 

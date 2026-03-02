@@ -19,6 +19,7 @@ export default {
       landingHosts: [],
       newHostname: '',
       newUnitCode: '',
+      newAutoLabel: '',
       isLoading: false,
       isSaving: false,
       labels: {
@@ -29,21 +30,29 @@ export default {
         empty: 'Nenhum domínio cadastrado ainda.',
         colHostname: 'Hostname',
         colCode: 'Código / Unidade',
+        colLabel: 'Etiqueta automática',
+        colPublicLink: 'Página pública',
         remove: 'Remover',
+        open: 'Abrir',
+        copy: 'Copiar link',
         addTitle: 'Adicionar Domínio',
         labelHostname: 'Hostname *',
         placeholderHostname: 'express.seuhotel.com.br',
         labelCode: 'Código Unidade',
         placeholderCode: 'EXPRESS',
+        labelAutoLabel: 'Etiqueta automática',
+        placeholderAutoLabel: 'lead_landing_express',
         labelSaving: 'Salvando...',
         labelAdd: 'Adicionar',
-        hint: 'Informe o domínio exato sem https://, ex: landing.meusite.com.br',
+        hint: 'Informe o domínio exato sem https://. Se quiser, defina uma etiqueta para aplicar automaticamente quando o lead converter.',
         errLoad: 'Erro ao carregar os domínios.',
         errAdd:
           'Erro ao adicionar domínio. Verifique se já existe ou o formato é válido.',
         errDel: 'Erro ao remover domínio.',
         successAdd: 'Domínio adicionado com sucesso!',
         successDel: 'Domínio removido.',
+        successCopy: 'Link copiado!',
+        errCopy: 'Não foi possível copiar o link.',
       },
     };
   },
@@ -90,11 +99,13 @@ export default {
           {
             hostname: cleanHostname,
             unit_code: this.newUnitCode.trim().toUpperCase(),
+            auto_label: this.newAutoLabel.trim() || null,
           }
         );
         this.landingHosts.push(data);
         this.newHostname = '';
         this.newUnitCode = '';
+        this.newAutoLabel = '';
         useAlert(this.labels.successAdd);
       } catch {
         useAlert(this.labels.errAdd);
@@ -113,6 +124,17 @@ export default {
         useAlert(this.labels.successDel);
       } catch {
         useAlert(this.labels.errDel);
+      }
+    },
+    landingUrl(hostname) {
+      return `https://${hostname}/lp`;
+    },
+    async copyLink(hostname) {
+      try {
+        await navigator.clipboard.writeText(this.landingUrl(hostname));
+        useAlert(this.labels.successCopy);
+      } catch {
+        useAlert(this.labels.errCopy);
       }
     },
   },
@@ -153,6 +175,12 @@ export default {
             <th class="text-left px-4 py-3 font-medium">
               {{ labels.colCode }}
             </th>
+            <th class="text-left px-4 py-3 font-medium">
+              {{ labels.colLabel }}
+            </th>
+            <th class="text-left px-4 py-3 font-medium">
+              {{ labels.colPublicLink }}
+            </th>
             <th class="px-4 py-3 text-right" />
           </tr>
         </thead>
@@ -167,6 +195,27 @@ export default {
             </td>
             <td class="px-4 py-3 text-n-slate-11">
               {{ host.unit_code || '—' }}
+            </td>
+            <td class="px-4 py-3 text-n-slate-11">
+              {{ host.auto_label || '—' }}
+            </td>
+            <td class="px-4 py-3 text-n-slate-11">
+              <div class="flex items-center gap-2">
+                <a
+                  class="text-xs text-n-brand hover:underline"
+                  :href="landingUrl(host.hostname)"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {{ labels.open }}
+                </a>
+                <button
+                  class="text-xs text-n-slate-10 hover:text-n-slate-12"
+                  @click="copyLink(host.hostname)"
+                >
+                  {{ labels.copy }}
+                </button>
+              </div>
             </td>
             <td class="px-4 py-3 text-right">
               <button
@@ -205,6 +254,17 @@ export default {
           <woot-input
             v-model="newUnitCode"
             :placeholder="labels.placeholderCode"
+            class="[&>input]:!mb-0"
+            @keyup.enter="addHost"
+          />
+        </div>
+        <div class="w-44">
+          <label class="block text-xs font-medium text-n-slate-11 mb-1">
+            {{ labels.labelAutoLabel }}
+          </label>
+          <woot-input
+            v-model="newAutoLabel"
+            :placeholder="labels.placeholderAutoLabel"
             class="[&>input]:!mb-0"
             @keyup.enter="addHost"
           />

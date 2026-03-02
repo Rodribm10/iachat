@@ -25,7 +25,7 @@ class Leads::AttributionMatcherService
   def find_matching_click
     base_query = LeadClick
                  .where(status: :clicked, inbox_id: @inbox_id)
-                 .where('created_at > ?', 30.minutes.ago)
+                 .where('created_at > ?', 5.minutes.ago)
 
     return base_query.where(ip: @inbound_ip).order(created_at: :desc).first if @inbound_ip.present?
 
@@ -61,6 +61,17 @@ class Leads::AttributionMatcherService
   end
 
   def apply_labels(click)
-    @conversation.add_labels(['lead_meta']) if click.source.to_s.downcase.include?('meta')
+    labels = []
+    labels << 'lead_meta' if click.source.to_s.downcase.include?('meta')
+
+    host_label = auto_label_for(click)
+    labels << host_label if host_label.present?
+
+    @conversation.add_labels(labels.uniq) if labels.any?
+  end
+
+  def auto_label_for(click)
+    hostname = click.hostname.to_s.strip.sub(%r{^https?://}, '').sub(%r{/.*$}, '')
+    LandingHost.find_by(inbox_id: @inbox_id, hostname: hostname, active: true)&.auto_label.to_s.strip.presence
   end
 end
