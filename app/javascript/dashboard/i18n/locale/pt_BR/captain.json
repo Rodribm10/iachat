@@ -298,6 +298,47 @@
           "LABEL": "Disponível para envio pelos agentes"
         }
       }
+    },
+    "NOTIFICATIONS": {
+      "TITLE": "Notificações Automáticas",
+      "DESCRIPTION": "Configure mensagens automáticas enviadas antes ou depois da chegada do hóspede.",
+      "LOADING": "Carregando notificações...",
+      "ADD": "Adicionar notificação",
+      "ACTIVE": "Ativo",
+      "INACTIVE": "Inativo",
+      "DIRECTION": {
+        "BEFORE": "antes",
+        "AFTER": "depois",
+        "OF_ARRIVAL": "da chegada"
+      },
+      "TIMING_LABEL": "da chegada",
+      "FORM": {
+        "LABEL_PLACEHOLDER": "Nome do template (ex: Orientações de Chegada)",
+        "CONTENT_PLACEHOLDER": "Mensagem a enviar... Use {{guest_name}}, {{check_in_time}}, {{suite_name}}",
+        "SEND": "Enviar",
+        "MINUTES": "min",
+        "CANCEL": "Cancelar",
+        "SAVE": "Salvar"
+      },
+      "CREATE": {
+        "SUCCESS": "Notificação criada com sucesso!",
+        "ERROR": "Erro ao criar notificação. Tente novamente."
+      },
+      "UPDATE": {
+        "SUCCESS": "Notificação atualizada!",
+        "ERROR": "Erro ao atualizar notificação."
+      },
+      "DELETE": {
+        "SUCCESS": "Notificação removida.",
+        "ERROR": "Erro ao remover notificação."
+      },
+      "INBOX_LABEL": "Selecione a caixa de entrada",
+      "NO_CAPTAIN_INBOXES": "Nenhuma caixa de entrada com Captain configurado.",
+      "SELECT_INBOX_HINT": "Clique em uma caixa de entrada acima para ver e configurar os templates.",
+      "EMPTY": {
+        "TITLE": "Nenhum template configurado",
+        "DESC": "Crie templates de mensagem automática para esta caixa de entrada."
+      }
     }
   },
   "CAPTAIN": {
@@ -444,47 +485,6 @@
       "SAVE": "Salvar FAQ",
       "SUCCESS": "FAQ criado com sucesso!",
       "ERROR": "Erro ao criar FAQ. Tente novamente."
-    },
-    "NOTIFICATIONS": {
-      "TITLE": "Notificações Automáticas",
-      "DESCRIPTION": "Configure mensagens automáticas enviadas antes ou depois da chegada do hóspede.",
-      "LOADING": "Carregando notificações...",
-      "ADD": "Adicionar notificação",
-      "ACTIVE": "Ativo",
-      "INACTIVE": "Inativo",
-      "DIRECTION": {
-        "BEFORE": "antes",
-        "AFTER": "depois",
-        "OF_ARRIVAL": "da chegada"
-      },
-      "TIMING_LABEL": "da chegada",
-      "FORM": {
-        "LABEL_PLACEHOLDER": "Nome do template (ex: Orientações de Chegada)",
-        "CONTENT_PLACEHOLDER": "Mensagem a enviar... Use {{guest_name}}, {{check_in_time}}, {{suite_name}}",
-        "SEND": "Enviar",
-        "MINUTES": "min",
-        "CANCEL": "Cancelar",
-        "SAVE": "Salvar"
-      },
-      "CREATE": {
-        "SUCCESS": "Notificação criada com sucesso!",
-        "ERROR": "Erro ao criar notificação. Tente novamente."
-      },
-      "UPDATE": {
-        "SUCCESS": "Notificação atualizada!",
-        "ERROR": "Erro ao atualizar notificação."
-      },
-      "DELETE": {
-        "SUCCESS": "Notificação removida.",
-        "ERROR": "Erro ao remover notificação."
-      },
-      "INBOX_LABEL": "Selecione a caixa de entrada",
-      "NO_CAPTAIN_INBOXES": "Nenhuma caixa de entrada com Captain configurado.",
-      "SELECT_INBOX_HINT": "Clique em uma caixa de entrada acima para ver e configurar os templates.",
-      "EMPTY": {
-        "TITLE": "Nenhum template configurado",
-        "DESC": "Crie templates de mensagem automática para esta caixa de entrada."
-      }
     }
   }
 }

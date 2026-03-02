@@ -298,6 +298,46 @@
           "LABEL": "Available for agent sending"
         }
       }
+    },
+    "NOTIFICATIONS": {
+      "TITLE": "Automatic Notifications",
+      "DESCRIPTION": "Configure messages sent automatically before or after the guest's arrival.",
+      "LOADING": "Loading notifications...",
+      "ADD": "Add notification",
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "DIRECTION": {
+        "BEFORE": "before",
+        "AFTER": "after",
+        "OF_ARRIVAL": "arrival"
+      },
+      "FORM": {
+        "LABEL_PLACEHOLDER": "Template name (e.g. Arrival Instructions)",
+        "CONTENT_PLACEHOLDER": "Message to send... Use {{guest_name}}, {{check_in_time}}, {{suite_name}}",
+        "SEND": "Send",
+        "MINUTES": "min",
+        "CANCEL": "Cancel",
+        "SAVE": "Save"
+      },
+      "CREATE": {
+        "SUCCESS": "Notification created successfully!",
+        "ERROR": "Error creating notification. Please try again."
+      },
+      "UPDATE": {
+        "SUCCESS": "Notification updated!",
+        "ERROR": "Error updating notification."
+      },
+      "DELETE": {
+        "SUCCESS": "Notification removed.",
+        "ERROR": "Error removing notification."
+      },
+      "INBOX_LABEL": "Select inbox",
+      "NO_CAPTAIN_INBOXES": "No inboxes with Captain configured.",
+      "SELECT_INBOX_HINT": "Click an inbox above to view and configure its templates.",
+      "EMPTY": {
+        "TITLE": "No templates configured",
+        "DESC": "Create automatic message templates for this inbox."
+      }
     }
   },
   "CAPTAIN": {
@@ -444,46 +484,6 @@
       "SAVE": "Save FAQ",
       "SUCCESS": "FAQ created successfully!",
       "ERROR": "Error creating FAQ. Please try again."
-    },
-    "NOTIFICATIONS": {
-      "TITLE": "Automatic Notifications",
-      "DESCRIPTION": "Configure messages sent automatically before or after the guest's arrival.",
-      "LOADING": "Loading notifications...",
-      "ADD": "Add notification",
-      "ACTIVE": "Active",
-      "INACTIVE": "Inactive",
-      "DIRECTION": {
-        "BEFORE": "before",
-        "AFTER": "after",
-        "OF_ARRIVAL": "arrival"
-      },
-      "FORM": {
-        "LABEL_PLACEHOLDER": "Template name (e.g. Arrival Instructions)",
-        "CONTENT_PLACEHOLDER": "Message to send... Use {{guest_name}}, {{check_in_time}}, {{suite_name}}",
-        "SEND": "Send",
-        "MINUTES": "min",
-        "CANCEL": "Cancel",
-        "SAVE": "Save"
-      },
-      "CREATE": {
-        "SUCCESS": "Notification created successfully!",
-        "ERROR": "Error creating notification. Please try again."
-      },
-      "UPDATE": {
-        "SUCCESS": "Notification updated!",
-        "ERROR": "Error updating notification."
-      },
-      "DELETE": {
-        "SUCCESS": "Notification removed.",
-        "ERROR": "Error removing notification."
-      },
-      "INBOX_LABEL": "Select inbox",
-      "NO_CAPTAIN_INBOXES": "No inboxes with Captain configured.",
-      "SELECT_INBOX_HINT": "Click an inbox above to view and configure its templates.",
-      "EMPTY": {
-        "TITLE": "No templates configured",
-        "DESC": "Create automatic message templates for this inbox."
-      }
     }
   }
 }
