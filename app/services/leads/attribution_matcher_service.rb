@@ -25,7 +25,7 @@ class Leads::AttributionMatcherService
   def find_matching_click
     base_query = LeadClick
                  .where(status: :clicked, inbox_id: @inbox_id)
-                 .where('created_at > ?', 10.minutes.ago)
+                 .where('created_at > ?', 30.minutes.ago)
 
     return base_query.where(ip: @inbound_ip).order(created_at: :desc).first if @inbound_ip.present?
 

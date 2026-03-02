@@ -74,12 +74,21 @@ export default {
     async addHost() {
       if (!this.newHostname.trim()) return;
       this.isSaving = true;
+
+      // Sanitiza: remove protocolo, www, barras e espaços
+      const cleanHostname = this.newHostname
+        .trim()
+        .toLowerCase()
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./, '')
+        .replace(/\/.*$/, '');
+
       try {
         const { data } = await landingHostsApi.createHost(
           this.currentAccountId,
           this.inbox.id,
           {
-            hostname: this.newHostname.trim().toLowerCase(),
+            hostname: cleanHostname,
             unit_code: this.newUnitCode.trim().toUpperCase(),
           }
         );
