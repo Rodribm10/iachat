@@ -4,32 +4,38 @@
 #
 # Table name: inboxes
 #
-#  id                            :integer          not null, primary key
-#  allow_messages_after_resolved :boolean          default(TRUE)
-#  auto_assignment_config        :jsonb
-#  auto_resolve_duration         :integer
-#  business_name                 :string
-#  channel_type                  :string
-#  csat_config                   :jsonb            not null
-#  csat_survey_enabled           :boolean          default(FALSE)
-#  email_address                 :string
-#  enable_auto_assignment        :boolean          default(TRUE)
-#  enable_email_collect          :boolean          default(TRUE)
-#  greeting_enabled              :boolean          default(FALSE)
-#  greeting_message              :string
-#  lock_to_single_conversation   :boolean          default(FALSE), not null
-#  message_signature_enabled     :boolean
-#  name                          :string           not null
-#  out_of_office_message         :string
-#  sender_name_type              :integer          default("friendly"), not null
-#  timezone                      :string           default("UTC")
-#  typing_delay                  :integer          default(0)
-#  working_hours_enabled         :boolean          default(FALSE)
-#  created_at                    :datetime         not null
-#  updated_at                    :datetime         not null
-#  account_id                    :integer          not null
-#  channel_id                    :integer          not null
-#  portal_id                     :bigint
+#  id                                  :integer          not null, primary key
+#  allow_messages_after_resolved       :boolean          default(TRUE)
+#  auto_assignment_config              :jsonb
+#  auto_resolve_duration               :integer
+#  business_name                       :string
+#  channel_type                        :string
+#  csat_config                         :jsonb            not null
+#  csat_survey_enabled                 :boolean          default(FALSE)
+#  email_address                       :string
+#  enable_auto_assignment              :boolean          default(TRUE)
+#  enable_email_collect                :boolean          default(TRUE)
+#  greeting_enabled                    :boolean          default(FALSE)
+#  greeting_message                    :string
+#  lock_to_single_conversation         :boolean          default(FALSE), not null
+#  message_signature_day_name          :string
+#  message_signature_default_name      :string
+#  message_signature_enabled           :boolean
+#  message_signature_night_even_name   :string
+#  message_signature_night_odd_name    :string
+#  message_signature_night_shift_end   :string           default("07:00")
+#  message_signature_night_shift_start :string           default("19:00")
+#  name                                :string           not null
+#  out_of_office_message               :string
+#  sender_name_type                    :integer          default("friendly"), not null
+#  timezone                            :string           default("UTC")
+#  typing_delay                        :integer          default(0)
+#  working_hours_enabled               :boolean          default(FALSE)
+#  created_at                          :datetime         not null
+#  updated_at                          :datetime         not null
+#  account_id                          :integer          not null
+#  channel_id                          :integer          not null
+#  portal_id                           :bigint
 #
 # Indexes
 #
@@ -209,7 +215,28 @@ class Inbox < ApplicationRecord
     account.feature_enabled?('assignment_v2')
   end
 
+  def shift_signature_name
+    time_now = Time.current.in_time_zone(ENV.fetch('ACCOUNT_TIMEZONE', 'UTC'))
+    night_shift?(time_now) ? night_name(time_now.day) : day_name
+  end
+
   private
+
+  def night_shift?(time_now)
+    current = time_now.strftime('%H:%M')
+    start_h = message_signature_night_shift_start.presence || '19:00'
+    end_h   = message_signature_night_shift_end.presence || '07:00'
+    start_h < end_h ? (current >= start_h && current < end_h) : (current >= start_h || current < end_h)
+  end
+
+  def night_name(day)
+    base = day.even? ? message_signature_night_even_name : message_signature_night_odd_name
+    base.presence || message_signature_default_name
+  end
+
+  def day_name
+    message_signature_day_name.presence || message_signature_default_name
+  end
 
   def default_name_for_blank_name
     email? ? display_name_from_email : ''

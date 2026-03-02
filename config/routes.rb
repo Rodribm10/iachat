@@ -37,6 +37,7 @@ Rails.application.routes.draw do
 
   get '/health', to: 'health#show'
   get '/api', to: 'api#index'
+  post '/track/click', to: 'api/v1/tracking#click'
   namespace :api, defaults: { format: 'json' } do
     namespace :v1 do
       # ----------------------------------
@@ -234,6 +235,7 @@ Rails.application.routes.draw do
             get :campaigns, on: :member
             get :agent_bot, on: :member
             post :set_agent_bot, on: :member
+            resources :landing_hosts, only: [:index, :create, :destroy]
             post :setup_channel_provider, on: :member
             post :disconnect_channel_provider, on: :member
             delete :avatar, on: :member

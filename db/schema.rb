@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_01_200000) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_02_154737) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1405,6 +1405,12 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_01_200000) do
     t.integer "auto_resolve_duration"
     t.boolean "message_signature_enabled"
     t.integer "typing_delay", default: 0
+    t.string "message_signature_default_name"
+    t.string "message_signature_day_name"
+    t.string "message_signature_night_even_name"
+    t.string "message_signature_night_odd_name"
+    t.string "message_signature_night_shift_start", default: "19:00"
+    t.string "message_signature_night_shift_end", default: "07:00"
     t.index ["account_id"], name: "index_inboxes_on_account_id"
     t.index ["channel_id", "channel_type"], name: "index_inboxes_on_channel_id_and_channel_type"
     t.index ["portal_id"], name: "index_inboxes_on_portal_id"
@@ -1545,6 +1551,32 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_01_200000) do
     t.datetime "updated_at", precision: nil, null: false
     t.index ["account_id"], name: "index_labels_on_account_id"
     t.index ["title", "account_id"], name: "index_labels_on_title_and_account_id", unique: true
+  end
+
+  create_table "landing_hosts", force: :cascade do |t|
+    t.string "hostname"
+    t.string "unit_code"
+    t.integer "inbox_id"
+    t.boolean "active"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["hostname"], name: "index_landing_hosts_on_hostname", unique: true
+  end
+
+  create_table "lead_clicks", force: :cascade do |t|
+    t.integer "inbox_id"
+    t.string "ip"
+    t.string "user_agent"
+    t.string "hostname"
+    t.string "source"
+    t.string "campanha"
+    t.string "lp"
+    t.integer "status"
+    t.integer "conversation_id"
+    t.integer "contact_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["inbox_id", "ip", "status", "created_at"], name: "index_lead_clicks_on_inbox_id_and_ip_and_status_and_created_at"
   end
 
   create_table "leaves", force: :cascade do |t|

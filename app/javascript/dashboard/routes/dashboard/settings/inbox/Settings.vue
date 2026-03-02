@@ -33,6 +33,7 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import { getInboxIconByType } from 'dashboard/helper/inbox';
 import Editor from 'dashboard/components-next/Editor/Editor.vue';
+import LandingHostsConfig from './settingsPage/LandingHostsConfig.vue';
 
 export default {
   components: {
@@ -61,6 +62,7 @@ export default {
     WuzapiConfiguration,
     EvolutionGoConfiguration,
     InboxAutoResolve,
+    LandingHostsConfig,
   },
   mixins: [inboxMixin],
   setup() {
@@ -93,6 +95,12 @@ export default {
       isLoadingHealth: false,
       healthError: null,
       messageSignatureEnabled: false,
+      messageSignatureDefaultName: '',
+      messageSignatureDayName: '',
+      messageSignatureNightEvenName: '',
+      messageSignatureNightOddName: '',
+      messageSignatureNightShiftStart: '19:00',
+      messageSignatureNightShiftEnd: '07:00',
       typingDelay: 0,
     };
   },
@@ -214,6 +222,14 @@ export default {
           },
         ];
       }
+
+      visibleToAllChannelTabs = [
+        ...visibleToAllChannelTabs,
+        {
+          key: 'landing-hosts',
+          name: 'Landing Pages',
+        },
+      ];
 
       return visibleToAllChannelTabs;
     },
@@ -451,6 +467,18 @@ export default {
           null;
         this.typingDelay = this.inbox.typing_delay || 0;
         this.messageSignatureEnabled = this.inbox.message_signature_enabled;
+        this.messageSignatureDefaultName =
+          this.inbox.message_signature_default_name || '';
+        this.messageSignatureDayName =
+          this.inbox.message_signature_day_name || '';
+        this.messageSignatureNightEvenName =
+          this.inbox.message_signature_night_even_name || '';
+        this.messageSignatureNightOddName =
+          this.inbox.message_signature_night_odd_name || '';
+        this.messageSignatureNightShiftStart =
+          this.inbox.message_signature_night_shift_start || '19:00';
+        this.messageSignatureNightShiftEnd =
+          this.inbox.message_signature_night_shift_end || '07:00';
 
         // Set initial tab after inbox data is loaded
         this.setTabFromRouteParam();
@@ -476,6 +504,13 @@ export default {
           sender_name_type: this.senderNameType,
           business_name: this.businessName || null,
           message_signature_enabled: this.messageSignatureEnabled,
+          message_signature_default_name: this.messageSignatureDefaultName,
+          message_signature_day_name: this.messageSignatureDayName,
+          message_signature_night_even_name: this.messageSignatureNightEvenName,
+          message_signature_night_odd_name: this.messageSignatureNightOddName,
+          message_signature_night_shift_start:
+            this.messageSignatureNightShiftStart,
+          message_signature_night_shift_end: this.messageSignatureNightShiftEnd,
           channel: {
             widget_color: this.inbox.widget_color,
             website_url: this.channelWebsiteUrl,
@@ -631,6 +666,54 @@ export default {
             <label for="messageSignatureEnabled">
               {{ $t('INBOX_MGMT.ADD.MESSAGE_SIGNATURE.LABEL') }}
             </label>
+          </div>
+          <woot-input
+            v-if="messageSignatureEnabled"
+            v-model="messageSignatureDefaultName"
+            class="pb-4"
+            label="Nome Geral (Se não houver plantão definido)"
+            placeholder="Ex: Equipe Hotel"
+            @blur="updateInbox"
+          />
+          <div
+            v-if="messageSignatureEnabled"
+            class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4"
+          >
+            <woot-input
+              v-model="messageSignatureDayName"
+              label="Recepcionista do Dia (07h - 19h)"
+              placeholder="Nome aqui"
+              @blur="updateInbox"
+            />
+            <woot-input
+              v-model="messageSignatureNightEvenName"
+              label="Noite - Dias PARES (19h - 07h)"
+              placeholder="Nome aqui"
+              @blur="updateInbox"
+            />
+            <woot-input
+              v-model="messageSignatureNightOddName"
+              label="Noite - Dias ÍMPARES"
+              placeholder="Nome aqui"
+              @blur="updateInbox"
+            />
+          </div>
+          <div
+            v-if="messageSignatureEnabled"
+            class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-t pt-4 mt-2"
+          >
+            <woot-input
+              v-model="messageSignatureNightShiftStart"
+              label="Início do Plantão Noturno"
+              placeholder="19:00"
+              @blur="updateInbox"
+            />
+            <woot-input
+              v-model="messageSignatureNightShiftEnd"
+              label="Fim do Plantão Noturno"
+              placeholder="07:00"
+              @blur="updateInbox"
+            />
           </div>
           <woot-input
             v-if="isAPIInbox"
@@ -1045,6 +1128,9 @@ export default {
       </div>
       <div v-if="selectedTabKey === 'whatsapp-health'">
         <AccountHealth :health-data="healthData" />
+      </div>
+      <div v-if="selectedTabKey === 'landing-hosts'">
+        <LandingHostsConfig :inbox="inbox" />
       </div>
     </section>
   </div>

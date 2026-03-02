@@ -41,6 +41,9 @@ class Whatsapp::IncomingMessageWuzapiService < Whatsapp::IncomingMessageBaseServ
 
     @conversation = find_or_create_conversation
 
+    # Processar Match de Leads (Fingerprinting) caso a mensagem venha do Lead
+    Leads::AttributionMatcherService.new(@conversation).perform unless @parser.from_me?
+
     return if @parser.from_me? && handle_echo_message
 
     create_new_message
@@ -150,8 +153,18 @@ class Whatsapp::IncomingMessageWuzapiService < Whatsapp::IncomingMessageBaseServ
 
   def build_message(parser, conversation, clean_source_id)
     is_outgoing = parser.from_me?
+    content = parser.text_content
+    inbox_obj = inbox
+
+    # Se a mensagem vier do celular (outgoing) e a assinatura estiver ativa,
+    # e o conteúdo não parecer já ter uma assinatura (evita duplicar em ecos)
+    if is_outgoing && inbox_obj.message_signature_enabled? && content.present? && !content.start_with?('*[') && !content.start_with?('*')
+      signature_name = inbox_obj.shift_signature_name
+      content = "*[ #{signature_name} ]*\n#{content}" if signature_name.present?
+    end
+
     msg_params = {
-      content: parser.text_content,
+      content: content,
       account_id: inbox.account_id, inbox_id: inbox.id,
       message_type: is_outgoing ? :outgoing : :incoming,
       sender: is_outgoing ? nil : @contact,

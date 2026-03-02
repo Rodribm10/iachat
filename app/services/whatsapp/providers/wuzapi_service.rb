@@ -10,97 +10,46 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
 
   def send_message(phone_number, message)
     user_token = whatsapp_channel.wuzapi_user_token
-    # Normalize phone number: remove +, space, -, (, )
-    normalized_phone = phone_number.gsub(/[\+\s\-\(\)]/, '')
+    normalized_phone = normalize_phone(phone_number)
+    log_outgoing_message(message)
+    return send_reaction_message(normalized_phone, message) if reaction_message?(message)
 
-    Rails.logger.info "[WuzapiService] Sending Message:
-      Message ID: #{message.id}
-      Conversation ID: #{message.conversation_id}
-      Contact Inbox ID: #{message.conversation.contact_inbox_id}
-      Raw Phone (arg): #{phone_number}
-      Normalized Phone (Target): #{normalized_phone}
-      Content: #{message.content&.truncate(50)}
-    "
-
-    return send_reaction_message(normalized_phone, message) if message.content_attributes['is_reaction'] || message.content_attributes[:is_reaction]
-
-    response = if message.attachments.present?
-                 send_attachment_message(user_token, normalized_phone, message)
-               else
-                 params = {}
-                 # Extract and clean reply ID (remove WAID: prefix if stored)
-                 if (reply_id = message.content_attributes['in_reply_to_external_id']).present?
-                   params['MessageId'] = reply_id.gsub(/^WAID:/, '')
-                 elsif (reply_id = message.in_reply_to_external_id).present?
-                   params['MessageId'] = reply_id.gsub(/^WAID:/, '')
-                 end
-
-                 client.send_text(user_token, normalized_phone, message.content, **params)
-               end
-
-    # Extract message ID from WuzAPI response and format as WAID:xxx
+    content_to_send = build_content_with_signature(message)
+    response = dispatch_message(user_token, normalized_phone, message, content_to_send)
     extract_message_id(response)
   end
 
-  def send_attachment_message(user_token, phone_number, message)
+  def send_attachment_message(user_token, phone_number, message, content_with_signature = nil)
     attachment = message.attachments.first
-    base64_data = Base64.strict_encode64(attachment.file.download)
     mime_type = attachment.file.content_type
+    caption = content_with_signature || message.content
+
+    base64_data = attachment.file.blob.open { |tmp| Base64.strict_encode64(tmp.read) }
     data_uri = "data:#{mime_type};base64,#{base64_data}"
 
     if mime_type.start_with?('image/')
-      client.send_image(user_token, phone_number, data_uri, message.content)
+      client.send_image(user_token, phone_number, data_uri, caption)
     else
       client.send_file(user_token, phone_number, data_uri, attachment.file.filename.to_s)
     end
   end
 
   def send_reaction_message(phone_number, message)
-    user_token = whatsapp_channel.wuzapi_user_token
-    normalized_phone = phone_number.gsub(/[\+\s\-\(\)]/, '')
-
-    # Assuming message content is the emoji
+    user_token  = whatsapp_channel.wuzapi_user_token
     reaction_emoji = message.content
+    message_id  = resolve_reaction_message_id(message)
+    phone, mid  = build_reaction_targets(phone_number, message_id, message)
 
-    # Resolve the correct external message ID
-    message_id = message.content_attributes['in_reply_to_external_id']
+    Rails.logger.info "[WuzapiService] Attempting reaction: phone=#{phone}, msg_id=#{mid}, emoji=#{reaction_emoji}"
 
-    # Fallback to internal ID resolution if external is missing
-    if message_id.blank? && message.content_attributes['in_reply_to'].present?
-      target_msg = message.conversation.messages.find_by(id: message.content_attributes['in_reply_to'])
-      message_id = target_msg&.source_id
-    end
-
-    # Strip WAID prefix if present
-    message_id = message_id.gsub(/^WAID:/, '') if message_id.present?
-
-    use_me_prefix = reaction_to_own_message?(message)
-
-    if use_me_prefix
-      normalized_phone = "me:#{normalized_phone}" unless normalized_phone.start_with?('me:')
-      message_id = "me:#{message_id}" if message_id.present? && !message_id.start_with?('me:')
-    else
-      # Enforce JID format for customer numbers
-      clean_number = normalized_phone.split('@').first
-      normalized_phone = "#{clean_number}@s.whatsapp.net"
-    end
-
-    Rails.logger.info "[WuzapiService] Attempting reaction: phone=#{normalized_phone}, msg_id=#{message_id}, emoji=#{reaction_emoji}"
-
-    if message_id.present?
-      # Wuzapi client needs to implement send_reaction
-      # This assumes the client wrapper has this method. If not, we might need to add it or use raw request.
-      # Based on typical Wuzapi forks, it might be /send-reaction-message
-
-      # We'll assume the client wrapper will have a send_reaction method.
-      # If not visible in the existing codebase, we might need to add it to the client class too.
-      # checking...
-      response = client.send_reaction(user_token, normalized_phone, message_id, reaction_emoji)
-      Rails.logger.info "[WuzapiService] Reaction response: #{response}"
-      response
-    else
+    if mid.blank?
       Rails.logger.warn 'Wuzapi: Cannot send reaction without in_reply_to message ID'
+      return
     end
+
+    response = client.send_reaction(user_token, phone, mid, reaction_emoji)
+    Rails.logger.info "[WuzapiService] Reaction response: #{response}"
+    response
   end
 
   def send_template(_phone_number, _template_info)
@@ -154,6 +103,74 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
   end
 
   private
+
+  def normalize_phone(phone_number)
+    phone_number.gsub(/[+\s\-()]/, '')
+  end
+
+  def reaction_message?(message)
+    message.content_attributes['is_reaction'] || message.content_attributes[:is_reaction]
+  end
+
+  def log_outgoing_message(message)
+    Rails.logger.info "[WuzapiService] Sending Message: ID=#{message.id} Conv=#{message.conversation_id} Content=#{message.content&.truncate(50)}"
+  end
+
+  def sender_name_for(message)
+    agent = message.sender
+    if agent.is_a?(User)
+      agent.display_name.presence || agent.name
+    elsif agent.is_a?(Captain::Assistant)
+      agent.name
+    else
+      message.inbox.shift_signature_name
+    end
+  end
+
+  def build_content_with_signature(message)
+    content = message.content
+    return content unless message.inbox.message_signature_enabled?
+
+    name = sender_name_for(message)
+    name.present? ? "*[ #{name} ]*\n#{content}" : content
+  end
+
+  def reply_params(message)
+    params = {}
+    reply_id = message.content_attributes['in_reply_to_external_id'].presence ||
+               message.in_reply_to_external_id.presence
+    params['MessageId'] = reply_id.gsub(/^WAID:/, '') if reply_id
+    params
+  end
+
+  def dispatch_message(user_token, phone, message, content)
+    if message.attachments.present?
+      send_attachment_message(user_token, phone, message, content)
+    else
+      client.send_text(user_token, phone, content, **reply_params(message))
+    end
+  end
+
+  def resolve_reaction_message_id(message)
+    mid = message.content_attributes['in_reply_to_external_id']
+    if mid.blank? && message.content_attributes['in_reply_to'].present?
+      target = message.conversation.messages.find_by(id: message.content_attributes['in_reply_to'])
+      mid = target&.source_id
+    end
+    mid.present? ? mid.gsub(/^WAID:/, '') : nil
+  end
+
+  def build_reaction_targets(phone_number, message_id, message)
+    phone = normalize_phone(phone_number)
+    mid   = message_id
+    if reaction_to_own_message?(message)
+      phone = "me:#{phone}" unless phone.start_with?('me:')
+      mid   = "me:#{mid}" if mid.present? && !mid.start_with?('me:')
+    else
+      phone = "#{phone.split('@').first}@s.whatsapp.net"
+    end
+    [phone, mid]
+  end
 
   def client
     @client ||= ::Wuzapi::Client.new(@base_url)
