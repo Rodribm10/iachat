@@ -414,6 +414,12 @@ const menuItems = computed(() => {
           activeOn: ['captain_settings_reports'],
           to: accountScopedRoute('captain_settings_reports'),
         },
+        {
+          name: 'Notifications',
+          label: t('SIDEBAR.CAPTAIN_NOTIFICATIONS'),
+          activeOn: ['captain_settings_notifications'],
+          to: accountScopedRoute('captain_settings_notifications'),
+        },
       ],
     },
     {
