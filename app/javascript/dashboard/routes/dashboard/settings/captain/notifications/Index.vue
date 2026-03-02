@@ -18,10 +18,8 @@ const selectedInboxId = ref(null);
 const editingId = ref(null);
 const showNewForm = ref(false);
 
-// ─── Inboxes com Captain assistant ────────────────────────────────────────────
-const captainInboxes = computed(() =>
-  (inboxes.value || []).filter(i => i.captain_assistant_id)
-);
+// Todas as inboxes da conta (o usuário escolhe em qual configurar)
+const captainInboxes = computed(() => inboxes.value || []);
 
 const hasInboxes = computed(() => captainInboxes.value.length > 0);
 
