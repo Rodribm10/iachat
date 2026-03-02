@@ -1,4 +1,5 @@
 <script setup>
+/* global axios */
 import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
@@ -26,7 +27,29 @@ const tabs = [
   { key: 'dashboard' },
   { key: 'insights' },
   { key: 'operational' },
+  { key: 'landing_pages' },
 ];
+
+const lpStats = ref(null);
+const lpLoading = ref(false);
+
+const fetchLpStats = async () => {
+  const user = store.getters['auth/getCurrentUser'];
+  const accountId =
+    user?.account_id || window.location.pathname.match(/accounts\/(\d+)/)?.[1];
+  if (!accountId) return;
+  lpLoading.value = true;
+  try {
+    const { data } = await axios.get(
+      `/api/v1/accounts/${accountId}/lead_click_stats`
+    );
+    lpStats.value = data;
+  } catch {
+    // silent
+  } finally {
+    lpLoading.value = false;
+  }
+};
 
 const getPeriodDates = period => {
   const end = new Date();
@@ -106,6 +129,7 @@ onMounted(async () => {
   await store.dispatch('captainAssistants/get');
   await store.dispatch('captainReports/fetchInsights', {});
   if (hasProcessingInsights.value) startPolling();
+  await fetchLpStats();
 });
 
 onUnmounted(() => {
@@ -215,9 +239,20 @@ const tabLabel = key => {
     dashboard: t('CAPTAIN_REPORTS.TABS.DASHBOARD'),
     insights: t('CAPTAIN_REPORTS.TABS.INSIGHTS'),
     operational: t('CAPTAIN_REPORTS.TABS.OPERATIONAL'),
+    landing_pages: 'Landing Pages',
   };
   return map[key] || key;
 };
+
+const lpMaxClicks = computed(() => {
+  if (!lpStats.value) return 1;
+  const all = [
+    ...(lpStats.value.by_source || []),
+    ...(lpStats.value.by_campaign || []),
+    ...(lpStats.value.by_hostname || []),
+  ];
+  return Math.max(...all.map(r => r.clicks), 1);
+});
 
 // ── FAQ Quick-Add ──
 const quickAddFaq = reactive({
@@ -1384,6 +1419,226 @@ const maxHandoffCount = computed(() =>
             <p class="mb-0 max-w-sm text-sm text-n-slate-10">
               {{ t('CAPTAIN_REPORTS.OPERATIONAL.COMING_SOON_DESC') }}
             </p>
+          </div>
+        </div>
+
+        <!-- Tab: Landing Pages -->
+        <div v-else-if="activeTab === 'landing_pages'">
+          <!-- carregando -->
+          <div
+            v-if="lpLoading"
+            class="flex flex-col items-center justify-center gap-4 py-20 text-center"
+          >
+            <span
+              class="i-lucide-loader-circle size-8 animate-spin text-n-brand"
+            />
+            <p class="text-sm text-n-slate-9">
+              {{ t('CAPTAIN_REPORTS.LP.LOADING') }}
+            </p>
+          </div>
+
+          <!-- sem dados -->
+          <div
+            v-else-if="!lpStats"
+            class="flex flex-col items-center justify-center gap-4 py-20 text-center"
+          >
+            <div
+              class="flex size-16 items-center justify-center rounded-full bg-n-slate-2"
+            >
+              <span
+                class="i-lucide-mouse-pointer-click size-8 text-n-slate-9"
+              />
+            </div>
+            <p class="mb-0 max-w-sm text-sm text-n-slate-10">
+              {{ t('CAPTAIN_REPORTS.LP.NO_DATA') }}
+            </p>
+          </div>
+
+          <!-- dados -->
+          <div v-else class="space-y-6">
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-3">
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-slate-12">
+                  {{ lpStats.total_clicks?.toLocaleString() ?? 0 }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.LP.TOTAL_CLICKS') }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-teal-11">
+                  {{ lpStats.total_conversions?.toLocaleString() ?? 0 }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.LP.TOTAL_CONVERSIONS') }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-blue-11">
+                  {{ lpStats.conversion_rate ?? 0 }}{{ '%' }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.LP.CONVERSION_RATE') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <!-- Por Fonte -->
+              <div
+                v-if="lpStats.by_source?.length"
+                class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+              >
+                <p
+                  class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                >
+                  {{ t('CAPTAIN_REPORTS.LP.BY_SOURCE') }}
+                </p>
+                <div class="space-y-3">
+                  <div
+                    v-for="row in lpStats.by_source"
+                    :key="row.label"
+                    class="space-y-1"
+                  >
+                    <div class="flex items-center justify-between text-xs">
+                      <span class="font-medium text-n-slate-11">
+                        {{ row.label }}
+                      </span>
+                      <span class="text-n-slate-8">
+                        {{ row.clicks }}
+                        {{ t('CAPTAIN_REPORTS.LP.CLICKS') }}
+                        {{ '·' }}
+                        {{ row.conversions }}
+                        {{ t('CAPTAIN_REPORTS.LP.CONV') }}
+                        {{ '·' }}
+                        {{ row.rate }}{{ '%' }}
+                      </span>
+                    </div>
+                    <div
+                      class="flex h-2 overflow-hidden rounded-full bg-n-slate-3"
+                    >
+                      <div
+                        class="bg-n-blue-8 transition-all"
+                        :style="{
+                          width:
+                            Math.round((row.clicks / lpMaxClicks) * 100) + '%',
+                        }"
+                      />
+                      <div
+                        class="bg-n-teal-7 transition-all"
+                        :style="{
+                          width:
+                            Math.round((row.conversions / lpMaxClicks) * 100) +
+                            '%',
+                        }"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-3 flex gap-4">
+                  <span
+                    class="flex items-center gap-1.5 text-xs text-n-blue-11"
+                  >
+                    <span class="size-2 rounded-full bg-n-blue-8" />
+                    {{ t('CAPTAIN_REPORTS.LP.LEGEND_CLICKS') }}
+                  </span>
+                  <span
+                    class="flex items-center gap-1.5 text-xs text-n-teal-11"
+                  >
+                    <span class="size-2 rounded-full bg-n-teal-7" />
+                    {{ t('CAPTAIN_REPORTS.LP.LEGEND_CONVERSIONS') }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Por Campanha -->
+              <div
+                v-if="lpStats.by_campaign?.length"
+                class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+              >
+                <p
+                  class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                >
+                  {{ t('CAPTAIN_REPORTS.LP.BY_CAMPAIGN') }}
+                </p>
+                <div class="space-y-3">
+                  <div
+                    v-for="row in lpStats.by_campaign"
+                    :key="row.label"
+                    class="space-y-1"
+                  >
+                    <div class="flex items-center justify-between text-xs">
+                      <span
+                        class="font-medium text-n-slate-11 truncate max-w-[12rem]"
+                      >
+                        {{ row.label }}
+                      </span>
+                      <span class="shrink-0 text-n-slate-8">
+                        {{ row.clicks }} {{ '·' }} {{ row.rate }}{{ '%' }}
+                      </span>
+                    </div>
+                    <div class="h-2 overflow-hidden rounded-full bg-n-slate-3">
+                      <div
+                        class="h-2 bg-n-amber-8 transition-all"
+                        :style="{
+                          width:
+                            Math.round((row.clicks / lpMaxClicks) * 100) + '%',
+                        }"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Por Hostname -->
+            <div
+              v-if="lpStats.by_hostname?.length"
+              class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+            >
+              <p
+                class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+              >
+                {{ t('CAPTAIN_REPORTS.LP.BY_HOSTNAME') }}
+              </p>
+              <div class="space-y-3">
+                <div
+                  v-for="row in lpStats.by_hostname"
+                  :key="row.label"
+                  class="flex items-center gap-3"
+                >
+                  <span class="w-56 shrink-0 truncate text-xs text-n-slate-11">
+                    {{ row.label }}
+                  </span>
+                  <div class="h-2 flex-1 rounded-full bg-n-slate-3">
+                    <div
+                      class="h-2 rounded-full bg-n-blue-8 transition-all"
+                      :style="{
+                        width:
+                          Math.round((row.clicks / lpMaxClicks) * 100) + '%',
+                      }"
+                    />
+                  </div>
+                  <span class="w-24 shrink-0 text-right text-xs text-n-slate-8">
+                    {{ row.clicks }} {{ '·' }} {{ row.rate }}{{ '%' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Botão atualizar -->
+            <div class="flex justify-end">
+              <button
+                class="flex items-center gap-2 rounded-lg border border-n-weak px-3 py-1.5 text-xs text-n-slate-10 transition-colors hover:text-n-slate-12"
+                :disabled="lpLoading"
+                @click="fetchLpStats"
+              >
+                <span class="i-lucide-refresh-cw size-3" />
+                {{ t('CAPTAIN_REPORTS.LP.REFRESH') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>

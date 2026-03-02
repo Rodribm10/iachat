@@ -37,7 +37,7 @@ class Leads::AttributionMatcherService
       'link_de_origem' => click.source,
       'campanha' => click.campanha,
       'lp_hostname' => click.hostname,
-      'click_id' => click.id.to_s
+      'click_id' => click.click_id || click.id.to_s
     }
   end
 

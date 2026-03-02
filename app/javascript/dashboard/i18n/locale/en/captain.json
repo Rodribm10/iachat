@@ -394,7 +394,23 @@
     "TABS": {
       "DASHBOARD": "Dashboard",
       "INSIGHTS": "AI Insights",
-      "OPERATIONAL": "Operational"
+      "OPERATIONAL": "Operational",
+      "LANDING_PAGES": "Landing Pages"
+    },
+    "LP": {
+      "LOADING": "Loading data...",
+      "NO_DATA": "No clicks recorded yet. Integrate the pixel on your landing page to see data here.",
+      "TOTAL_CLICKS": "Total Clicks",
+      "TOTAL_CONVERSIONS": "Conversions (WhatsApp)",
+      "CONVERSION_RATE": "Conversion Rate",
+      "BY_SOURCE": "Clicks by Source",
+      "BY_CAMPAIGN": "Clicks by Campaign",
+      "BY_HOSTNAME": "Clicks by Landing Page",
+      "CLICKS": "clicks",
+      "CONV": "conv",
+      "REFRESH": "Refresh",
+      "LEGEND_CLICKS": "Clicks",
+      "LEGEND_CONVERSIONS": "Conversions"
     },
     "FILTER_DATE": {
       "LABEL": "Period:",
