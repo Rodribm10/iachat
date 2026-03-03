@@ -33,6 +33,13 @@ const tabs = [
 const lpStats = ref(null);
 const lpLoading = ref(false);
 
+function formatLocalDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function getPeriodDates(period) {
   const end = new Date();
   const start = new Date();
@@ -83,8 +90,8 @@ function getPeriodDates(period) {
   }
 
   return {
-    period_start: start.toISOString().split('T')[0],
-    period_end: end.toISOString().split('T')[0],
+    period_start: formatLocalDate(start),
+    period_end: formatLocalDate(end),
   };
 }
 
