@@ -2,19 +2,21 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
     <title><%= @landing_host&.page_title.presence || 'Atendimento WhatsApp' %></title>
     <link id="pageFavicon" rel="icon" type="image/png" href="<%= @landing_host&.logo_url || 'https://iachat.hoteis1001noites.com.br/assets/images/dashboard/captain/logo.svg' %>" />
     <style>
       :root {
         --bg-1: #040b18;
         --bg-2: #031325;
-        --card: #0f1729;
-        --card-border: #1f2c43;
-        --text-1: #e7ecf6;
-        --text-2: #96a2b5;
-        --btn: <%= @landing_host&.theme_color.presence || '#27c15b' %>;
-        --btn-text: #f4fff7;
+        --card-bg: rgba(15, 23, 41, 0.65);
+        --card-border: rgba(255, 255, 255, 0.08);
+        --text-1: #ffffff;
+        --text-2: #a1b0c8;
+        --btn: <%= @landing_host&.theme_color.presence || '#25D366' %>;
+        --btn-text: #ffffff;
+        --timer-bg: rgba(255, 255, 255, 0.05);
+        --timer-alert: #ef4444;
       }
 
       * {
@@ -23,88 +25,207 @@
 
       body {
         margin: 0;
+        padding: 0;
         min-height: 100vh;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        /* prevent scroll by using 100vh absolute and hidden overflow occasionally, but flex is better */
+        min-height: 100dvh; 
+        font-family: -apple-system, BlinkMacSystemFont, "Inter", Roboto, Helvetica, Arial, sans-serif;
         color: var(--text-1);
         background:
-          radial-gradient(circle at 50% 52%, rgba(31, 150, 91, 0.18), transparent 34%),
-          radial-gradient(circle at 30% 30%, rgba(16, 92, 172, 0.16), transparent 46%),
-          linear-gradient(170deg, var(--bg-2), var(--bg-1));
+          radial-gradient(circle at top right, rgba(37, 211, 102, 0.12), transparent 40%),
+          radial-gradient(circle at bottom left, rgba(16, 92, 172, 0.15), transparent 50%),
+          linear-gradient(135deg, var(--bg-1), var(--bg-2));
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden; /* Força não ter scroll vertical se o conteúdo couber perfeitamente */
       }
 
       .page {
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        padding: 20px;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 16px;
       }
 
       .card {
-        width: min(100%, 480px);
+        width: min(100%, 420px);
+        max-height: 95vh;
+        background: var(--card-bg);
         border: 1px solid var(--card-border);
-        background: rgba(15, 23, 41, 0.9);
-        border-radius: 20px;
-        padding: 34px 28px;
+        border-radius: 24px;
+        padding: clamp(20px, 4vh, 32px) clamp(16px, 4vw, 24px);
         text-align: center;
-        box-shadow: 0 24px 56px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
       }
 
       .logo-wrap {
-        width: 82px;
-        height: 82px;
-        margin: 0 auto 18px;
-        border-radius: 999px;
-        display: grid;
-        place-items: center;
-        background: rgba(40, 215, 122, 0.16);
+        width: clamp(70px, 18vw, 84px);
+        height: clamp(70px, 18vw, 84px);
+        margin: 0 auto clamp(12px, 3vh, 18px);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #ffffff; /* Fundo branco fixo para logos com fundo branco */
+        border: 2px solid rgba(255,255,255,0.1);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        flex-shrink: 0;
+        overflow: hidden; /* Garante que a imagem não vaze o círculo */
       }
 
       .logo-wrap img {
-        width: 58px;
-        height: 58px;
-        border-radius: 8px;
-        object-fit: cover;
+        width: 100%;
+        height: 100%;
+        object-fit: cover; /* Faz a imagem preencher todo o espaço circular */
       }
 
       h1 {
         margin: 0;
-        font-size: clamp(29px, 4.2vw, 40px);
-        line-height: 1.15;
+        font-size: clamp(24px, 6vw, 32px);
+        font-weight: 800;
+        line-height: 1.1;
         letter-spacing: -0.02em;
+        text-wrap: balance;
+        color: var(--text-1);
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
       }
 
       p.subtitle {
-        margin: 14px 0 26px;
-        font-size: 18px;
+        margin: clamp(8px, 2vh, 12px) 0 clamp(16px, 3vh, 24px);
+        font-size: clamp(14px, 3.5vw, 16px);
         color: var(--text-2);
+        line-height: 1.4;
+        text-wrap: balance;
+      }
+
+      /* Timer Area */
+      .timer-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: var(--timer-bg);
+        border: 1px solid rgba(255,255,255,0.04);
+        padding: clamp(8px, 2vh, 12px) 20px;
+        border-radius: 12px;
+        margin-bottom: clamp(16px, 3vh, 24px);
+        width: 100%;
+      }
+
+      .timer-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-2);
+        margin-bottom: 4px;
+        font-weight: 600;
+      }
+
+      .timer-value {
+        font-size: clamp(28px, 7vw, 36px);
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        color: var(--btn);
+        text-shadow: 0 0 15px rgba(37, 211, 102, 0.3);
+        line-height: 1;
+        transition: color 0.3s;
+      }
+      
+      .timer-value.alert {
+        color: var(--timer-alert);
+        text-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+        animation: pulse-alert 2s infinite;
       }
 
       .wa-button {
         width: 100%;
         border: 0;
         border-radius: 14px;
-        padding: 18px 22px;
-        font-size: 34px;
+        padding: clamp(14px, 3.5vh, 18px) 20px;
+        font-size: clamp(18px, 4.5vw, 22px);
         font-weight: 800;
         color: var(--btn-text);
         background: var(--btn);
         cursor: pointer;
-        transition: transform 0.14s ease, opacity 0.14s ease;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.25), 0 0 0 0 transparent;
+        transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s;
+        animation: pulse-button 2.5s infinite;
       }
 
-      .wa-button:hover {
-        transform: translateY(-1px);
+      /* Shine effect */
+      .wa-button::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(
+          to right,
+          rgba(255, 255, 255, 0) 0%,
+          rgba(255, 255, 255, 0.3) 50%,
+          rgba(255, 255, 255, 0) 100%
+        );
+        transform: rotate(30deg);
+        animation: shine 4s infinite linear;
+        pointer-events: none;
       }
 
       .wa-button:active {
-        transform: translateY(0);
-        opacity: 0.9;
+        transform: scale(0.97);
+        animation: none;
       }
 
       .foot {
-        margin-top: 14px;
-        font-size: 14px;
-        color: #647086;
+        margin-top: clamp(12px, 3vh, 18px);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: clamp(11px, 2.5vw, 13px);
+        color: #5d6a80;
+        font-weight: 500;
+      }
+
+      .foot svg {
+        width: 14px;
+        height: 14px;
+        opacity: 0.8;
+      }
+
+      /* Animations */
+      @keyframes pulse-button {
+        0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+      }
+
+      @keyframes shine {
+        0% { left: -100%; }
+        20% { left: 100%; }
+        100% { left: 100%; }
+      }
+      
+      @keyframes pulse-alert {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+      }
+      
+      /* Extremely small height screen adjustments (iPhone SE landscape) */
+      @media (max-height: 500px) {
+        body { overflow-y: auto; }
+        .card { padding: 16px; margin: 16px 0; }
+        .logo-wrap { width: 40px; height: 40px; margin-bottom: 8px;}
+        .timer-container { margin-bottom: 12px; padding: 6px; }
       }
     </style>
   </head>
@@ -123,9 +244,20 @@
             <img src="<%= @landing_host.logo_url.presence || 'https://iachat.hoteis1001noites.com.br/assets/images/dashboard/captain/logo.svg' %>" alt="logo" />
           </div>
           <h1><%= @landing_host.page_title %></h1>
+          
           <p class="subtitle"><%= @landing_host.page_subtitle&.gsub("\n", "<br>")&.html_safe %></p>
+          
+          <div class="timer-container">
+            <span class="timer-label">Oferta expira em</span>
+            <span class="timer-value" id="countdownTimer">10:00</span>
+          </div>
+
           <button id="whatsButton" class="wa-button" type="button"><%= @landing_host.button_text.presence || 'Falar no WhatsApp' %></button>
-          <div class="foot">Pagina segura · atendimento humano</div>
+          
+          <div class="foot">
+            <svg xmlns="http://www.w3.org/.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20ZM11 15H13V17H11V15ZM11 7H13V13H11V7Z"></path></svg>
+            Página segura e atendimento humano
+          </div>
         </div>
       </div>
 
@@ -141,6 +273,58 @@
 
           const params = new URLSearchParams(window.location.search);
           const clickKey = "lp_click_id_" + window.location.hostname;
+          
+          // --- Timer Logic ---
+          function startTimer() {
+            const timerElement = document.getElementById("countdownTimer");
+            if (!timerElement) return;
+            
+            // 10 minutes from now (in seconds)
+            let totalSeconds = 10 * 60;
+            
+            // Check if we already have a timer running in session storage to persist across refresh
+            const sessionKey = "lp_timer_" + window.location.hostname;
+            const savedTime = sessionStorage.getItem(sessionKey);
+            const savedTimestamp = sessionStorage.getItem(sessionKey + "_ts");
+            
+            if (savedTime && savedTimestamp) {
+              const elapsed = Math.floor((Date.now() - parseInt(savedTimestamp)) / 1000);
+              const remaining = parseInt(savedTime) - elapsed;
+              if (remaining > 0) {
+                totalSeconds = remaining;
+              }
+            }
+
+            const interval = setInterval(() => {
+              if (totalSeconds <= 0) {
+                clearInterval(interval);
+                timerElement.innerText = "00:00";
+                timerElement.classList.add("alert"); // Change color to red/alert
+                return;
+              }
+              
+              const minutes = Math.floor(totalSeconds / 60);
+              const seconds = totalSeconds % 60;
+              
+              const formattedMinutes = minutes.toString().padStart(2, '0');
+              const formattedSeconds = seconds.toString().padStart(2, '0');
+              
+              timerElement.innerText = `${formattedMinutes}:${formattedSeconds}`;
+              
+              // Persist in case of refresh
+              sessionStorage.setItem(sessionKey, totalSeconds.toString());
+              sessionStorage.setItem(sessionKey + "_ts", Date.now().toString());
+              
+              if (totalSeconds <= 60) {
+                timerElement.classList.add("alert"); // Final minute warning
+              }
+              
+              totalSeconds--;
+            }, 1000);
+          }
+          
+          startTimer();
+          // -------------------
 
           function getClickId() {
             const fromUrl = params.get("click_id") || params.get("clickid") || params.get("utm_id") || params.get("gclid");
