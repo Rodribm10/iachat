@@ -67,8 +67,8 @@ class Api::V1::Accounts::LeadClickStatsController < Api::V1::Accounts::BaseContr
 
   def daily_breakdown(clicks)
     rows = clicks
-           .group('DATE(created_at)')
-           .select('DATE(created_at) AS day, COUNT(*) AS clicks, COUNT(conversation_id) AS conversions')
+           .group('DATE(lead_clicks.created_at)')
+           .select('DATE(lead_clicks.created_at) AS day, COUNT(*) AS clicks, COUNT(lead_clicks.conversation_id) AS conversions')
            .order('day ASC')
 
     rows.map do |row|
