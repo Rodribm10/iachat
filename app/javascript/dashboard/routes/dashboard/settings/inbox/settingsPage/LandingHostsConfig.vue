@@ -136,14 +136,15 @@ export default {
       }
     },
     async deleteHost(id) {
+      /* eslint-disable no-alert */
       if (
-        // eslint-disable-next-line no-alert
         !window.confirm(
           'Deseja realmente remover este domínio? A landing page parará de funcionar imediatamente.'
         )
       ) {
         return;
       }
+      /* eslint-enable no-alert */
       try {
         await landingHostsApi.deleteHost(
           this.currentAccountId,
@@ -204,6 +205,7 @@ export default {
 </script>
 
 <template>
+  <!-- eslint-disable vue/html-closing-bracket-newline -->
   <div class="mx-8 mt-4 pb-12">
     <div class="mb-6">
       <h2 class="text-base font-semibold text-n-slate-12 mb-1">

@@ -51,7 +51,8 @@ class Api::V1::Accounts::LandingHostsController < Api::V1::Accounts::BaseControl
       :hostname, :unit_code, :active, :auto_label,
       :page_title, :page_subtitle, :button_text, :logo_url,
       :suite_image_url, :theme_color, :whatsapp_number,
-      :initial_message, :default_source, :default_campanha
+      :initial_message, :default_source, :default_campanha,
+      custom_config: {}
     )
   end
 end
