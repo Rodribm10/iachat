@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_02_211000) do
+ActiveRecord::Schema[7.1].define(version: 2026_03_03_074000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -1561,6 +1561,17 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_02_211000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "auto_label"
+    t.string "page_title", default: "Atendimento Express"
+    t.string "page_subtitle", default: "Atendimento Imediato\nEntrada Discreta\nSem Burocracia"
+    t.string "button_text", default: "Ver disponibilidade agora"
+    t.string "logo_url"
+    t.string "suite_image_url"
+    t.string "theme_color", default: "#25D366"
+    t.string "whatsapp_number", default: ""
+    t.text "initial_message"
+    t.string "default_source"
+    t.string "default_campanha"
+    t.jsonb "custom_config", default: {}
     t.index ["hostname"], name: "index_landing_hosts_on_hostname", unique: true
   end
 

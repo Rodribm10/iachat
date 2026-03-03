@@ -234,7 +234,8 @@
           "Ações"
         ],
         "ADD_NEW_ITEM": "Adicione fotos na galeria",
-        "NO_ITEMS_MESSAGE": "Ainda não há fotos cadastradas para envio automático aos clientes."
+        "NO_ITEMS_MESSAGE": "Ainda não há fotos cadastradas para envio automático aos clientes.",
+        "VIEW_URL": "URL da Imagem"
       },
       "DELETE": {
         "CONFIRM": {
@@ -274,14 +275,14 @@
           "SPECIFIC_HELP": "Essas fotos serão usadas somente na caixa de entrada {inbox}."
         },
         "SUITE_CATEGORY": {
-          "LABEL": "Categoria da suíte",
+          "LABEL": "Categoria",
           "PLACEHOLDER": "Ex: Hidromassagem",
           "ERROR": "A categoria é obrigatória"
         },
         "SUITE_NUMBER": {
-          "LABEL": "Número/identificador da suíte",
+          "LABEL": "Nome/identificador",
           "PLACEHOLDER": "Ex: 101",
-          "ERROR": "O identificador da suíte é obrigatório"
+          "ERROR": "O identificador é obrigatório"
         },
         "DESCRIPTION": {
           "LABEL": "Descrição da foto",
@@ -337,7 +338,7 @@
       "SELECT_INBOX_HINT": "Clique em uma caixa de entrada acima para ver e configurar os templates.",
       "EMPTY": {
         "TITLE": "Nenhum template configurado",
-        "DESC": "Crie templates de mensagem automática para esta caixa de entrada."
+        "DESC": "Configure as permissões das informações que o sistema utiliza. Por ex.: Quais imagens enviar durante as aproximações."
       }
     }
   },

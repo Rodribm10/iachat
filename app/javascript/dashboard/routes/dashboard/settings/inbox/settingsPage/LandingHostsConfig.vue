@@ -22,19 +22,23 @@ export default {
       newAutoLabel: '',
       isLoading: false,
       isSaving: false,
+      isUpdating: false,
+      expandedHostId: null,
+      editingHostData: {},
       labels: {
         title: 'Landing Pages (Tracking de Origem)',
         subtitle:
-          'Defina os domínios de Landing Pages que enviam leads para esta caixa de entrada. O sistema usará esses domínios para identificar automaticamente a origem de cada conversa.',
+          'Defina os domínios de Landing Pages para esta caixa de entrada e personalize a aparência de cada um.',
         loading: 'Carregando...',
         empty: 'Nenhum domínio cadastrado ainda.',
         colHostname: 'Hostname',
         colCode: 'Código / Unidade',
-        colLabel: 'Etiqueta automática',
-        colPublicLink: 'Página pública',
+        colLabel: 'Etiqueta',
+        colPublicLink: 'Link',
         remove: 'Remover',
+        edit: 'Editar',
         open: 'Abrir',
-        copy: 'Copiar link',
+        copy: 'Copiar',
         addTitle: 'Adicionar Domínio',
         labelHostname: 'Hostname *',
         placeholderHostname: 'express.seuhotel.com.br',
@@ -53,6 +57,22 @@ export default {
         successDel: 'Domínio removido.',
         successCopy: 'Link copiado!',
         errCopy: 'Não foi possível copiar o link.',
+
+        // Novos campos
+        cfgTitle: 'Editar Configurações de Aparência e Tracking',
+        cfgPageTitle: 'Título Principal',
+        cfgPageSubtitle: 'Subtítulo',
+        cfgButtonText: 'Texto do Botão',
+        cfgThemeColor: 'Cor do Botão (Ex: #25D366)',
+        cfgLogoUrl: 'URL da Logo',
+        cfgWhatsapp: 'Número de WhatsApp (5511999999999)',
+        cfgMessage: 'Mensagem Inicial',
+        cfgSource: 'Origem (UTM Source) Padrão',
+        cfgCampaign: 'Campanha (UTM Campaign) Padrão',
+        cfgSave: 'Salvar Alterações',
+        cfgCancel: 'Cancelar',
+        errUpdate: 'Erro ao salvar configurações.',
+        successUpdate: 'Configurações atualizadas com sucesso!',
       },
     };
   },
@@ -60,6 +80,9 @@ export default {
     ...mapGetters({ currentAccountId: 'getCurrentAccountId' }),
     addLabel() {
       return this.isSaving ? this.labels.labelSaving : this.labels.labelAdd;
+    },
+    updateLabel() {
+      return this.isUpdating ? this.labels.labelSaving : this.labels.cfgSave;
     },
   },
   mounted() {
@@ -84,7 +107,6 @@ export default {
       if (!this.newHostname.trim()) return;
       this.isSaving = true;
 
-      // Sanitiza: remove protocolo, www, barras e espaços
       const cleanHostname = this.newHostname
         .trim()
         .toLowerCase()
@@ -114,6 +136,14 @@ export default {
       }
     },
     async deleteHost(id) {
+      if (
+        // eslint-disable-next-line no-alert
+        !window.confirm(
+          'Deseja realmente remover este domínio? A landing page parará de funcionar imediatamente.'
+        )
+      ) {
+        return;
+      }
       try {
         await landingHostsApi.deleteHost(
           this.currentAccountId,
@@ -121,9 +151,41 @@ export default {
           id
         );
         this.landingHosts = this.landingHosts.filter(h => h.id !== id);
+        this.expandedHostId = null;
         useAlert(this.labels.successDel);
       } catch {
         useAlert(this.labels.errDel);
+      }
+    },
+    openEdit(host) {
+      this.expandedHostId = host.id;
+      this.editingHostData = { ...host };
+    },
+    cancelEdit() {
+      this.expandedHostId = null;
+    },
+    async saveEdit() {
+      this.isUpdating = true;
+      try {
+        const { data } = await landingHostsApi.updateHost(
+          this.currentAccountId,
+          this.inbox.id,
+          this.expandedHostId,
+          this.editingHostData
+        );
+
+        // Atualiza na lista
+        const index = this.landingHosts.findIndex(h => h.id === data.id);
+        if (index !== -1) {
+          this.landingHosts.splice(index, 1, data);
+        }
+
+        this.expandedHostId = null;
+        useAlert(this.labels.successUpdate);
+      } catch {
+        useAlert(this.labels.errUpdate);
+      } finally {
+        this.isUpdating = false;
       }
     },
     landingUrl(hostname) {
@@ -184,12 +246,8 @@ export default {
             <th class="px-4 py-3 text-right" />
           </tr>
         </thead>
-        <tbody>
-          <tr
-            v-for="host in landingHosts"
-            :key="host.id"
-            class="border-t border-n-slate-3 hover:bg-n-slate-1"
-          >
+        <tbody v-for="host in landingHosts" :key="host.id">
+          <tr class="border-t border-n-slate-3 hover:bg-n-slate-1">
             <td class="px-4 py-3 font-mono text-n-slate-12 text-xs">
               {{ host.hostname }}
             </td>
@@ -218,19 +276,199 @@ export default {
               </div>
             </td>
             <td class="px-4 py-3 text-right">
-              <button
-                class="text-xs text-ruby-9 hover:text-ruby-11 font-medium transition-colors"
-                @click="deleteHost(host.id)"
+              <div class="flex items-center justify-end gap-3">
+                <button
+                  class="text-xs text-n-brand hover:underline font-medium transition-colors"
+                  @click="openEdit(host)"
+                >
+                  {{ labels.edit }}
+                </button>
+                <button
+                  class="text-xs text-ruby-9 hover:text-ruby-11 font-medium transition-colors"
+                  @click="deleteHost(host.id)"
+                >
+                  {{ labels.remove }}
+                </button>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Formulário de Edição Inline -->
+          <tr v-if="expandedHostId === host.id" class="bg-n-brand-1/30">
+            <td colspan="5" class="p-4 border-t border-n-brand-3">
+              <div
+                class="bg-white dark:bg-slate-900 border border-n-brand-3 rounded-lg p-5 shadow-sm"
               >
-                {{ labels.remove }}
-              </button>
+                <h4 class="text-sm font-semibold text-n-slate-12 mb-4">
+                  {{ labels.cfgTitle }}
+                </h4>
+
+                <div
+                  class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4"
+                >
+                  <!-- Básico -->
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.labelHostname }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.hostname"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.labelCode }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.unit_code"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.labelAutoLabel }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.auto_label"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+
+                  <!-- Textos LP -->
+                  <div class="sm:col-span-2">
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.cfgPageTitle }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.page_title"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+                  <div class="sm:col-span-3">
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.cfgPageSubtitle }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.page_subtitle"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+
+                  <!-- Botão e Aparência -->
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.cfgButtonText }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.button_text"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.cfgThemeColor }}</label
+                    >
+                    <div class="flex gap-2">
+                      <input
+                        v-model="editingHostData.theme_color"
+                        type="color"
+                        class="h-9 w-10 p-1 border border-n-slate-3 rounded cursor-pointer"
+                      />
+                      <woot-input
+                        v-model="editingHostData.theme_color"
+                        class="flex-1 [&>input]:!mb-0"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.cfgLogoUrl }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.logo_url"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+
+                  <!-- WhatsApp e Tracking -->
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.cfgWhatsapp }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.whatsapp_number"
+                      type="tel"
+                      placeholder="5511999999999"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.cfgMessage }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.initial_message"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.cfgSource }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.default_source"
+                      placeholder="direto"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      class="block text-xs font-medium text-n-slate-11 mb-1"
+                      >{{ labels.cfgCampaign }}</label
+                    >
+                    <woot-input
+                      v-model="editingHostData.default_campanha"
+                      placeholder="site"
+                      class="[&>input]:!mb-0"
+                    />
+                  </div>
+                </div>
+
+                <div
+                  class="mt-4 flex justify-end gap-3 border-t border-n-slate-2 pt-4"
+                >
+                  <NextButton
+                    :label="labels.cfgCancel"
+                    variant="hollow"
+                    @click="cancelEdit"
+                  />
+                  <NextButton
+                    :label="updateLabel"
+                    :disabled="isUpdating"
+                    @click="saveEdit"
+                  />
+                </div>
+              </div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Formulário de adição -->
+    <!-- Formulário de adição rápida (somente hostname e unit_code) -->
     <div class="border border-n-slate-3 rounded-lg p-4 bg-n-slate-1">
       <h3 class="text-sm font-semibold text-n-slate-12 mb-3">
         {{ labels.addTitle }}

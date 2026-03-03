@@ -12,6 +12,7 @@
 #  user_agent      :string
 #  created_at      :datetime         not null
 #  updated_at      :datetime         not null
+#  click_id        :string
 #  contact_id      :integer
 #  conversation_id :integer
 #  inbox_id        :integer

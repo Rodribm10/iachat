@@ -13,6 +13,12 @@ export default {
       { landing_host: data }
     );
   },
+  updateHost(accountId, inboxId, id, data) {
+    return axios.patch(
+      `/api/v1/accounts/${accountId}/inboxes/${inboxId}/landing_hosts/${id}`,
+      { landing_host: data }
+    );
+  },
   deleteHost(accountId, inboxId, id) {
     return axios.delete(
       `/api/v1/accounts/${accountId}/inboxes/${inboxId}/landing_hosts/${id}`

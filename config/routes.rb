@@ -237,7 +237,7 @@ Rails.application.routes.draw do
             get :campaigns, on: :member
             get :agent_bot, on: :member
             post :set_agent_bot, on: :member
-            resources :landing_hosts, only: [:index, :create, :destroy]
+            resources :landing_hosts, only: [:index, :create, :update, :destroy]
             post :setup_channel_provider, on: :member
             post :disconnect_channel_provider, on: :member
             delete :avatar, on: :member

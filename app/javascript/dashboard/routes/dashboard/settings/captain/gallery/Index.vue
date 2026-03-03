@@ -99,11 +99,6 @@ const confirmDelete = async () => {
                   {{ t('CAPTAIN_SETTINGS.GALLERY.LIST.TABLE_HEADER[2]') }}
                 </th>
                 <th
-                  class="py-3 pr-4 text-left text-xs font-medium uppercase tracking-wider text-n-slate-10"
-                >
-                  {{ t('CAPTAIN_SETTINGS.GALLERY.LIST.TABLE_HEADER[3]') }}
-                </th>
-                <th
                   class="py-3 text-right text-xs font-medium uppercase tracking-wider text-n-slate-10"
                 >
                   {{ t('CAPTAIN_SETTINGS.GALLERY.LIST.TABLE_HEADER[4]') }}
@@ -122,6 +117,14 @@ const confirmDelete = async () => {
                 </td>
                 <td class="py-4 pr-4">
                   <p class="mb-0 font-medium text-n-slate-12">
+                    {{ item.suite_category }}
+                  </p>
+                  <p class="mb-0 text-xs text-n-slate-10">
+                    {{ item.suite_number }}
+                  </p>
+                </td>
+                <td class="py-4 pr-4">
+                  <p class="mb-0 font-medium text-n-slate-12">
                     {{
                       item.scope === 'global'
                         ? t('CAPTAIN_SETTINGS.GALLERY.FORM.INBOX.GLOBAL_OPTION')
@@ -131,13 +134,19 @@ const confirmDelete = async () => {
                   <p class="mb-0 text-xs text-n-slate-10">
                     {{ item.description }}
                   </p>
+                  <div v-if="item.image_url" class="mt-1 flex items-center">
+                    <a
+                      :href="item.image_url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="flex items-center gap-1 break-all text-[11px] text-n-brand-9 hover:underline"
+                    >
+                      <i class="i-lucide-external-link size-3" />
+                      {{ t('CAPTAIN_SETTINGS.GALLERY.LIST.VIEW_URL') }}
+                    </a>
+                  </div>
                 </td>
-                <td class="py-4 pr-4 text-n-slate-11">
-                  {{ item.suite_category }}
-                </td>
-                <td class="py-4 pr-4 text-n-slate-11">
-                  {{ item.suite_number }}
-                </td>
+
                 <td class="py-4">
                   <div class="flex justify-end gap-2">
                     <Button
