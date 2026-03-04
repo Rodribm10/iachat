@@ -73,6 +73,18 @@ export default {
         cfgCancel: 'Cancelar',
         errUpdate: 'Erro ao salvar configurações.',
         successUpdate: 'Configurações atualizadas com sucesso!',
+
+        // Campos Promoção
+        promoSectionTitle: 'Promoções / IA (Opcional)',
+        promoAdd: 'Adicionar Promoção',
+        promoRemove: 'Remover',
+        promoChannel: 'Canal / Origem (Ex: Instagram)',
+        promoTitle: 'Ativa',
+        promoName: 'Nome da Promoção',
+        promoDesc: 'Descrição / Condições',
+        promoCoupon: 'Cupom',
+        promoValid: 'Válida Até (Data)',
+        promoEmpty: 'Nenhuma promoção configurada para esta Landing Page.',
       },
     };
   },
@@ -160,7 +172,31 @@ export default {
     },
     openEdit(host) {
       this.expandedHostId = host.id;
-      this.editingHostData = { ...host };
+
+      let promotions = [];
+      if (
+        host.custom_config?.promotions &&
+        Array.isArray(host.custom_config.promotions)
+      ) {
+        promotions = [...host.custom_config.promotions];
+      } else if (
+        host.custom_config?.promotion &&
+        host.custom_config.promotion.title
+      ) {
+        promotions = [{ ...host.custom_config.promotion, channel: 'Geral' }];
+      }
+
+      this.editingHostData = {
+        ...host,
+        custom_config: {
+          ...host.custom_config,
+          promotions: promotions,
+        },
+      };
+
+      if (this.editingHostData.custom_config.promotion) {
+        delete this.editingHostData.custom_config.promotion;
+      }
     },
     cancelEdit() {
       this.expandedHostId = null;
@@ -199,6 +235,22 @@ export default {
       } catch {
         useAlert(this.labels.errCopy);
       }
+    },
+    addPromotion() {
+      if (!this.editingHostData.custom_config.promotions) {
+        this.editingHostData.custom_config.promotions = [];
+      }
+      this.editingHostData.custom_config.promotions.push({
+        active: true,
+        channel: '',
+        title: '',
+        description: '',
+        coupon_code: '',
+        valid_until: '',
+      });
+    },
+    removePromotion(index) {
+      this.editingHostData.custom_config.promotions.splice(index, 1);
     },
   },
 };
@@ -446,6 +498,132 @@ export default {
                       placeholder="site"
                       class="[&>input]:!mb-0"
                     />
+                  </div>
+                </div>
+
+                <!-- Seção de Promoções (Para IA) -->
+                <div class="mt-4 pt-4 border-t border-n-slate-2">
+                  <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-sm font-semibold text-n-slate-12">
+                      {{ labels.promoSectionTitle }}
+                    </h4>
+                    <button
+                      class="text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 border border-emerald-200"
+                      @click.prevent="addPromotion"
+                    >
+                      <span class="text-base leading-none font-bold">+</span>
+                      {{ labels.promoAdd }}
+                    </button>
+                  </div>
+
+                  <div
+                    v-for="(promo, index) in editingHostData.custom_config
+                      .promotions"
+                    :key="index"
+                    class="bg-n-brand-1/10 p-5 rounded-lg border border-n-brand-2 mb-4 relative"
+                  >
+                    <button
+                      class="absolute top-4 right-4 text-xs font-medium text-ruby-9 hover:text-ruby-11 transition-colors z-10"
+                      @click.prevent="removePromotion(index)"
+                    >
+                      {{ labels.promoRemove }}
+                    </button>
+
+                    <div class="mb-4 flex items-center gap-2">
+                      <input
+                        :id="'promo-toggle-' + editingHostData.id + '-' + index"
+                        v-model="promo.active"
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-gray-300 text-n-brand cursor-pointer"
+                      />
+                      <label
+                        :for="
+                          'promo-toggle-' + editingHostData.id + '-' + index
+                        "
+                        class="text-sm font-medium text-n-slate-12 cursor-pointer"
+                      >
+                        {{ labels.promoTitle }}
+                      </label>
+                    </div>
+
+                    <div
+                      class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+                      :class="{
+                        'opacity-50 pointer-events-none grayscale':
+                          !promo.active,
+                      }"
+                    >
+                      <div>
+                        <label
+                          class="block text-xs font-medium text-n-slate-11 mb-1"
+                        >
+                          {{ labels.promoChannel }} *
+                        </label>
+                        <woot-input
+                          v-model="promo.channel"
+                          placeholder="Ex: Instagram"
+                          class="[&>input]:!mb-0"
+                        />
+                      </div>
+                      <div class="sm:col-span-2">
+                        <label
+                          class="block text-xs font-medium text-n-slate-11 mb-1"
+                        >
+                          {{ labels.promoName }}
+                        </label>
+                        <woot-input
+                          v-model="promo.title"
+                          placeholder="Ex: Oferta Fim de Semana"
+                          class="[&>input]:!mb-0"
+                        />
+                      </div>
+                      <div class="sm:col-span-2">
+                        <label
+                          class="block text-xs font-medium text-n-slate-11 mb-1"
+                        >
+                          {{ labels.promoDesc }}
+                        </label>
+                        <woot-input
+                          v-model="promo.description"
+                          placeholder="Ex: 20% OFF na reserva sexta ou sábado. Válido para novos clientes."
+                          class="[&>input]:!mb-0"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          class="block text-xs font-medium text-n-slate-11 mb-1"
+                        >
+                          {{ labels.promoCoupon }}
+                        </label>
+                        <woot-input
+                          v-model="promo.coupon_code"
+                          placeholder="Ex: BLACK20"
+                          class="[&>input]:!mb-0"
+                        />
+                      </div>
+                      <div>
+                        <label
+                          class="block text-xs font-medium text-n-slate-11 mb-1"
+                        >
+                          {{ labels.promoValid }}
+                        </label>
+                        <woot-input
+                          v-model="promo.valid_until"
+                          type="date"
+                          class="[&>input]:!mb-0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="
+                      !editingHostData.custom_config.promotions ||
+                      editingHostData.custom_config.promotions.length === 0
+                    "
+                    class="text-sm text-n-slate-10 italic py-4 text-center border border-dashed border-n-slate-3 rounded-lg"
+                  >
+                    {{ labels.promoEmpty }}
                   </div>
                 </div>
 

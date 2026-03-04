@@ -27,4 +27,7 @@
 #  index_landing_hosts_on_hostname  (hostname) UNIQUE
 #
 class LandingHost < ApplicationRecord
+  belongs_to :inbox, optional: true
+
+  include LandingHostAiSyncable
 end
