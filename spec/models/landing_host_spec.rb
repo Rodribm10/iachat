@@ -2,7 +2,6 @@ require 'rails_helper'
 
 RSpec.describe LandingHost, type: :model do
   let(:account) { create(:account) }
-  let!(:user) { create(:user, account: account) }
   let(:portal) { create(:portal, account: account) }
   let(:inbox) { create(:inbox, account: account, portal: portal) }
 

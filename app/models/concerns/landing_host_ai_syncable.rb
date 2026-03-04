@@ -31,8 +31,16 @@ module LandingHostAiSyncable
 
     article = find_or_initialize_faq_article
     article.title = faq_article_title
+    article.content = generate_promotions_text(promos)
+    article.description = "FAQ Gerado automaticamente pela Landing Page: #{hostname}"
+    # Setting the author as the portal's account first user (just as a fallback) or we can use a system user
+    article.author ||= default_article_author
+    article.status = :published
 
-    # Generating the standard AI instruction text for the multiple promotions
+    article.save!
+  end
+
+  def generate_promotions_text(promos)
     text = %(INSTRUÇÃO PARA A IA (PROMOÇÕES ATIVAS DO LINK #{hostname}):\n\n)
     text += %(Existem promoções ativas para os leads que chegam pela landing page '#{hostname}'.\n)
     text += %(Ofereça a promoção correspondente ao Canal/Origem pelo qual o cliente chegou.\n\n)
@@ -47,13 +55,7 @@ module LandingHostAiSyncable
       text += "\n"
     end
 
-    article.content = text
-    article.description = "FAQ Gerado automaticamente pela Landing Page: #{hostname}"
-    # Setting the author as the portal's account first user (just as a fallback) or we can use a system user
-    article.author ||= default_article_author
-    article.status = :published
-
-    article.save!
+    text
   end
 
   def archive_faq_article
