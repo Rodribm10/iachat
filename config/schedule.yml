@@ -94,3 +94,10 @@ captain_notification_scanner_job:
   cron: '*/5 * * * *'
   class: 'Captain::Notifications::NotificationScannerJob'
   queue: scheduled_jobs
+
+# executed every hour
+# keeps landing page promotions and Captain knowledge in sync (including expired promotions cleanup)
+landing_hosts_promotion_sync_scheduler_job:
+  cron: '0 * * * *'
+  class: 'LandingHosts::PromotionSyncSchedulerJob'
+  queue: scheduled_jobs
