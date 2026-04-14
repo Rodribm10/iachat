@@ -22,7 +22,25 @@ json.sender_name_type resource.sender_name_type
 json.business_name resource.business_name
 json.typing_delay resource.typing_delay
 
-json.captain_unit_id resource.captain_inbox&.captain_unit_id if defined?(CaptainInbox)
+# captain_unit_id: cascata entre as 3 fontes de vínculo inbox↔unit existentes
+# no fork (resultado de refatorações não finalizadas):
+#   1. captain_inboxes.captain_unit_id (fluxo principal do Captain)
+#   2. captain_unit_inboxes (tabela de join pura — usada pela UI nova)
+#   3. captain_units.inbox_id (legado direto na Unit)
+# A UI "Vincular Unidade Pix" agora mostra a unit ligada, independente de
+# qual mecanismo foi usado pra gravar.
+if defined?(CaptainInbox)
+  linked_unit_id = resource.captain_inbox&.captain_unit_id
+  if linked_unit_id.blank?
+    linked_unit_id = ActiveRecord::Base.connection.select_value(
+      ActiveRecord::Base.send(:sanitize_sql_array,
+                              ['SELECT captain_unit_id FROM captain_unit_inboxes WHERE inbox_id = ? LIMIT 1',
+                               resource.id])
+    )
+  end
+  linked_unit_id ||= Captain::Unit.where(inbox_id: resource.id).limit(1).pick(:id) if defined?(Captain::Unit)
+  json.captain_unit_id linked_unit_id
+end
 
 if resource.portal.present?
   json.help_center do
