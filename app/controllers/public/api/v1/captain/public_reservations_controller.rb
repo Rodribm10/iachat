@@ -31,12 +31,18 @@ class Public::Api::V1::Captain::PublicReservationsController < ActionController:
         name: customer[:name],
         phone_number: normalized_phone,
         email: customer[:email].presence,
+        custom_attributes: {
+          cpf: customer[:cpf].presence
+        }.compact,
         additional_attributes: {
-          cpf: customer[:cpf].presence,
           origem: 'reserva-1001'
-        }.compact
+        }
       }
     ).perform
+
+    # Atualiza campos visiveis do contato (alem do ContactInboxBuilder, que so
+    # preenche no create e nao mexe em contato ja existente).
+    persist_customer_metadata!(contact_inbox.contact, customer, params)
 
     conversation = ConversationBuilder.new(
       params: ActionController::Parameters.new(
@@ -128,6 +134,30 @@ class Public::Api::V1::Captain::PublicReservationsController < ActionController:
     return if provided.present? && ActiveSupport::SecurityUtils.secure_compare(provided, expected)
 
     render json: { error: 'unauthorized' }, status: :unauthorized
+  end
+
+  # Persiste CPF, email, ultima suite/permanencia, data e total de reservas
+  # no contact.custom_attributes para aparecer no painel lateral do Chatwoot
+  # e pra facilitar reservas futuras (cliente recorrente).
+  def persist_customer_metadata!(contact, customer, payload) # rubocop:disable Metrics/AbcSize
+    return if contact.blank?
+
+    current_custom = contact.custom_attributes || {}
+    current_custom = current_custom.dup
+
+    current_custom['cpf'] = customer[:cpf] if customer[:cpf].present?
+    current_custom['ultima_suite'] = payload[:category] if payload[:category].present?
+    current_custom['ultima_permanencia'] = payload[:stay_type] if payload[:stay_type].present?
+    current_custom['ultima_reserva_em'] = Time.current.iso8601
+    current_custom['total_reservas'] = (current_custom['total_reservas'].to_i + 1)
+
+    updates = { custom_attributes: current_custom }
+    updates[:email] = customer[:email] if customer[:email].present? && contact.email.blank?
+    updates[:name] = customer[:name] if customer[:name].present? && contact.name.blank?
+
+    contact.update!(updates)
+  rescue StandardError => e
+    Rails.logger.error("[PublicReservations] persist_customer_metadata failed: #{e.message}")
   end
 
   # Espelha Captain::Tools::GeneratePixTool#mark_conversation_as_awaiting_payment

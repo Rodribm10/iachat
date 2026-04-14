@@ -14,74 +14,75 @@ class Captain::Tools::GenerateReservationLinkTool < Captain::Tools::BaseTool
   def description
     <<~DESC.strip
       FALLBACK para gerar reserva via pagina publica (Reserva Rede 1001).
-      Use SOMENTE quando `generate_pix` falhar ou retornar success=false.
-      Gera um link com os dados ja preenchidos (categoria, permanencia,
-      data). Nome, telefone e CPF do cliente sao lidos automaticamente do
-      contato da conversa - voce nao precisa passa-los. Envie o link
-      retornado como alternativa, explicando que o cliente pode revisar
-      e pagar pela pagina.
+      Use SOMENTE quando `generate_pix` retornar success=false na mesma conversa.
+      OBRIGATORIO passar: marca, unidade, categoria, permanencia, checkin_at.
+      Nome/telefone/CPF/email vem do contato automaticamente.
+      Retorna uma URL que DEVE ser enviada ao cliente como texto puro (sem markdown).
     DESC
   end
 
   def tool_parameters_schema
     {
       type: 'object',
+      required: %w[marca unidade categoria permanencia checkin_at],
       properties: {
         marca: {
           type: 'string',
-          description: 'Nome da marca. Ex: "Hotel 1001 Noites".'
+          description: 'OBRIGATORIO. Nome da marca. Ex: "Hotel 1001 Noites Prime".'
         },
         unidade: {
           type: 'string',
-          description: 'Nome da unidade do hotel. Ex: "Hotel 1001 Aguas Lindas".'
-        },
-        permanencia: {
-          type: 'string',
-          description: 'Permanencia escolhida. Ex: "3hrs", "4hrs", "Pernoite".'
+          description: 'OBRIGATORIO. Nome da unidade. Ex: "Prime Aguas Lindas".'
         },
         categoria: {
           type: 'string',
-          description: 'Categoria da suite. Ex: "Standard", "Hidromassagem".'
+          description: 'OBRIGATORIO. Categoria da suite. Ex: "Alexa", "Stilo", "Hidromassagem".'
+        },
+        permanencia: {
+          type: 'string',
+          description: 'OBRIGATORIO. Permanencia escolhida. Ex: "2hrs", "3hrs", "4hrs", "Pernoite", "Diaria".'
         },
         checkin_at: {
           type: 'string',
-          description: 'Data e horario de check-in em ISO 8601. Ex: "2026-04-14T22:00:00".'
-        },
-        nome: {
-          type: 'string',
-          description: 'Nome completo do cliente.'
-        },
-        telefone: {
-          type: 'string',
-          description: 'Telefone do cliente (com ou sem DDI).'
-        },
-        cpf: {
-          type: 'string',
-          description: 'CPF do cliente (apenas numeros ou com pontuacao).'
+          description: 'OBRIGATORIO. Check-in em ISO 8601. Ex: "2026-04-28T22:00:00". Default: ' \
+                       '22:00 para Pernoite/Diaria, +1h do horario atual para 2hrs/3hrs/4hrs.'
         },
         email: {
           type: 'string',
-          description: 'Email do cliente (opcional).'
+          description: 'OPCIONAL. Email do cliente (se tiver).'
         },
         observacao: {
           type: 'string',
-          description: 'Observacao ou preferencia especial do cliente (opcional).'
+          description: 'OPCIONAL. Preferencia especial do cliente.'
         }
       }
     }
   end
 
+  REQUIRED_STAY_FIELDS = %i[marca unidade categoria permanencia checkin_at].freeze
+
   def execute(*args, **params)
     actual_params = resolve_params(args, params)
+    missing = REQUIRED_STAY_FIELDS.reject { |f| actual_params[f].to_s.strip.present? }
+
+    if missing.any?
+      return {
+        formatted_message: "Nao posso gerar o link sem: #{missing.join(', ')}. " \
+                           'Colete esses dados na conversa e chame a ferramenta de novo.',
+        success: false,
+        missing_fields: missing
+      }
+    end
+
     conversation = resolve_conversation(args, params)
     enriched_params = enrich_with_contact(actual_params, conversation)
 
     base = ENV.fetch('RESERVA_1001_BASE_URL', DEFAULT_BASE_URL)
     query = build_query(enriched_params)
-    url = query.empty? ? base : "#{base}/?#{query}"
+    url = "#{base}/?#{query}"
 
     {
-      formatted_message: "Pronto! Clique no link para revisar e pagar a entrada via PIX:\n#{url}",
+      formatted_message: url,
       raw_payload: url,
       success: true
     }
