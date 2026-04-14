@@ -89,6 +89,7 @@ class Captain::Reservation < ApplicationRecord
   before_validation :set_captain_unit_id, on: :create
   after_commit :sync_conversation_marker_snapshot
   after_create_commit :update_contact_reservation_metadata
+  after_create_commit :post_internal_reservation_note
 
   def ui_status
     Captain::Reservations::MarkerBuilder.ui_status(status)
@@ -126,6 +127,38 @@ class Captain::Reservation < ApplicationRecord
   rescue StandardError => e
     Rails.logger.error("[Captain::Reservation] failed to sync conversation marker: #{e.class} - #{e.message}")
   end
+
+  # Cria uma nota interna (privada) na conversa com os detalhes da reserva
+  # recem criada. A atendente humana ve tudo em um so lugar.
+  # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
+  def post_internal_reservation_note
+    return if conversation.blank?
+
+    meta = metadata.to_h
+    deposit = meta['deposit_amount'].to_f
+    deposit = (total_amount.to_f / 2.0) if deposit <= 0
+
+    check_in_fmt = check_in_at&.strftime('%d/%m/%Y %H:%M') || '—'
+    category = meta['category'].presence || suite_identifier
+
+    content = [
+      '🛎️ *Nova reserva criada*',
+      "Suíte: #{category}",
+      "Check-in: #{check_in_fmt}",
+      "Valor total: R$ #{format('%.2f', total_amount.to_f)}",
+      "Sinal (PIX 50%): R$ #{format('%.2f', deposit)}",
+      "Reserva ##{id}"
+    ].join("\n")
+
+    Messages::MessageBuilder.new(
+      nil,
+      conversation,
+      { content: content, message_type: 'outgoing', private: true }
+    ).perform
+  rescue StandardError => e
+    Rails.logger.warn("[Captain::Reservation] failed to post internal note: #{e.class} - #{e.message}")
+  end
+  # rubocop:enable Metrics/AbcSize,Metrics/MethodLength
 
   # Atualiza campos visiveis no painel lateral do Chatwoot (custom_attributes)
   # pra que a recepcionista veja num relance:

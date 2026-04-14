@@ -56,13 +56,8 @@ class Public::Api::V1::Captain::PublicReservationsController < ActionController:
       contact_inbox: contact_inbox
     ).perform
 
-    initial_note = build_initial_note(params)
-
-    Messages::MessageBuilder.new(
-      nil,
-      conversation,
-      { content: initial_note, message_type: 'outgoing', private: true }
-    ).perform
+    # Nota: o model Captain::Reservation#post_internal_reservation_note ja cria
+    # a nota interna automaticamente via after_create_commit. Nao duplicamos aqui.
 
     reservation = Captain::Reservation.create!(
       account: account,
