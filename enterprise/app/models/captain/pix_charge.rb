@@ -41,6 +41,8 @@ class Captain::PixCharge < ApplicationRecord
   validates :txid, presence: true, uniqueness: true
   validates :unit_id, presence: true
 
+  after_create_commit :post_internal_pix_sent_note
+
   def expires_at
     return nil unless created_at
 
@@ -51,6 +53,33 @@ class Captain::PixCharge < ApplicationRecord
     return false unless created_at
 
     now > expires_at
+  end
+
+  # Cria uma nota interna (privada) na conversa avisando que o PIX foi gerado
+  # e enviado ao cliente. Nao significa que o cliente pagou — e so o marcador
+  # de "aguardando pagamento" com os detalhes da cobranca pra atendente.
+  def post_internal_pix_sent_note
+    conversation = reservation&.conversation
+    return if conversation.blank?
+
+    value = original_value.to_f
+    expires_fmt = expires_at&.strftime('%d/%m/%Y %H:%M') || '—'
+
+    content = [
+      '💸 *PIX enviado ao cliente* — aguardando pagamento',
+      "Valor: R$ #{format('%.2f', value)}",
+      "Txid: #{txid}",
+      "Expira em: #{expires_fmt}",
+      "Reserva ##{reservation_id}"
+    ].join("\n")
+
+    Messages::MessageBuilder.new(
+      nil,
+      conversation,
+      { content: content, message_type: 'outgoing', private: true }
+    ).perform
+  rescue StandardError => e
+    Rails.logger.warn("[Captain::PixCharge] failed to post sent note: #{e.class} - #{e.message}")
   end
 
   # Retorna o valor original da cobrança a partir do payload da Inter
