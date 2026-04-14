@@ -80,6 +80,8 @@ class Public::Api::V1::Captain::PublicReservationsController < ActionController:
       }
     )
 
+    mark_conversation_as_awaiting_payment(conversation)
+
     deposit_amount = (params[:deposit_cents].to_i / 100.0)
     charge = Captain::Inter::CobService.new(reservation, amount: deposit_amount).call
     reservation.update!(status: :pending_payment)
@@ -126,6 +128,18 @@ class Public::Api::V1::Captain::PublicReservationsController < ActionController:
     return if provided.present? && ActiveSupport::SecurityUtils.secure_compare(provided, expected)
 
     render json: { error: 'unauthorized' }, status: :unauthorized
+  end
+
+  # Espelha Captain::Tools::GeneratePixTool#mark_conversation_as_awaiting_payment
+  # (enterprise/app/services/captain/tools/generate_pix_tool.rb:713-721)
+  def mark_conversation_as_awaiting_payment(conversation)
+    current = conversation.label_list
+    merged = (current + ['aguardando_pagamento']).uniq
+    merged -= %w[pagamento_confirmado reserva_feita]
+    conversation.update_labels(merged)
+  rescue StandardError => e
+    Rails.logger.error("[PublicReservations] label update failed: #{e.message}")
+    # Não falha a request por causa disso
   end
 
   def build_initial_note(payload)
