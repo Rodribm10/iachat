@@ -88,6 +88,7 @@ class Captain::Reservation < ApplicationRecord
 
   before_validation :set_captain_unit_id, on: :create
   after_commit :sync_conversation_marker_snapshot
+  after_create_commit :update_contact_reservation_metadata
 
   def ui_status
     Captain::Reservations::MarkerBuilder.ui_status(status)
@@ -124,5 +125,24 @@ class Captain::Reservation < ApplicationRecord
     Captain::Reservations::ConversationMarkerSyncService.new(reservation: self).perform
   rescue StandardError => e
     Rails.logger.error("[Captain::Reservation] failed to sync conversation marker: #{e.class} - #{e.message}")
+  end
+
+  # Atualiza campos visiveis no painel lateral do Chatwoot (custom_attributes)
+  # pra que a recepcionista veja num relance:
+  #   ultima_suite, ultima_permanencia, ultima_reserva_em, total_reservas
+  def update_contact_reservation_metadata # rubocop:disable Metrics/AbcSize
+    return if contact.blank?
+
+    meta = metadata.to_h
+    current = contact.custom_attributes.to_h
+
+    current['ultima_suite'] = meta['category'].presence || suite_identifier.to_s.split('·').first.to_s.strip
+    current['ultima_permanencia'] = meta['stay_type'].presence || suite_identifier.to_s.split('·').last.to_s.strip
+    current['ultima_reserva_em'] = created_at.iso8601
+    current['total_reservas'] = (current['total_reservas'].to_i + 1)
+
+    contact.update_columns(custom_attributes: current) # rubocop:disable Rails/SkipsModelValidations
+  rescue StandardError => e
+    Rails.logger.warn("[Captain::Reservation] failed to update contact metadata: #{e.class} - #{e.message}")
   end
 end

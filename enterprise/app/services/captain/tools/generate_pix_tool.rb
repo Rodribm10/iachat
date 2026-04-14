@@ -2,6 +2,7 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
   CPF_WITH_LABEL_REGEX = /cpf[^\d]*(\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{11})/i
   CPF_FALLBACK_REGEX = /\b\d{11}\b/
   NAME_WITH_LABEL_REGEX = /nome\s*[:\-]\s*([^\n\r,;]+)/i
+  EMAIL_REGEX = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
   SUITE_REGEX = /su[ií]te\s+([^\n\r,.!?]+)/i
   DDMMYYYY_REGEX = %r{\b(\d{1,2}/\d{1,2}/\d{2,4})\b}
   CURRENCY_REGEX = /r\$\s*([\d.,]+)/i
@@ -116,6 +117,8 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
 
     updates[:name] = extracted[:name] if valid_contact_name?(contact.name).blank? && extracted[:name].present?
 
+    updates[:email] = extracted[:email] if contact.email.blank? && extracted[:email].present?
+
     return if updates.blank?
 
     contact.update!(updates)
@@ -132,6 +135,7 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
 
     cpf = nil
     name = nil
+    email = nil
 
     recent_messages.each do |message|
       content = normalize_text(message.content)
@@ -139,13 +143,21 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
 
       cpf ||= extract_cpf_from_text(content)
       name ||= extract_name_from_text(content)
-      break if cpf.present? && name.present?
+      email ||= extract_email_from_text(content)
+      break if cpf.present? && name.present? && email.present?
     end
 
     {
       cpf: cpf,
-      name: name
+      name: name,
+      email: email
     }.compact
+  end
+
+  def extract_email_from_text(text)
+    text = normalize_text(text)
+    candidate = text[EMAIL_REGEX]
+    candidate.to_s.strip.downcase.presence
   end
 
   def extract_cpf_from_text(text)
@@ -317,6 +329,18 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
     normalize_payload({ formatted_message: msg, success: true })
   end
 
+  def dispatch_direct_link_message(link, label)
+    return if @conversation.blank? || link.to_s.strip.empty?
+
+    content = "#{label}\n#{link}".strip
+    Messages::MessageBuilder.new(@assistant, @conversation, {
+                                   content: content,
+                                   message_type: 'outgoing'
+                                 }).perform
+  rescue StandardError => e
+    Rails.logger.warn("[GeneratePixTool] failed to dispatch direct link: #{e.class} - #{e.message}")
+  end
+
   def current_pix_charge_for(reservation)
     return nil unless reservation
 
@@ -333,7 +357,13 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
     Rails.logger.info "[GeneratePixTool] Reserva #{reservation.id} → pending_payment"
 
     final_prefix = prefix || 'Cobrança Pix gerada com sucesso.'
-    build_pix_response(charge, reservation, amount: charge_amount, prefix: final_prefix)
+    response = build_pix_response(charge, reservation, amount: charge_amount, prefix: final_prefix)
+
+    # Envia o link como mensagem direta pro cliente. Isso garante que o URL chegue
+    # no WhatsApp mesmo que a LLM parafraseie com placeholder tipo "[Link do Pix]".
+    dispatch_direct_link_message(response[:payment_link], 'Link do Pix:')
+
+    response
   rescue StandardError => e
     safe_error_message = normalize_text(e.message)
     Rails.logger.error("[GeneratePixTool] Falha ao gerar Pix: #{e.class} - #{safe_error_message}")

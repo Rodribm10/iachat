@@ -81,6 +81,10 @@ class Captain::Tools::GenerateReservationLinkTool < Captain::Tools::BaseTool
     query = build_query(enriched_params)
     url = "#{base}/?#{query}"
 
+    # Envia o link como mensagem direta pra garantir que chegue no WhatsApp
+    # mesmo que a LLM parafraseie com placeholder [Link da reserva] etc.
+    dispatch_direct_link_message(conversation, url)
+
     {
       formatted_message: url,
       raw_payload: url,
@@ -115,6 +119,18 @@ class Captain::Tools::GenerateReservationLinkTool < Captain::Tools::BaseTool
       email: actual_params[:email].presence || contact.email.presence,
       observacao: actual_params[:observacao]
     }.compact
+  end
+
+  def dispatch_direct_link_message(conversation, url)
+    return if conversation.blank? || url.to_s.strip.empty?
+
+    content = "Link da sua reserva (tudo ja preenchido):\n#{url}"
+    Messages::MessageBuilder.new(@assistant, conversation, {
+                                   content: content,
+                                   message_type: 'outgoing'
+                                 }).perform
+  rescue StandardError => e
+    Rails.logger.warn("[GenerateReservationLinkTool] failed to dispatch link: #{e.class} - #{e.message}")
   end
 
   def build_query(actual_params)
