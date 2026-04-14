@@ -4,7 +4,7 @@
 
 **Goal:** Criar o novo projeto `reserva-1001` do zero como Vite + React 19 + TypeScript + Tailwind v4 + Supabase, com a paleta premium aplicada, schema novo no Supabase, e uma página de teste renderizando marcas reais do banco.
 
-**Architecture:** App Vite novo em `/Users/user/Dev/Produtos/Chatwoot-fazer-ai/fazer-ai-kanban/reserva-1001/`, separado do Chatwoot. POC antigo fica como `_poc-reference/` para consulta. Supabase com schema reformado e seeds. Nenhuma integração com Chatwoot ainda — isso é Fase 2.
+**Architecture:** App Vite novo em `/Users/user/Dev/Produtos/Chatwoot-fazer-ai/fazer-ai-kanban/reserva-1001/`, separado do Chatwoot. POC antigo fica como `_poc-reference/` para consulta. Reutiliza o schema `reserva_hotel` existente no projeto Supabase `acdvblhzzaneddlxqyst` (InAudit Hotel), com migração aditiva para fotos, extras e integração Chatwoot. Nenhuma integração com Chatwoot ainda — isso é Fase 2.
 
 **Tech Stack:** Vite 6 · React 19 · TypeScript 5.6 · Tailwind v4 · shadcn/ui (cva + Radix) · Supabase JS 2 · framer-motion 12 · anime.js 4 · Vitest · ESLint · Prettier
 
@@ -14,34 +14,21 @@
 
 ---
 
-## Pré-requisitos (você precisa fazer antes de começar)
+## Pré-requisitos (já resolvidos)
 
-1. **Decisão sobre Supabase project:**
-   - **Recomendado:** criar um projeto novo em [app.supabase.com](https://app.supabase.com) chamado `reserva-1001` na região `sa-east-1` (São Paulo)
-   - Alternativa: reutilizar o projeto existente do POC (`qdpzlxqsjbyxcajinixi`) — se escolher isso, nas migrations use `CREATE TABLE IF NOT EXISTS` e rode em um schema separado `reserva_v2`
-   - **Este plano assume projeto novo.**
+**Supabase:** projeto **InAudit Hotel** (`acdvblhzzaneddlxqyst`), schema **`reserva_hotel`** reaproveitado. Migration aditiva (3 tabelas novas: `fotos_categoria`, `extras`, `reserva_extras` + colunas `chatwoot_*`) já aplicada via MCP antes de iniciar o plano.
 
-2. **Credenciais Supabase do projeto novo:**
-   - Anote `Project URL` (ex: `https://abcd1234.supabase.co`)
-   - Anote `anon public key` (em Settings → API)
-   - Anote `service_role key` (só usado no backend, guardar seguro)
+**Credenciais:**
+- URL: `https://acdvblhzzaneddlxqyst.supabase.co`
+- Anon key: ver `.env.local` (criado na Task 4)
+- Schema: `reserva_hotel`
 
-3. **Supabase CLI instalado:**
-   ```bash
-   brew install supabase/tap/supabase
-   supabase --version  # deve mostrar >= 1.200.0
-   ```
+**Tabelas PT-BR disponíveis:**
+`marcas`, `unidades`, `suites`, `suites_unidades`, `precos`, `contas_pagamento`, `reservas`, `fotos_categoria`, `extras`, `reserva_extras`, `vw_precos_completa`, `vw_reservas_completa`.
 
-4. **pnpm instalado:**
-   ```bash
-   which pnpm || npm install -g pnpm
-   pnpm --version  # deve mostrar >= 9
-   ```
+**⚠️ Ação manual do usuário necessária:** no Supabase Dashboard → Project Settings → API → **Data API settings** → **Exposed schemas**, adicionar `reserva_hotel` à lista (se ainda não estiver). Sem isso, o cliente JS não consegue ler as tabelas.
 
-5. **Node 18+:**
-   ```bash
-   node --version  # v18 ou maior
-   ```
+**Ferramental local (já validado):** Node v20, pnpm 9.14, supabase CLI 2.48.
 
 ---
 
@@ -68,9 +55,8 @@ reserva-1001/
 │   └── hotel-1001-noites-prime---reserva/
 ├── supabase/
 │   ├── config.toml
-│   ├── migrations/
-│   │   └── 20260413000001_initial_schema.sql
-│   └── seed.sql
+│   └── migrations/
+│       └── 20260413000001_reserva_1001_additive_schema.sql
 └── src/
     ├── main.tsx                  # entrypoint
     ├── App.tsx                   # shell simples exibindo marcas
@@ -491,26 +477,28 @@ git commit -m "feat: configura tailwind v4 com paleta premium (obsidian/champagn
 
 Create `reserva-1001/.env.local.example`:
 ```
-# Supabase — pegue em app.supabase.com > Settings > API
-VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
-VITE_SUPABASE_ANON_KEY=sua_anon_key_aqui
+# Supabase — projeto InAudit Hotel
+VITE_SUPABASE_URL=https://acdvblhzzaneddlxqyst.supabase.co
+VITE_SUPABASE_ANON_KEY=
+VITE_SUPABASE_SCHEMA=reserva_hotel
 
 # Chatwoot — token de integração (Fase 2)
 VITE_CHATWOOT_API_URL=https://chatwoot.fazer.ai
 VITE_CHATWOOT_API_TOKEN=
 ```
 
-- [ ] **Step 2: Criar .env.local com as credenciais reais**
+- [ ] **Step 2: Criar .env.local com as credenciais reais do projeto InAudit Hotel**
 
-Create `reserva-1001/.env.local` (substitua os valores pelos do seu projeto Supabase):
+Create `reserva-1001/.env.local`:
 ```
-VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGc...
+VITE_SUPABASE_URL=https://acdvblhzzaneddlxqyst.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjZHZibGh6emFuZWRkbHhxeXN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MTMyNzcsImV4cCI6MjA2NjM4OTI3N30.wwmr0TMYuds-QLrTESR4kx34umssseDyEsPjVRt02qI
+VITE_SUPABASE_SCHEMA=reserva_hotel
 VITE_CHATWOOT_API_URL=https://chatwoot.fazer.ai
 VITE_CHATWOOT_API_TOKEN=
 ```
 
-**IMPORTANTE:** este arquivo está no `.gitignore` e NÃO vai pro git. Se você não tem as credenciais ainda, crie o projeto Supabase antes (pré-requisito 1).
+**IMPORTANTE:** este arquivo está no `.gitignore` e NÃO vai pro git.
 
 - [ ] **Step 3: Criar src/lib/utils.ts (cn helper)**
 
@@ -553,6 +541,7 @@ import type { Database } from '@/types/database'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseSchema = import.meta.env.VITE_SUPABASE_SCHEMA ?? 'reserva_hotel'
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
@@ -560,7 +549,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   )
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+  db: { schema: supabaseSchema as 'reserva_hotel' },
+})
 ```
 
 - [ ] **Step 6: Validar que o typecheck passa**
@@ -581,12 +572,13 @@ git commit -m "feat: configura cliente supabase com variaveis de ambiente"
 
 ---
 
-## Task 5: Inicializar Supabase CLI local e criar a migration
+## Task 5: Documentar a migration aditiva (schema já aplicado via MCP)
+
+**Contexto:** A migration aditiva ao schema `reserva_hotel` já foi aplicada no projeto Supabase antes do plano começar (via MCP). Esta task **só cria o arquivo SQL** como fonte de verdade/histórico no repositório — **não roda `supabase db push`**.
 
 **Files:**
 - Create: `reserva-1001/supabase/config.toml` (via CLI)
-- Create: `reserva-1001/supabase/migrations/20260413000001_initial_schema.sql`
-- Create: `reserva-1001/supabase/seed.sql`
+- Create: `reserva-1001/supabase/migrations/20260413000001_reserva_1001_additive_schema.sql`
 
 - [ ] **Step 1: Inicializar Supabase CLI no projeto**
 
@@ -597,233 +589,111 @@ supabase init
 
 Expected: cria `supabase/config.toml` e `supabase/` folder. Se perguntar sobre VSCode settings, responda N.
 
-- [ ] **Step 2: Criar migration 001 — schema inicial**
+- [ ] **Step 2: Criar o arquivo de migration (DDL da migration já aplicada)**
 
-Create `reserva-1001/supabase/migrations/20260413000001_initial_schema.sql`:
+Create `reserva-1001/supabase/migrations/20260413000001_reserva_1001_additive_schema.sql`:
 ```sql
--- Reserva Rede 1001 — schema inicial
--- Paleta de tabelas: brands, hotel_units, suite_categories, suite_images,
--- pricing, extras, reservations, reservation_extras
+-- Reserva Rede 1001 — adições ao schema reserva_hotel existente
+-- Já aplicada via MCP. Este arquivo é a fonte de verdade histórica.
+-- Zero alteração destrutiva. Tudo aditivo.
 
--- === Marcas ===
-create table public.brands (
-  id            bigserial primary key,
-  name          text not null,
-  slug          text not null unique,
-  logo_url      text,
-  primary_color text,
-  created_at    timestamptz not null default now()
+-- === 1. Fotos por categoria de suíte (linked por unidade + nome da categoria) ===
+create table if not exists reserva_hotel.fotos_categoria (
+  id          uuid primary key default gen_random_uuid(),
+  id_unidade  uuid not null references reserva_hotel.unidades(id) on delete cascade,
+  categoria   text not null,
+  url_foto    text not null,
+  alt         text,
+  ordem       int not null default 0,
+  ativa       boolean not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
 
--- === Unidades ===
-create table public.hotel_units (
-  id                bigserial primary key,
-  brand_id          bigint not null references public.brands(id) on delete cascade,
-  name              text not null,
-  slug              text not null,
-  chatwoot_unit_id  bigint not null,
-  active            boolean not null default true,
-  created_at        timestamptz not null default now(),
-  unique (brand_id, slug)
+create index if not exists idx_fotos_categoria_unidade on reserva_hotel.fotos_categoria(id_unidade);
+create index if not exists idx_fotos_categoria_lookup on reserva_hotel.fotos_categoria(id_unidade, categoria);
+
+-- === 2. Extras (adicionais por marca) ===
+create table if not exists reserva_hotel.extras (
+  id           uuid primary key default gen_random_uuid(),
+  id_marca     uuid not null references reserva_hotel.marcas(id) on delete cascade,
+  titulo       text not null,
+  descricao    text,
+  preco        numeric not null check (preco >= 0),
+  imagem_url   text,
+  ativo        boolean not null default true,
+  ordem        int not null default 0,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
 );
 
-create index idx_hotel_units_brand on public.hotel_units(brand_id);
-create index idx_hotel_units_chatwoot_unit on public.hotel_units(chatwoot_unit_id);
+create index if not exists idx_extras_marca on reserva_hotel.extras(id_marca);
 
--- === Categorias de suíte ===
-create table public.suite_categories (
-  id          bigserial primary key,
-  unit_id     bigint not null references public.hotel_units(id) on delete cascade,
-  name        text not null,
-  description text,
-  sort_order  int not null default 0,
-  active      boolean not null default true,
-  created_at  timestamptz not null default now()
+-- === 3. Junction reserva ↔ extras ===
+create table if not exists reserva_hotel.reserva_extras (
+  id_reserva   uuid not null references reserva_hotel.reservas(id) on delete cascade,
+  id_extra     uuid not null references reserva_hotel.extras(id),
+  preco        numeric not null check (preco >= 0),
+  created_at   timestamptz not null default now(),
+  primary key (id_reserva, id_extra)
 );
 
-create index idx_suite_categories_unit on public.suite_categories(unit_id);
+-- === 4. Integração Chatwoot em unidades ===
+alter table reserva_hotel.unidades
+  add column if not exists chatwoot_unit_id bigint;
 
--- === Fotos de categoria ===
-create table public.suite_images (
-  id            bigserial primary key,
-  category_id   bigint not null references public.suite_categories(id) on delete cascade,
-  storage_path  text not null,
-  alt           text,
-  sort_order    int not null default 0,
-  created_at    timestamptz not null default now()
-);
+create index if not exists idx_unidades_chatwoot_unit on reserva_hotel.unidades(chatwoot_unit_id);
 
-create index idx_suite_images_category on public.suite_images(category_id);
+-- === 5. Integração Chatwoot em reservas ===
+alter table reserva_hotel.reservas
+  add column if not exists chatwoot_contact_id bigint;
 
--- === Preços ===
-create type public.day_range_enum as enum ('weekday', 'weekend');
-create type public.stay_type_enum as enum ('2hrs', '3hrs', '4hrs', 'pernoite', 'diaria');
+alter table reserva_hotel.reservas
+  add column if not exists chatwoot_conversation_id bigint;
 
-create table public.pricing (
-  id              bigserial primary key,
-  category_id     bigint not null references public.suite_categories(id) on delete cascade,
-  day_range       public.day_range_enum not null,
-  stay_type       public.stay_type_enum not null,
-  price_cents     int not null check (price_cents >= 0),
-  created_at      timestamptz not null default now(),
-  unique (category_id, day_range, stay_type)
-);
+alter table reserva_hotel.reservas
+  add column if not exists chatwoot_pix_charge_id bigint;
 
-create index idx_pricing_category on public.pricing(category_id);
-
--- === Extras ===
-create table public.extras (
-  id            bigserial primary key,
-  brand_id      bigint not null references public.brands(id) on delete cascade,
-  title         text not null,
-  description   text,
-  price_cents   int not null check (price_cents >= 0),
-  image_url     text,
-  active        boolean not null default true,
-  sort_order    int not null default 0,
-  created_at    timestamptz not null default now()
-);
-
-create index idx_extras_brand on public.extras(brand_id);
-
--- === Reservas ===
-create type public.reservation_status_enum as enum ('pending', 'paid', 'expired', 'canceled');
-
-create table public.reservations (
-  id                       bigserial primary key,
-  brand_id                 bigint not null references public.brands(id),
-  unit_id                  bigint not null references public.hotel_units(id),
-  category_id              bigint not null references public.suite_categories(id),
-  stay_type                public.stay_type_enum not null,
-  checkin_at               timestamptz not null,
-  customer_name            text not null,
-  customer_phone           text not null,
-  customer_cpf             text not null,
-  customer_email           text,
-  notes                    text,
-  total_cents              int not null check (total_cents >= 0),
-  deposit_cents            int not null check (deposit_cents >= 0),
-  chatwoot_contact_id      bigint,
-  chatwoot_conversation_id bigint,
-  chatwoot_pix_charge_id   bigint,
-  pix_txid                 text,
-  status                   public.reservation_status_enum not null default 'pending',
-  created_at               timestamptz not null default now(),
-  paid_at                  timestamptz
-);
-
-create index idx_reservations_status on public.reservations(status);
-create index idx_reservations_pix_txid on public.reservations(pix_txid);
-create index idx_reservations_created_at on public.reservations(created_at desc);
-
--- === Extras escolhidos na reserva ===
-create table public.reservation_extras (
-  reservation_id  bigint not null references public.reservations(id) on delete cascade,
-  extra_id        bigint not null references public.extras(id),
-  price_cents     int not null check (price_cents >= 0),
-  primary key (reservation_id, extra_id)
-);
-
--- === RLS ===
-alter table public.brands enable row level security;
-alter table public.hotel_units enable row level security;
-alter table public.suite_categories enable row level security;
-alter table public.suite_images enable row level security;
-alter table public.pricing enable row level security;
-alter table public.extras enable row level security;
-alter table public.reservations enable row level security;
-alter table public.reservation_extras enable row level security;
-
--- Leitura pública para catálogo
-create policy "public_read_brands" on public.brands
-  for select using (true);
-
-create policy "public_read_units" on public.hotel_units
-  for select using (active = true);
-
-create policy "public_read_categories" on public.suite_categories
-  for select using (active = true);
-
-create policy "public_read_images" on public.suite_images
-  for select using (true);
-
-create policy "public_read_pricing" on public.pricing
-  for select using (true);
-
-create policy "public_read_extras" on public.extras
-  for select using (active = true);
-
--- reservations e reservation_extras: somente service_role pode ler/escrever
--- (deliberadamente sem policies pra anon — o backend controla)
+create index if not exists idx_reservas_chatwoot_conversation on reserva_hotel.reservas(chatwoot_conversation_id);
+create index if not exists idx_reservas_txid_pix on reserva_hotel.reservas(txid_pix);
 ```
 
-- [ ] **Step 3: Criar seed.sql com as 4 marcas**
+- [ ] **Step 3: Commit**
 
-Create `reserva-1001/supabase/seed.sql`:
-```sql
--- Seed inicial: 4 marcas do Grupo Nova
-insert into public.brands (name, slug, primary_color) values
-  ('Hotel 1001 Noites',        'hotel-1001-noites',       '#C9A961'),
-  ('Hotel 1001 Noites Prime',  'hotel-1001-noites-prime', '#C9A961'),
-  ('Hotel 1001 Noites Express','hotel-1001-noites-express','#C9A961'),
-  ('Dolce Amore',              'dolce-amore',             '#E8B4A0')
-on conflict (slug) do nothing;
-```
-
-- [ ] **Step 4: Linkar o projeto local ao projeto Supabase remoto**
+Nota: não há seed.sql neste plano — o schema `reserva_hotel` já contém 1 marca de seed e o usuário vai cadastrar o resto via admin (Fase 4). Também não rodamos `supabase db push` porque a migration já foi aplicada via MCP antes do plano.
 
 ```bash
-cd /Users/user/Dev/Produtos/Chatwoot-fazer-ai/fazer-ai-kanban/reserva-1001
-supabase link --project-ref SEU_PROJECT_REF
-```
-
-Substitua `SEU_PROJECT_REF` pelo ID do projeto (a parte antes de `.supabase.co` na URL). Vai pedir a senha do banco — use a que você definiu ao criar o projeto.
-
-Expected: `Finished supabase link.`
-
-- [ ] **Step 5: Aplicar a migration no Supabase remoto**
-
-```bash
-supabase db push
-```
-
-Expected: aplica a migration. Se perguntar confirmação, responda Y.
-
-- [ ] **Step 6: Rodar o seed via SQL editor do Supabase**
-
-O `supabase db push` não roda `seed.sql` em projetos remotos por padrão. O caminho mais seguro:
-
-1. Abra o projeto em [app.supabase.com](https://app.supabase.com)
-2. Vá em **SQL Editor** → **New query**
-3. Cole o conteúdo de `supabase/seed.sql`
-4. Clique em **Run**
-
-Expected: resposta `Success. No rows returned` e 4 linhas inseridas. Confira em **Table Editor** → `brands` — deve listar as 4 marcas.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add supabase/config.toml supabase/migrations/ supabase/seed.sql
-git commit -m "feat: migration inicial do schema + seed das 4 marcas"
+git add supabase/config.toml supabase/migrations/
+git commit -m "feat: documenta migration aditiva do schema reserva_hotel"
 ```
 
 ---
 
-## Task 6: Gerar types TypeScript a partir do schema
+## Task 6: Gerar types TypeScript do schema reserva_hotel
 
 **Files:**
 - Modify: `reserva-1001/src/types/database.ts`
 
-- [ ] **Step 1: Gerar os tipos a partir do projeto remoto**
+- [ ] **Step 1: Linkar CLI ao projeto InAudit Hotel**
 
 ```bash
 cd /Users/user/Dev/Produtos/Chatwoot-fazer-ai/fazer-ai-kanban/reserva-1001
-supabase gen types typescript --linked > src/types/database.ts
+supabase link --project-ref acdvblhzzaneddlxqyst
 ```
 
-Expected: `src/types/database.ts` agora contém as definições completas de `Database` com as tabelas `brands`, `hotel_units`, `suite_categories`, etc.
+Vai pedir a senha do banco. Use a senha do projeto. Se não souber, peça pro usuário.
 
-- [ ] **Step 2: Validar typecheck**
+- [ ] **Step 2: Gerar os tipos do schema reserva_hotel**
+
+```bash
+supabase gen types typescript --linked --schema reserva_hotel > src/types/database.ts
+```
+
+Expected: `src/types/database.ts` contém `Database` tipado com as tabelas `marcas`, `unidades`, `suites`, `precos`, `reservas`, `fotos_categoria`, `extras`, `reserva_extras`, `contas_pagamento` sob o namespace `reserva_hotel`.
+
+**Nota:** o cliente Supabase configurado em Task 4 já aponta para o schema `reserva_hotel` via `db: { schema }`. Logo, ao fazer `supabase.from('marcas')`, ele automaticamente resolve `reserva_hotel.marcas`.
+
+- [ ] **Step 3: Validar typecheck**
 
 ```bash
 pnpm typecheck
@@ -831,11 +701,25 @@ pnpm typecheck
 
 Expected: passa sem erros.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Atualizar o script `supabase:types` em package.json**
+
+Edit `reserva-1001/package.json`, campo `scripts`:
+
+De:
+```json
+"supabase:types": "supabase gen types typescript --local > src/types/database.ts"
+```
+
+Para:
+```json
+"supabase:types": "supabase gen types typescript --linked --schema reserva_hotel > src/types/database.ts"
+```
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/types/database.ts
-git commit -m "feat: gera tipos typescript do supabase"
+git add src/types/database.ts package.json
+git commit -m "feat: gera tipos typescript do schema reserva_hotel"
 ```
 
 ---
@@ -845,7 +729,7 @@ git commit -m "feat: gera tipos typescript do supabase"
 **Files:**
 - Modify: `reserva-1001/src/App.tsx`
 
-- [ ] **Step 1: Reescrever App.tsx para buscar e exibir marcas do Supabase**
+- [ ] **Step 1: Reescrever App.tsx para buscar e exibir marcas do Supabase (schema reserva_hotel, tabela `marcas`)**
 
 Replace `reserva-1001/src/App.tsx`:
 ```tsx
@@ -853,28 +737,29 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Database } from '@/types/database'
 
-type Brand = Database['public']['Tables']['brands']['Row']
+type Marca = Database['reserva_hotel']['Tables']['marcas']['Row']
 
 export default function App() {
-  const [brands, setBrands] = useState<Brand[]>([])
+  const [marcas, setMarcas] = useState<Marca[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function loadBrands() {
+    async function loadMarcas() {
       const { data, error } = await supabase
-        .from('brands')
+        .from('marcas')
         .select('*')
-        .order('name', { ascending: true })
+        .eq('ativa', true)
+        .order('nome', { ascending: true })
 
       if (error) {
         setError(error.message)
       } else {
-        setBrands(data ?? [])
+        setMarcas(data ?? [])
       }
       setLoading(false)
     }
-    loadBrands()
+    loadMarcas()
   }, [])
 
   return (
@@ -897,15 +782,24 @@ export default function App() {
         </div>
       )}
 
-      {!loading && !error && (
+      {!loading && !error && marcas.length === 0 && (
+        <p className="text-slate">Nenhuma marca cadastrada ainda.</p>
+      )}
+
+      {!loading && !error && marcas.length > 0 && (
         <ul className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
-          {brands.map((brand) => (
+          {marcas.map((marca) => (
             <li
-              key={brand.id}
+              key={marca.id}
               className="rounded-xl border border-champagne/20 bg-midnight/60 backdrop-blur p-6 text-center transition hover:border-champagne hover:glow-champagne"
             >
-              <h2 className="font-serif text-2xl text-champagne">{brand.name}</h2>
-              <p className="text-slate text-sm mt-1">{brand.slug}</p>
+              <h2 className="font-serif text-2xl text-champagne">{marca.nome}</h2>
+              {marca.descricao && <p className="text-slate text-sm mt-1">{marca.descricao}</p>}
+              {marca.categorias && marca.categorias.length > 0 && (
+                <p className="text-rose-gold text-xs mt-2 uppercase tracking-widest">
+                  {marca.categorias.join(' · ')}
+                </p>
+              )}
             </li>
           ))}
         </ul>
@@ -925,7 +819,7 @@ export default function App() {
 pnpm dev
 ```
 
-Abra `http://localhost:5173`. Expected: vê as 4 marcas em cards escuros com borda dourada sutil, título "Reserva Rede 1001" em gradiente dourado. Hover nos cards faz a borda brilhar.
+Abra `http://localhost:5173`. Expected: vê as marcas existentes no schema `reserva_hotel` (hoje 1 marca: "Hotel 1001 Noites") em cards escuros com borda dourada sutil, título "Reserva Rede 1001" em gradiente dourado. Hover nos cards faz a borda brilhar.
 
 Pare com `Ctrl+C`.
 
@@ -1186,24 +1080,40 @@ afterEach(() => {
   cleanup()
 })
 
-// Mock do Supabase client
-vi.mock('@/lib/supabase', () => ({
-  supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        order: vi.fn(() =>
-          Promise.resolve({
-            data: [
-              { id: 1, name: 'Hotel 1001 Noites', slug: 'hotel-1001-noites', logo_url: null, primary_color: '#C9A961', created_at: '2026-04-13T00:00:00Z' },
-              { id: 2, name: 'Dolce Amore', slug: 'dolce-amore', logo_url: null, primary_color: '#E8B4A0', created_at: '2026-04-13T00:00:00Z' },
-            ],
-            error: null,
-          })
-        ),
-      })),
-    })),
-  },
-}))
+// Mock do Supabase client — imita from('marcas').select('*').eq('ativa', true).order('nome')
+vi.mock('@/lib/supabase', () => {
+  const mockMarcas = [
+    {
+      id: '3fac5ed4-100f-4c0a-82ce-06110758b9c9',
+      nome: 'Hotel 1001 Noites',
+      categorias: ['Standard', 'Superior', 'Luxo'],
+      permanencias: ['3hrs', '6hrs', 'Pernoite'],
+      descricao: null,
+      ativa: true,
+      created_at: '2026-04-13T00:00:00Z',
+      updated_at: '2026-04-13T00:00:00Z',
+    },
+    {
+      id: '11111111-1111-1111-1111-111111111111',
+      nome: 'Dolce Amore',
+      categorias: ['Suite Master', 'Apartamento'],
+      permanencias: ['3hrs', '4hrs'],
+      descricao: null,
+      ativa: true,
+      created_at: '2026-04-13T00:00:00Z',
+      updated_at: '2026-04-13T00:00:00Z',
+    },
+  ]
+
+  const orderFn = vi.fn(() => Promise.resolve({ data: mockMarcas, error: null }))
+  const eqFn = vi.fn(() => ({ order: orderFn }))
+  const selectFn = vi.fn(() => ({ eq: eqFn, order: orderFn }))
+  const fromFn = vi.fn(() => ({ select: selectFn }))
+
+  return {
+    supabase: { from: fromFn },
+  }
+})
 ```
 
 - [ ] **Step 2: Escrever smoke test do App.tsx (TDD: test primeiro)**
@@ -1413,8 +1323,7 @@ src/
 ├── types/         # Tipos gerados do Supabase
 └── __tests__/     # Testes Vitest
 supabase/
-├── migrations/    # SQL de schema
-└── seed.sql       # Dados iniciais
+└── migrations/    # SQL de schema (source of truth)
 _poc-reference/    # POC antigo — só pra consultar
 ```
 
@@ -1493,7 +1402,7 @@ pnpm dev
 
 Abra `http://localhost:5173`:
 - Título "Reserva Rede 1001" em gradiente dourado ✓
-- 4 marcas listadas em cards escuros com borda champagne ✓
+- Marcas do schema `reserva_hotel` listadas em cards escuros com borda champagne ✓
 - Hover nos cards faz borda brilhar ✓
 - Fundo com gradiente obsidian→midnight ✓
 - Fonte serif (Fraunces) nos títulos, sans (Inter) no resto ✓
@@ -1515,7 +1424,7 @@ def4567 feat: componente Button base com variantes premium
 efg5678 feat: migra FormField e SelectField com paleta premium
 fgh6789 feat: renderiza marcas reais do supabase na pagina inicial
 ghi7890 feat: gera tipos typescript do supabase
-hij8901 feat: migration inicial do schema + seed das 4 marcas
+hij8901 feat: documenta migration aditiva do schema reserva_hotel
 ijk9012 feat: configura cliente supabase com variaveis de ambiente
 jkl0123 feat: configura tailwind v4 com paleta premium (obsidian/champagne/rose-gold)
 klm1234 feat: scaffold inicial do projeto vite + react + typescript
@@ -1527,7 +1436,7 @@ lmn2345 chore: inicializa repo com POC como referencia
 ## Critérios de conclusão da Fase 1
 
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` todos passam
-- [ ] Dev server sobe e renderiza a página inicial com as 4 marcas vindas do Supabase
+- [ ] Dev server sobe e renderiza a página inicial com as marcas vindas do schema `reserva_hotel`
 - [ ] Paleta premium visível e consistente
 - [ ] Tipografia Fraunces + Inter carregada
 - [ ] FormField, SelectField e Button prontos para uso (mesmo que não usados ainda)
