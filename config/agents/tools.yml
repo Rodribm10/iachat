@@ -54,3 +54,8 @@
   title: 'Criar Reserva'
   description: 'Cria uma reserva draft quando o cliente confirmar suíte, preço e horário de chegada'
   icon: 'calendar-add'
+
+- id: generate_reservation_link
+  title: 'Gerar Link de Reserva'
+  description: 'Gera um link da pagina publica de reserva ja pre-preenchida, pronto para o cliente revisar e pagar'
+  icon: 'link'
