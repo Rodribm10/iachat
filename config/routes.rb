@@ -692,6 +692,14 @@ Rails.application.routes.draw do
   # Página pública de pagamento PIX (link curto gerado via SGID pela IA)
   get '/r/:token', to: 'public/api/v1/captain/payments#show', as: :short_payment_link
 
+  # API pública de reservas (Reserva 1001)
+  post '/public/api/v1/captain/public_reservations',
+       to: 'public/api/v1/captain/public_reservations#create',
+       defaults: { format: 'json' }
+  get '/public/api/v1/captain/public_reservations/:id/status',
+      to: 'public/api/v1/captain/public_reservations#status',
+      defaults: { format: 'json' }
+
   # Webhook do Banco Inter para notificações de PIX pago
   post '/api/v1/captain/webhooks/inter_pix',
        to: 'public/api/v1/captain/inter_webhooks#create',

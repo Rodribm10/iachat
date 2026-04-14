@@ -6,7 +6,12 @@ RSpec.describe 'Public Captain Reservations API', type: :request do
   let(:valid_token) { 'test-token-abc' }
   let(:account) { create(:account) }
   let(:inbox) { create(:inbox, account: account) }
-  let(:unit) { create(:captain_unit, account: account, inbox: inbox) }
+  let(:brand) { create(:captain_brand, account: account) }
+  let(:unit) do
+    Captain::Unit.create!(account: account, brand: brand, inbox_id: inbox.id,
+                          name: 'Hotel Teste', inter_pix_key: 'pix@test.com',
+                          inter_account_number: '12345678')
+  end
 
   before do
     allow(ENV).to receive(:fetch).and_call_original
@@ -39,9 +44,13 @@ RSpec.describe 'Public Captain Reservations API', type: :request do
 
     context 'with valid token and valid payload' do
       let(:unit) do
-        create(:captain_unit, account: account, inbox: inbox,
-                              inter_client_id: 'fake-id',
-                              inter_pix_key: 'fake-key@test.com')
+        Captain::Unit.create!(
+          account: account, brand: brand, inbox_id: inbox.id,
+          name: 'Hotel Teste Com Inter', inter_pix_key: 'fake-key@test.com',
+          inter_account_number: '1234567', inter_client_id: 'fake-id',
+          inter_client_secret: 'fake-secret', inter_cert_content: 'FAKE-CERT',
+          inter_key_content: 'FAKE-KEY'
+        )
       end
 
       let(:valid_payload) do
@@ -108,11 +117,8 @@ RSpec.describe 'Public Captain Reservations API', type: :request do
   end
 
   describe 'GET /public/api/v1/captain/public_reservations/:id/status' do
-    let(:account) { create(:account) }
-    let(:inbox) { create(:inbox, account: account) }
     let(:contact) { create(:contact, account: account) }
     let(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact) }
-    let(:unit) { create(:captain_unit, account: account, inbox: inbox) }
     let(:reservation) do
       Captain::Reservation.create!(
         account: account, inbox: inbox, contact: contact, contact_inbox: contact_inbox,
