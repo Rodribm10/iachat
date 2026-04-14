@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# rubocop:disable Metrics/MethodLength
+# rubocop:disable Metrics/ClassLength,Metrics/MethodLength,Metrics/AbcSize
 # Ferramenta que gera um link pré-preenchido da página pública de reserva
 # (reserva-1001). A Jasmine invoca isso após coletar os dados do cliente
 # em conversa e envia a URL como mensagem outgoing.
@@ -13,13 +13,13 @@ class Captain::Tools::GenerateReservationLinkTool < Captain::Tools::BaseTool
 
   def description
     <<~DESC.strip
-      Gera um link da pagina publica de reserva (Reserva Rede 1001) com os
-      dados ja pre-preenchidos. Use esta ferramenta quando ja tiver coletado
-      em conversa: marca, unidade, categoria da suite, permanencia,
-      data/hora de check-in e ao menos nome + telefone + CPF do cliente.
-      Envie o link retornado ao cliente como mensagem outgoing para ele
-      revisar e pagar. Todos os parametros sao opcionais - passe o que
-      souber, a pagina aceita preenchimento parcial.
+      FALLBACK para gerar reserva via pagina publica (Reserva Rede 1001).
+      Use SOMENTE quando `generate_pix` falhar ou retornar success=false.
+      Gera um link com os dados ja preenchidos (categoria, permanencia,
+      data). Nome, telefone e CPF do cliente sao lidos automaticamente do
+      contato da conversa - voce nao precisa passa-los. Envie o link
+      retornado como alternativa, explicando que o cliente pode revisar
+      e pagar pela pagina.
     DESC
   end
 
@@ -73,8 +73,11 @@ class Captain::Tools::GenerateReservationLinkTool < Captain::Tools::BaseTool
 
   def execute(*args, **params)
     actual_params = resolve_params(args, params)
+    conversation = resolve_conversation(args, params)
+    enriched_params = enrich_with_contact(actual_params, conversation)
+
     base = ENV.fetch('RESERVA_1001_BASE_URL', DEFAULT_BASE_URL)
-    query = build_query(actual_params)
+    query = build_query(enriched_params)
     url = query.empty? ? base : "#{base}/?#{query}"
 
     {
@@ -88,6 +91,30 @@ class Captain::Tools::GenerateReservationLinkTool < Captain::Tools::BaseTool
   end
 
   private
+
+  # Params passados pela Jasmine vencem. Se nao passou, preenche com dados do contato.
+  def enrich_with_contact(actual_params, conversation)
+    return actual_params if conversation.blank?
+
+    contact = conversation.contact
+    return actual_params if contact.blank?
+
+    custom = contact.custom_attributes || {}
+    additional = contact.additional_attributes || {}
+
+    {
+      marca: actual_params[:marca],
+      unidade: actual_params[:unidade],
+      permanencia: actual_params[:permanencia],
+      categoria: actual_params[:categoria],
+      checkin_at: actual_params[:checkin_at],
+      nome: actual_params[:nome].presence || contact.name.presence,
+      telefone: actual_params[:telefone].presence || contact.phone_number.presence,
+      cpf: actual_params[:cpf].presence || custom['cpf'].presence || additional['cpf'].presence,
+      email: actual_params[:email].presence || contact.email.presence,
+      observacao: actual_params[:observacao]
+    }.compact
+  end
 
   def build_query(actual_params)
     mapping = {
@@ -119,6 +146,69 @@ class Captain::Tools::GenerateReservationLinkTool < Captain::Tools::BaseTool
     merged.with_indifferent_access
   end
 
+  # Copiado de CheckPixPaymentTool (enterprise/app/services/captain/tools/check_pix_payment_tool.rb:157-227)
+  def resolve_conversation(args, params)
+    state = extract_state(args, params)
+    return nil if state.blank?
+
+    conversation_state = state_from_context_hash(state, :conversation) || {}
+    conversation_id = state_from_context_hash(conversation_state, :id)
+    display_id = state_from_context_hash(conversation_state, :display_id)
+    account_id = state[:account_id] || state['account_id']
+
+    conversation = Conversation.find_by(id: conversation_id) if conversation_id.present?
+    return conversation if conversation.present?
+    return nil if display_id.blank?
+
+    scope = Conversation.where(display_id: display_id)
+    scope = scope.where(account_id: account_id) if account_id.present?
+    scope.first
+  end
+
+  def extract_state(args, params)
+    context_sources = [
+      *args,
+      params[:tool_context],
+      params['tool_context'],
+      params[:context_wrapper],
+      params['context_wrapper'],
+      params[:context],
+      params['context']
+    ].compact
+
+    context_sources.each do |source|
+      state = extract_state_from_source(source)
+      return state if state.present?
+    end
+
+    {}
+  end
+
+  def extract_state_from_source(source)
+    return source.state if source.respond_to?(:state)
+    return state_from_source_context(source) if source.respond_to?(:context)
+    return state_from_hash_source(source) if source.is_a?(Hash)
+
+    nil
+  end
+
+  def state_from_source_context(source)
+    context = source.context
+    return nil unless context.is_a?(Hash)
+
+    state_from_context_hash(context, :state)
+  end
+
+  def state_from_hash_source(source)
+    state_from_context_hash(source, :state) ||
+      source.dig(:context, :state) ||
+      source.dig('context', 'state')
+  end
+
+  def state_from_context_hash(hash, key)
+    hash[key] || hash[key.to_s]
+  end
+
   def tool_context_hash?(hash)
     hash.key?(:state) ||
       hash.key?('state') ||
@@ -128,4 +218,4 @@ class Captain::Tools::GenerateReservationLinkTool < Captain::Tools::BaseTool
       hash.key?('conversation')
   end
 end
-# rubocop:enable Metrics/MethodLength
+# rubocop:enable Metrics/ClassLength,Metrics/MethodLength,Metrics/AbcSize
