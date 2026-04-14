@@ -13,16 +13,23 @@ class Public::Api::V1::Captain::PublicReservationsController < ActionController:
 
     customer = params[:customer] || {}
     return render(json: { error: 'customer_required' }, status: :unprocessable_entity) if customer[:name].blank?
+    return render(json: { error: 'customer_phone_required' }, status: :unprocessable_entity) if customer[:phone].blank?
 
     account = unit.account
     inbox   = Inbox.find(unit.inbox_id)
 
+    # WhatsApp inbox exige source_id com apenas digitos (padrao E.164 sem o +)
+    phone_digits = customer[:phone].to_s.gsub(/\D/, '')
+    return render(json: { error: 'customer_phone_invalid' }, status: :unprocessable_entity) if phone_digits.empty? || phone_digits.length > 15
+
+    normalized_phone = "+#{phone_digits}"
+
     contact_inbox = ::ContactInboxWithContactBuilder.new(
-      source_id: "reserva1001-#{SecureRandom.uuid}",
+      source_id: phone_digits,
       inbox: inbox,
       contact_attributes: {
         name: customer[:name],
-        phone_number: customer[:phone].presence,
+        phone_number: normalized_phone,
         email: customer[:email].presence,
         additional_attributes: {
           cpf: customer[:cpf].presence,
