@@ -1,3 +1,4 @@
+/* global axios */
 import ApiClient from '../../api/ApiClient';
 
 class CaptainUnitsAPI extends ApiClient {
@@ -23,6 +24,12 @@ class CaptainUnitsAPI extends ApiClient {
 
   deleteUnit(id) {
     return this.delete(id);
+  }
+
+  updateConcierge(id, payload) {
+    return axios.patch(`${this.url}/${id}/concierge`, {
+      captain_unit: payload,
+    });
   }
 }
 
