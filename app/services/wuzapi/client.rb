@@ -79,6 +79,38 @@ class Wuzapi::Client # rubocop:disable Metrics/ClassLength
     )
   end
 
+  # Sends quick-reply buttons (up to 3 by WhatsApp limit).
+  def send_buttons(user_token, phone_number, text, buttons)
+    payload = {
+      Phone: phone_number,
+      Text: text,
+      Buttons: buttons.map { |b| { DisplayText: b[:text] || b['text'] } }
+    }
+    request(:post, '/chat/sendbuttons', payload, user_auth_headers(user_token))
+  end
+
+  # Sends a list menu (sections with rows).
+  def send_list(user_token, phone_number, text:, button_text:, sections:, footer: nil)
+    payload = {
+      Phone: phone_number,
+      Text: text,
+      ButtonText: button_text,
+      FooterText: footer,
+      Sections: build_list_sections(sections)
+    }.compact
+    request(:post, '/chat/sendlist', payload, user_auth_headers(user_token))
+  end
+
+  # Sends a single button that opens a URL when clicked.
+  def send_url_button(user_token, phone_number, text:, button_text:, url:)
+    payload = {
+      Phone: phone_number,
+      Text: text,
+      Buttons: [{ Type: 'url', DisplayText: button_text, Url: url }]
+    }
+    request(:post, '/chat/sendbuttons', payload, user_auth_headers(user_token))
+  end
+
   def send_chat_presence(user_token, phone_number, state, media = nil)
     # State: "composing" or "paused"
     # Media: "audio" (optional)
@@ -400,5 +432,20 @@ class Wuzapi::Client # rubocop:disable Metrics/ClassLength
 
   def raise_authentication_error(response)
     raise AuthenticationError, "Authentication failed: #{response.code} #{response.body}"
+  end
+
+  def build_list_sections(sections)
+    sections.map do |s|
+      {
+        Title: s[:title] || s['title'],
+        Rows: Array(s[:rows] || s['rows']).map do |r|
+          {
+            Title: r[:title] || r['title'],
+            Description: r[:description] || r['description'],
+            RowId: r[:row_id] || r['row_id']
+          }
+        end
+      }
+    end
   end
 end
