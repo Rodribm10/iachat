@@ -1,0 +1,9 @@
+# Concierge Context (unit: {{ concierge.unit_name }})
+Persona: {{ concierge.persona_name }}
+
+## Base de Conhecimento
+{{ concierge.knowledge }}
+
+## Variáveis Disponíveis
+{% for pair in concierge.variables %}- {{ pair[0] }}: {{ pair[1] }}
+{% endfor %}

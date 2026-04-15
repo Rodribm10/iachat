@@ -21,7 +21,9 @@ module Concerns::Agentable
       contact_data = state[:contact] || {}
       enhanced_context = enhanced_context.merge(
         conversation: conversation_data,
-        contact: contact_data
+        contact: contact_data,
+        concierge: resolve_concierge_context(conversation_data),
+        reservation: resolve_reservation_context(conversation_data)
       )
     end
 
@@ -67,5 +69,53 @@ module Concerns::Agentable
 
   def prompt_context
     raise NotImplementedError, "#{self.class} must implement prompt_context"
+  end
+
+  def resolve_concierge_context(conversation_data)
+    unit = resolve_current_unit(conversation_data)
+    return default_concierge_context if unit.blank?
+
+    {
+      'persona_name' => unit.concierge_persona_name,
+      'unit_name' => unit.name.to_s,
+      'knowledge' => unit.concierge_knowledge,
+      'variables' => unit.concierge_variables
+    }
+  end
+
+  def resolve_reservation_context(conversation_data)
+    conv = lookup_conversation(conversation_data)
+    return {} if conv.blank?
+
+    reservation = Captain::Reservation
+                  .where(account_id: conv.account_id, contact_id: conv.contact_id)
+                  .order(created_at: :desc)
+                  .first
+    return {} if reservation.blank?
+
+    Captain::Lifecycle::ContextBuilder.build(reservation).fetch('reservation', {})
+  end
+
+  def resolve_current_unit(conversation_data)
+    conv = lookup_conversation(conversation_data)
+    return nil if conv.blank?
+
+    unit_id = conv.custom_attributes.to_h['current_unit_id']
+    return nil if unit_id.blank?
+
+    Captain::Unit.find_by(id: unit_id)
+  end
+
+  def lookup_conversation(conversation_data)
+    return nil if conversation_data.blank?
+
+    id = conversation_data.is_a?(Hash) ? (conversation_data[:id] || conversation_data['id']) : nil
+    return nil if id.blank?
+
+    ::Conversation.find_by(id: id)
+  end
+
+  def default_concierge_context
+    { 'persona_name' => 'Sofia', 'unit_name' => '', 'knowledge' => '', 'variables' => {} }
   end
 end
