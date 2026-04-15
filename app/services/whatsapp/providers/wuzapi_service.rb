@@ -1,5 +1,6 @@
 require_relative 'base_service'
 
+# rubocop:disable Metrics/ClassLength
 class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
   attr_reader :whatsapp_channel
 
@@ -50,6 +51,24 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
     response = client.send_reaction(user_token, phone, mid, reaction_emoji)
     Rails.logger.info "[WuzapiService] Reaction response: #{response}"
     response
+  end
+
+  # Dispatches an interactive message (buttons / list / url_button).
+  # Called by the lifecycle dispatcher when a rule has message_type != 'text'.
+  def send_interactive_message(phone_number, payload)
+    normalized_phone = normalize_phone(phone_number)
+    user_token = @whatsapp_channel.wuzapi_user_token
+
+    case payload['type'].to_s
+    when 'quick_reply', 'buttons'
+      dispatch_buttons(user_token, normalized_phone, payload)
+    when 'url_button'
+      dispatch_url_button(user_token, normalized_phone, payload)
+    when 'list'
+      dispatch_list(user_token, normalized_phone, payload)
+    else
+      raise ArgumentError, "unsupported interactive type: #{payload['type'].inspect}"
+    end
   end
 
   def send_template(_phone_number, _template_info)
@@ -103,6 +122,30 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
   end
 
   private
+
+  def dispatch_buttons(user_token, phone, payload)
+    buttons = Array(payload['buttons']).map { |b| { text: b['text'] || b[:text] } }
+    client.send_buttons(user_token, phone, payload['body'].to_s, buttons)
+  end
+
+  def dispatch_url_button(user_token, phone, payload)
+    button = payload['button'] || {}
+    client.send_url_button(
+      user_token, phone,
+      text: payload['body'].to_s,
+      button_text: button['text'].to_s,
+      url: button['url'].to_s
+    )
+  end
+
+  def dispatch_list(user_token, phone, payload)
+    client.send_list(
+      user_token, phone,
+      text: payload['body'].to_s,
+      button_text: payload['button_text'].to_s,
+      sections: payload['sections'] || []
+    )
+  end
 
   def normalize_phone(phone_number)
     phone_number.gsub(/[+\s\-()]/, '')
@@ -202,3 +245,4 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
     target_message.outgoing? || target_message.template?
   end
 end
+# rubocop:enable Metrics/ClassLength
