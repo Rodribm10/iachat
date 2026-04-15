@@ -60,6 +60,9 @@ import captainScenarios from './captain/scenarios';
 import captainTools from './captain/tools';
 import captainCustomTools from './captain/customTools';
 import captainReservations from './captain/reservations';
+import captainLifecycleRules from './captain/lifecycleRules';
+import captainLifecycleConfig from './captain/lifecycleConfig';
+import captainLifecycleDeliveries from './captain/lifecycleDeliveries';
 import captainUnits from './modules/captainUnits';
 import captainGalleryItems from './modules/captainGalleryItems';
 import captainReports from './modules/captainReports';
@@ -129,6 +132,9 @@ export default createStore({
     captainTools,
     captainCustomTools,
     captainReservations,
+    captainLifecycleRules,
+    captainLifecycleConfig,
+    captainLifecycleDeliveries,
     captainUnits,
     captainGalleryItems,
     captainReports,
