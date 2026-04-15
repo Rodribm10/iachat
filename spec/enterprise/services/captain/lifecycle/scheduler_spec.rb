@@ -15,6 +15,10 @@ RSpec.describe Captain::Lifecycle::Scheduler do
   end
 
   describe '.schedule_for' do
+    # Reservation must be created BEFORE rules so the after_create_commit
+    # :schedule_lifecycle_rules hook finds nothing and doesn't auto-create deliveries.
+    before { reservation }
+
     let!(:matching_rule) do
       create(:captain_lifecycle_rule,
              account: account,

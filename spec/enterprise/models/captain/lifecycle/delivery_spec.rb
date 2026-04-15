@@ -20,8 +20,20 @@ RSpec.describe Captain::Lifecycle::Delivery, type: :model do
 
   describe '.scheduled / .sent / .skipped' do
     it 'scopes by status' do
-      s = create(:captain_lifecycle_delivery, status: 'scheduled')
-      create(:captain_lifecycle_delivery, status: 'sent')
+      # Create reservation before rule so after_create_commit finds nothing to schedule
+      account = create(:account)
+      reservation = create(:captain_reservation, account: account,
+                                                 check_in_at: 2.hours.from_now,
+                                                 check_out_at: 10.hours.from_now)
+      rule = create(:captain_lifecycle_rule, account: account)
+      s = create(:captain_lifecycle_delivery, status: 'scheduled',
+                                              account: account,
+                                              captain_reservation: reservation,
+                                              lifecycle_rule: rule)
+      create(:captain_lifecycle_delivery, status: 'sent',
+                                          account: account,
+                                          captain_reservation: reservation,
+                                          lifecycle_rule: rule)
       expect(described_class.scheduled).to contain_exactly(s)
     end
   end
