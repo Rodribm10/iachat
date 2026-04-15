@@ -658,6 +658,8 @@
       "CONCIERGE_VARIABLE_KEY": "Key",
       "CONCIERGE_VARIABLE_VALUE": "Value",
       "CONCIERGE_ADD_VARIABLE": "Add variable",
+      "CONCIERGE_CONFIGURED": "Configured",
+      "CONCIERGE_NOT_CONFIGURED": "Not configured",
       "SAVE": "Save changes",
       "TOAST": {
         "SAVED": "Settings saved.",

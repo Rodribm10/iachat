@@ -660,6 +660,8 @@
       "CONCIERGE_VARIABLE_KEY": "Chave",
       "CONCIERGE_VARIABLE_VALUE": "Valor",
       "CONCIERGE_ADD_VARIABLE": "Adicionar variável",
+      "CONCIERGE_CONFIGURED": "Configurado",
+      "CONCIERGE_NOT_CONFIGURED": "Não configurado",
       "SAVE": "Salvar alterações",
       "TOAST": {
         "SAVED": "Configurações salvas.",
