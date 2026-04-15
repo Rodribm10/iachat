@@ -692,9 +692,22 @@
         "ALL": "Todas"
       },
       "PREVIEW": "Preview",
+      "TOTAL": "total",
+      "PAGINATION": {
+        "PREV": "Anterior",
+        "NEXT": "Próxima"
+      },
       "MODAL": {
         "TITLE": "Preview da mensagem",
-        "CLOSE": "Fechar"
+        "CLOSE": "Fechar",
+        "RULE": "Regra",
+        "STATUS": "Status",
+        "REASON": "Motivo",
+        "ERROR": "Erro",
+        "FIRE_AT": "Fire at",
+        "SENT_AT": "Sent at",
+        "RENDERED": "Rendered",
+        "RESERVATION_ID": "Reserva #"
       }
     }
   }

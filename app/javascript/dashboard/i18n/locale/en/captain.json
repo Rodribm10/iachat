@@ -690,9 +690,22 @@
         "ALL": "All"
       },
       "PREVIEW": "Preview",
+      "TOTAL": "total",
+      "PAGINATION": {
+        "PREV": "Prev",
+        "NEXT": "Next"
+      },
       "MODAL": {
         "TITLE": "Message preview",
-        "CLOSE": "Close"
+        "CLOSE": "Close",
+        "RULE": "Rule",
+        "STATUS": "Status",
+        "REASON": "Reason",
+        "ERROR": "Error",
+        "FIRE_AT": "Fire at",
+        "SENT_AT": "Sent at",
+        "RENDERED": "Rendered",
+        "RESERVATION_ID": "Reservation #"
       }
     }
   }
