@@ -92,7 +92,14 @@ Rails.application.routes.draw do
               post :label_suggestion
               post :follow_up
             end
-            resources :units
+            resources :lifecycle_rules
+            resource :lifecycle_config, only: [:show, :update], controller: 'lifecycle_configs'
+            resources :lifecycle_deliveries, only: [:index, :show]
+            resources :units do
+              member do
+                patch :concierge, action: :update_concierge
+              end
+            end
             namespace :reports do
               resource :operational, only: [:show], controller: 'reports/operational'
               resources :insights, only: [:index, :show] do
