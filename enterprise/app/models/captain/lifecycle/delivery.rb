@@ -6,7 +6,7 @@ class Captain::Lifecycle::Delivery < ApplicationRecord
   belongs_to :account
   belongs_to :lifecycle_rule, class_name: 'Captain::Lifecycle::Rule', optional: true
   belongs_to :captain_reservation, class_name: 'Captain::Reservation'
-  belongs_to :conversation, optional: true
+  belongs_to :conversation, class_name: '::Conversation', optional: true
   belongs_to :message, optional: true
   belongs_to :inbox, optional: true
 
