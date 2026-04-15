@@ -41,7 +41,37 @@
       "SORT_UPDATED": "Última atualização",
       "SORT_CREATED": "Data de criação",
       "APPLY": "Aplicar filtros",
-      "CLEAR": "Limpar filtros"
+      "CLEAR": "Limpar filtros",
+      "HIDE": "Ocultar filtros"
+    },
+    "KPI": {
+      "TOTAL": "Total na página",
+      "PENDING_PIX": "Aguardando PIX",
+      "CHECKIN_TODAY": "Check-in hoje",
+      "REVENUE_TODAY": "Receita hoje"
+    },
+    "PILLS": {
+      "ALL": "Todas",
+      "DRAFT": "Rascunho",
+      "PENDING_PAYMENT": "Aguardando PIX",
+      "CONFIRMED": "Confirmadas",
+      "CANCELLED": "Canceladas"
+    },
+    "QUICK_DATE": {
+      "TODAY": "Hoje",
+      "TOMORROW": "Amanhã",
+      "WEEK": "7 dias",
+      "ALL": "Tudo"
+    },
+    "CARD": {
+      "CHECK_IN": "Check-in",
+      "AMOUNT": "Valor",
+      "TODAY": "Hoje",
+      "TOMORROW": "Amanhã",
+      "YESTERDAY": "Ontem",
+      "PIX_EXPIRED": "Expirado",
+      "PIX_EXPIRES_IN_MIN": "Expira em {minutes}min",
+      "PIX_EXPIRES_IN_HR": "Expira em {hours}h"
     },
     "TABLE": {
       "CUSTOMER": "Cliente",
@@ -64,7 +94,19 @@
     },
     "ACTIONS": {
       "OPEN_CONVERSATION": "Abrir conversa",
-      "COPY_PIX": "Copiar Pix"
+      "COPY_PIX": "Copiar Pix",
+      "MORE": "Mais",
+      "REGENERATE_PIX": "Reenviar PIX",
+      "MARK_AS_PAID": "Marcar como paga",
+      "MARK_AS_PAID_CONFIRM": "Marcar esta reserva como paga manualmente?",
+      "MARKED_AS_PAID": "Reserva marcada como paga.",
+      "MARK_AS_PAID_FAILED": "Falha ao marcar como paga.",
+      "CANCEL": "Cancelar reserva",
+      "CANCEL_REASON_PROMPT": "Motivo do cancelamento (opcional):",
+      "CANCELLED": "Reserva cancelada.",
+      "CANCEL_FAILED": "Falha ao cancelar.",
+      "PIX_REGENERATED": "Novo PIX gerado e enviado.",
+      "PIX_REGENERATE_FAILED": "Falha ao reenviar PIX."
     },
     "KANBAN": {
       "EMPTY_COLUMN": "Nenhuma reserva neste status."
@@ -512,6 +554,148 @@
       "SAVE": "Salvar FAQ",
       "SUCCESS": "FAQ criado com sucesso!",
       "ERROR": "Erro ao criar FAQ. Tente novamente."
+    }
+  },
+  "CAPTAIN_LIFECYCLE": {
+    "HEADER": "Jornada do Cliente",
+    "SUBTITLE": "Automação de mensagens WhatsApp no ciclo de vida da reserva",
+    "TABS": {
+      "RULES": "Regras",
+      "SETTINGS": "Configurações",
+      "HISTORY": "Histórico"
+    },
+    "RULES": {
+      "EMPTY": "Nenhuma regra configurada ainda.",
+      "CREATE": "Nova regra",
+      "TEMPLATES_TITLE": "Templates prontos",
+      "COLUMNS": {
+        "NAME": "Nome",
+        "EVENT": "Evento",
+        "OFFSET": "Offset",
+        "FILTER": "Filtro",
+        "STATUS": "Status",
+        "ACTIONS": "Ações"
+      },
+      "STATUS": {
+        "ENABLED": "Ativo",
+        "DISABLED": "Desativado"
+      },
+      "ACTIONS": {
+        "EDIT": "Editar",
+        "DUPLICATE": "Duplicar",
+        "TOGGLE": "Ativar/Desativar",
+        "DELETE": "Excluir"
+      },
+      "DELETE_CONFIRM": "Tem certeza que deseja excluir esta regra?",
+      "TOAST": {
+        "CREATED": "Regra criada com sucesso.",
+        "UPDATED": "Regra atualizada.",
+        "DELETED": "Regra excluída."
+      },
+      "WIZARD": {
+        "TITLE_CREATE": "Nova regra",
+        "TITLE_EDIT": "Editar regra",
+        "STEP_WHEN": "Quando?",
+        "STEP_WHO": "Pra quem?",
+        "STEP_WHAT": "O quê?",
+        "STEP_REVIEW": "Revisão",
+        "NEXT": "Próximo",
+        "BACK": "Voltar",
+        "SAVE": "Salvar",
+        "FIELDS": {
+          "NAME": "Nome da regra",
+          "DESCRIPTION": "Descrição",
+          "EVENT": "Evento gatilho",
+          "OFFSET_VALUE": "Valor",
+          "OFFSET_UNIT": "Unidade",
+          "OFFSET_DIRECTION": "Direção",
+          "UNITS": "Unidades",
+          "CATEGORIAS": "Categorias de suíte",
+          "PERMANENCIAS": "Tipos de permanência",
+          "MESSAGE_TYPE": "Tipo de mensagem",
+          "MESSAGE_BODY": "Texto da mensagem",
+          "PRIORITY": "Prioridade",
+          "ENABLED": "Regra ativa"
+        },
+        "OFFSET_UNITS": {
+          "MINUTES": "Minutos",
+          "HOURS": "Horas",
+          "DAYS": "Dias"
+        },
+        "OFFSET_DIRECTIONS": {
+          "BEFORE": "Antes",
+          "AFTER": "Depois"
+        },
+        "EVENTS": {
+          "RESERVATION_CONFIRMED": "Reserva confirmada (Pix pago)",
+          "CHECKIN_SCHEDULED_AT": "Horário de check-in",
+          "CHECKOUT_SCHEDULED_AT": "Horário de check-out",
+          "RESERVATION_CANCELLED": "Reserva cancelada",
+          "RESERVATION_NO_SHOW": "No-show"
+        },
+        "MESSAGE_TYPES": {
+          "TEXT": "Texto simples",
+          "BUTTONS": "Texto com botões",
+          "LIST": "Menu de lista",
+          "URL_BUTTON": "Botão de link"
+        }
+      }
+    },
+    "SETTINGS": {
+      "GUARDS_TITLE": "Guards anti-spam",
+      "QUIET_HOURS_ENABLED": "Ativar quiet hours",
+      "QUIET_HOURS_FROM": "De",
+      "QUIET_HOURS_TO": "Até",
+      "MIN_INTERVAL": "Intervalo mínimo entre mensagens (min)",
+      "MIN_INTERVAL_HELP": "0 desativa",
+      "PAUSE_ON_REPLY": "Pausar se o cliente respondeu",
+      "PAUSE_ON_REPLY_WINDOW": "Janela (min)",
+      "OPT_OUT_LABEL": "Label de opt-out",
+      "MAX_PER_RESERVATION_INFO": "Máximo de 5 mensagens por reserva (não configurável)",
+      "CONCIERGE_TITLE": "Concierge (Sofia) por Unidade",
+      "CONCIERGE_INBOX": "Inbox WhatsApp",
+      "CONCIERGE_PERSONA": "Nome da persona",
+      "CONCIERGE_KNOWLEDGE": "Base de conhecimento (markdown)",
+      "CONCIERGE_VARIABLES": "Variáveis da unidade",
+      "CONCIERGE_VARIABLE_KEY": "Chave",
+      "CONCIERGE_VARIABLE_VALUE": "Valor",
+      "CONCIERGE_ADD_VARIABLE": "Adicionar variável",
+      "SAVE": "Salvar alterações",
+      "TOAST": {
+        "SAVED": "Configurações salvas.",
+        "CONCIERGE_SAVED": "Concierge da unidade atualizado."
+      }
+    },
+    "HISTORY": {
+      "EMPTY": "Nenhuma entrega registrada.",
+      "COLUMNS": {
+        "RULE": "Regra",
+        "CUSTOMER": "Cliente",
+        "RESERVATION": "Reserva",
+        "STATUS": "Status",
+        "FIRE_AT": "Disparado em",
+        "REASON": "Motivo",
+        "ACTIONS": ""
+      },
+      "STATUS": {
+        "SCHEDULED": "Agendada",
+        "SENT": "Enviada",
+        "SKIPPED": "Pulada",
+        "FAILED": "Falhou",
+        "CANCELLED": "Cancelada"
+      },
+      "FILTERS": {
+        "STATUS": "Status",
+        "RULE": "Regra",
+        "FROM": "De",
+        "TO": "Até",
+        "ALL": "Todas"
+      },
+      "PREVIEW": "Preview",
+      "MODAL": {
+        "TITLE": "Preview da mensagem",
+        "CLOSE": "Fechar"
+      }
     }
   }
 }

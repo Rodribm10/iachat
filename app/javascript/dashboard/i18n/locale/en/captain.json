@@ -41,7 +41,37 @@
       "SORT_UPDATED": "Last update",
       "SORT_CREATED": "Created at",
       "APPLY": "Apply filters",
-      "CLEAR": "Clear filters"
+      "CLEAR": "Clear filters",
+      "HIDE": "Hide filters"
+    },
+    "KPI": {
+      "TOTAL": "Total on page",
+      "PENDING_PIX": "Awaiting PIX",
+      "CHECKIN_TODAY": "Check-in today",
+      "REVENUE_TODAY": "Revenue today"
+    },
+    "PILLS": {
+      "ALL": "All",
+      "DRAFT": "Draft",
+      "PENDING_PAYMENT": "Awaiting PIX",
+      "CONFIRMED": "Confirmed",
+      "CANCELLED": "Cancelled"
+    },
+    "QUICK_DATE": {
+      "TODAY": "Today",
+      "TOMORROW": "Tomorrow",
+      "WEEK": "7 days",
+      "ALL": "All"
+    },
+    "CARD": {
+      "CHECK_IN": "Check-in",
+      "AMOUNT": "Amount",
+      "TODAY": "Today",
+      "TOMORROW": "Tomorrow",
+      "YESTERDAY": "Yesterday",
+      "PIX_EXPIRED": "Expired",
+      "PIX_EXPIRES_IN_MIN": "Expires in {minutes}min",
+      "PIX_EXPIRES_IN_HR": "Expires in {hours}h"
     },
     "TABLE": {
       "CUSTOMER": "Customer",
@@ -64,7 +94,19 @@
     },
     "ACTIONS": {
       "OPEN_CONVERSATION": "Open conversation",
-      "COPY_PIX": "Copy Pix"
+      "COPY_PIX": "Copy Pix",
+      "MORE": "More",
+      "REGENERATE_PIX": "Resend PIX",
+      "MARK_AS_PAID": "Mark as paid",
+      "MARK_AS_PAID_CONFIRM": "Mark this reservation as manually paid?",
+      "MARKED_AS_PAID": "Reservation marked as paid.",
+      "MARK_AS_PAID_FAILED": "Failed to mark as paid.",
+      "CANCEL": "Cancel reservation",
+      "CANCEL_REASON_PROMPT": "Cancellation reason (optional):",
+      "CANCELLED": "Reservation cancelled.",
+      "CANCEL_FAILED": "Failed to cancel.",
+      "PIX_REGENERATED": "New PIX generated and sent.",
+      "PIX_REGENERATE_FAILED": "Failed to resend PIX."
     },
     "KANBAN": {
       "EMPTY_COLUMN": "No reservations in this status."
@@ -510,6 +552,148 @@
       "SAVE": "Save FAQ",
       "SUCCESS": "FAQ created successfully!",
       "ERROR": "Error creating FAQ. Please try again."
+    }
+  },
+  "CAPTAIN_LIFECYCLE": {
+    "HEADER": "Customer Journey",
+    "SUBTITLE": "Automated WhatsApp messages along the reservation lifecycle",
+    "TABS": {
+      "RULES": "Rules",
+      "SETTINGS": "Settings",
+      "HISTORY": "History"
+    },
+    "RULES": {
+      "EMPTY": "No rules configured yet.",
+      "CREATE": "New rule",
+      "TEMPLATES_TITLE": "Ready-made templates",
+      "COLUMNS": {
+        "NAME": "Name",
+        "EVENT": "Event",
+        "OFFSET": "Offset",
+        "FILTER": "Filter",
+        "STATUS": "Status",
+        "ACTIONS": "Actions"
+      },
+      "STATUS": {
+        "ENABLED": "Active",
+        "DISABLED": "Disabled"
+      },
+      "ACTIONS": {
+        "EDIT": "Edit",
+        "DUPLICATE": "Duplicate",
+        "TOGGLE": "Enable/Disable",
+        "DELETE": "Delete"
+      },
+      "DELETE_CONFIRM": "Are you sure you want to delete this rule?",
+      "TOAST": {
+        "CREATED": "Rule created successfully.",
+        "UPDATED": "Rule updated.",
+        "DELETED": "Rule deleted."
+      },
+      "WIZARD": {
+        "TITLE_CREATE": "New rule",
+        "TITLE_EDIT": "Edit rule",
+        "STEP_WHEN": "When?",
+        "STEP_WHO": "Who?",
+        "STEP_WHAT": "What?",
+        "STEP_REVIEW": "Review",
+        "NEXT": "Next",
+        "BACK": "Back",
+        "SAVE": "Save",
+        "FIELDS": {
+          "NAME": "Rule name",
+          "DESCRIPTION": "Description",
+          "EVENT": "Trigger event",
+          "OFFSET_VALUE": "Value",
+          "OFFSET_UNIT": "Unit",
+          "OFFSET_DIRECTION": "Direction",
+          "UNITS": "Units",
+          "CATEGORIAS": "Suite categories",
+          "PERMANENCIAS": "Stay types",
+          "MESSAGE_TYPE": "Message type",
+          "MESSAGE_BODY": "Message body",
+          "PRIORITY": "Priority",
+          "ENABLED": "Rule active"
+        },
+        "OFFSET_UNITS": {
+          "MINUTES": "Minutes",
+          "HOURS": "Hours",
+          "DAYS": "Days"
+        },
+        "OFFSET_DIRECTIONS": {
+          "BEFORE": "Before",
+          "AFTER": "After"
+        },
+        "EVENTS": {
+          "RESERVATION_CONFIRMED": "Reservation confirmed (Pix paid)",
+          "CHECKIN_SCHEDULED_AT": "Check-in time",
+          "CHECKOUT_SCHEDULED_AT": "Check-out time",
+          "RESERVATION_CANCELLED": "Reservation cancelled",
+          "RESERVATION_NO_SHOW": "No-show"
+        },
+        "MESSAGE_TYPES": {
+          "TEXT": "Plain text",
+          "BUTTONS": "Text with buttons",
+          "LIST": "List menu",
+          "URL_BUTTON": "Link button"
+        }
+      }
+    },
+    "SETTINGS": {
+      "GUARDS_TITLE": "Anti-spam guards",
+      "QUIET_HOURS_ENABLED": "Enable quiet hours",
+      "QUIET_HOURS_FROM": "From",
+      "QUIET_HOURS_TO": "To",
+      "MIN_INTERVAL": "Minimum interval between messages (min)",
+      "MIN_INTERVAL_HELP": "0 disables",
+      "PAUSE_ON_REPLY": "Pause if customer replied",
+      "PAUSE_ON_REPLY_WINDOW": "Window (min)",
+      "OPT_OUT_LABEL": "Opt-out label",
+      "MAX_PER_RESERVATION_INFO": "Maximum of 5 messages per reservation (not configurable)",
+      "CONCIERGE_TITLE": "Concierge (Sofia) per Unit",
+      "CONCIERGE_INBOX": "WhatsApp Inbox",
+      "CONCIERGE_PERSONA": "Persona name",
+      "CONCIERGE_KNOWLEDGE": "Knowledge base (markdown)",
+      "CONCIERGE_VARIABLES": "Unit variables",
+      "CONCIERGE_VARIABLE_KEY": "Key",
+      "CONCIERGE_VARIABLE_VALUE": "Value",
+      "CONCIERGE_ADD_VARIABLE": "Add variable",
+      "SAVE": "Save changes",
+      "TOAST": {
+        "SAVED": "Settings saved.",
+        "CONCIERGE_SAVED": "Unit concierge updated."
+      }
+    },
+    "HISTORY": {
+      "EMPTY": "No deliveries recorded.",
+      "COLUMNS": {
+        "RULE": "Rule",
+        "CUSTOMER": "Customer",
+        "RESERVATION": "Reservation",
+        "STATUS": "Status",
+        "FIRE_AT": "Fired at",
+        "REASON": "Reason",
+        "ACTIONS": ""
+      },
+      "STATUS": {
+        "SCHEDULED": "Scheduled",
+        "SENT": "Sent",
+        "SKIPPED": "Skipped",
+        "FAILED": "Failed",
+        "CANCELLED": "Cancelled"
+      },
+      "FILTERS": {
+        "STATUS": "Status",
+        "RULE": "Rule",
+        "FROM": "From",
+        "TO": "To",
+        "ALL": "All"
+      },
+      "PREVIEW": "Preview",
+      "MODAL": {
+        "TITLE": "Message preview",
+        "CLOSE": "Close"
+      }
     }
   }
 }
