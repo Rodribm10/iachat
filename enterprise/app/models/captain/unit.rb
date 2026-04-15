@@ -3,6 +3,7 @@
 # Table name: captain_units
 #
 #  id                             :bigint           not null, primary key
+#  concierge_config               :jsonb            not null
 #  inter_account_number           :string
 #  inter_cert_content             :text
 #  inter_cert_path                :string
@@ -27,20 +28,23 @@
 #  updated_at                     :datetime         not null
 #  account_id                     :bigint           not null
 #  captain_brand_id               :bigint           not null
+#  concierge_inbox_id             :bigint
 #  inbox_id                       :bigint
 #  inter_client_id                :string
 #  plug_play_id                   :string
 #
 # Indexes
 #
-#  index_captain_units_on_account_id        (account_id)
-#  index_captain_units_on_captain_brand_id  (captain_brand_id)
-#  index_captain_units_on_inbox_id          (inbox_id)
+#  index_captain_units_on_account_id          (account_id)
+#  index_captain_units_on_captain_brand_id    (captain_brand_id)
+#  index_captain_units_on_concierge_inbox_id  (concierge_inbox_id)
+#  index_captain_units_on_inbox_id            (inbox_id)
 #
 # Foreign Keys
 #
 #  fk_rails_...  (account_id => accounts.id)
 #  fk_rails_...  (captain_brand_id => captain_brands.id)
+#  fk_rails_...  (concierge_inbox_id => inboxes.id)
 #  fk_rails_...  (inbox_id => inboxes.id)
 #
 class Captain::Unit < ApplicationRecord
@@ -48,6 +52,7 @@ class Captain::Unit < ApplicationRecord
 
   belongs_to :account
   belongs_to :brand, class_name: 'Captain::Brand', foreign_key: 'captain_brand_id', inverse_of: :units
+  belongs_to :concierge_inbox, class_name: 'Inbox', optional: true
   has_many :unit_inboxes, class_name: 'Captain::UnitInbox', foreign_key: :captain_unit_id,
                           inverse_of: :captain_unit, dependent: :destroy
   has_many :inboxes, through: :unit_inboxes
@@ -64,6 +69,22 @@ class Captain::Unit < ApplicationRecord
 
   validates :name, presence: true
   validate :proactive_pix_polling_requires_inter_credentials
+
+  def concierge_persona_name
+    concierge_config_hash['persona_name'].presence || 'Sofia'
+  end
+
+  def concierge_knowledge
+    concierge_config_hash['knowledge'].to_s
+  end
+
+  def concierge_variables
+    concierge_config_hash['variables'].to_h
+  end
+
+  def concierge_configured?
+    concierge_inbox_id.present?
+  end
 
   def inter_credentials_present?
     inter_client_id.present? &&
@@ -82,6 +103,10 @@ class Captain::Unit < ApplicationRecord
   end
 
   private
+
+  def concierge_config_hash
+    (concierge_config || {}).with_indifferent_access
+  end
 
   def proactive_pix_polling_requires_inter_credentials
     return unless proactive_pix_polling_enabled?
