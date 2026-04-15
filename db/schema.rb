@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_03_03_172517) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_15_040957) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -534,6 +534,68 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_03_172517) do
     t.index ["inbox_id"], name: "index_captain_inboxes_on_inbox_id"
   end
 
+  create_table "captain_lifecycle_configs", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.boolean "quiet_hours_enabled", default: false, null: false
+    t.time "quiet_hours_from", default: "2000-01-01 23:00:00", null: false
+    t.time "quiet_hours_to", default: "2000-01-01 08:00:00", null: false
+    t.integer "min_interval_minutes", default: 30, null: false
+    t.boolean "pause_on_customer_reply", default: false, null: false
+    t.integer "pause_on_customer_reply_within_minutes", default: 60, null: false
+    t.bigint "opt_out_label_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id"], name: "index_captain_lifecycle_configs_on_account_id", unique: true
+    t.index ["opt_out_label_id"], name: "index_captain_lifecycle_configs_on_opt_out_label_id"
+  end
+
+  create_table "captain_lifecycle_deliveries", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "lifecycle_rule_id"
+    t.bigint "captain_reservation_id", null: false
+    t.bigint "conversation_id"
+    t.bigint "message_id"
+    t.bigint "inbox_id"
+    t.datetime "fire_at", null: false
+    t.datetime "sent_at"
+    t.string "status", default: "scheduled", null: false
+    t.string "skip_reason"
+    t.text "failure_reason"
+    t.text "rendered_body"
+    t.string "origin", default: "scheduled_lifecycle", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "status", "fire_at"], name: "idx_lifecycle_deliveries_dashboard"
+    t.index ["account_id"], name: "index_captain_lifecycle_deliveries_on_account_id"
+    t.index ["captain_reservation_id", "origin", "status"], name: "idx_lifecycle_deliveries_cap_check"
+    t.index ["captain_reservation_id"], name: "idx_lifecycle_deliveries_reservation"
+    t.index ["conversation_id"], name: "index_captain_lifecycle_deliveries_on_conversation_id"
+    t.index ["fire_at"], name: "idx_lifecycle_deliveries_scheduled", where: "((status)::text = 'scheduled'::text)"
+    t.index ["inbox_id"], name: "index_captain_lifecycle_deliveries_on_inbox_id"
+    t.index ["lifecycle_rule_id"], name: "idx_lifecycle_deliveries_rule"
+    t.index ["message_id"], name: "index_captain_lifecycle_deliveries_on_message_id"
+  end
+
+  create_table "captain_lifecycle_rules", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.boolean "enabled", default: true, null: false
+    t.string "event", null: false
+    t.integer "offset_minutes", default: 0, null: false
+    t.jsonb "filters", default: {}, null: false
+    t.string "message_type", default: "text", null: false
+    t.text "message_body", null: false
+    t.jsonb "message_payload"
+    t.integer "priority", default: 50, null: false
+    t.bigint "created_by_user_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "enabled", "event"], name: "idx_on_account_id_enabled_event_2d8b8a9942"
+    t.index ["account_id"], name: "index_captain_lifecycle_rules_on_account_id"
+    t.index ["created_by_user_id"], name: "index_captain_lifecycle_rules_on_created_by_user_id"
+  end
+
   create_table "captain_notification_templates", force: :cascade do |t|
     t.string "label", null: false
     t.text "content", null: false
@@ -855,8 +917,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_03_172517) do
     t.text "inter_key_content"
     t.datetime "webhook_configured_at"
     t.boolean "proactive_pix_polling_enabled", default: false, null: false
+    t.bigint "concierge_inbox_id"
+    t.jsonb "concierge_config", default: {}, null: false
     t.index ["account_id"], name: "index_captain_units_on_account_id"
     t.index ["captain_brand_id"], name: "index_captain_units_on_captain_brand_id"
+    t.index ["concierge_inbox_id"], name: "index_captain_units_on_concierge_inbox_id"
     t.index ["inbox_id"], name: "index_captain_units_on_inbox_id"
   end
 
@@ -2022,6 +2087,16 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_03_172517) do
   add_foreign_key "captain_inbox_reminder_settings", "accounts"
   add_foreign_key "captain_inbox_reminder_settings", "inboxes"
   add_foreign_key "captain_inboxes", "captain_units"
+  add_foreign_key "captain_lifecycle_configs", "accounts"
+  add_foreign_key "captain_lifecycle_configs", "labels", column: "opt_out_label_id"
+  add_foreign_key "captain_lifecycle_deliveries", "accounts"
+  add_foreign_key "captain_lifecycle_deliveries", "captain_lifecycle_rules", column: "lifecycle_rule_id"
+  add_foreign_key "captain_lifecycle_deliveries", "captain_reservations"
+  add_foreign_key "captain_lifecycle_deliveries", "conversations"
+  add_foreign_key "captain_lifecycle_deliveries", "inboxes"
+  add_foreign_key "captain_lifecycle_deliveries", "messages"
+  add_foreign_key "captain_lifecycle_rules", "accounts"
+  add_foreign_key "captain_lifecycle_rules", "users", column: "created_by_user_id"
   add_foreign_key "captain_notification_templates", "inboxes"
   add_foreign_key "captain_pix_charges", "captain_reservations", column: "reservation_id"
   add_foreign_key "captain_pix_charges", "captain_units", column: "unit_id"
@@ -2059,6 +2134,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_03_03_172517) do
   add_foreign_key "captain_units", "accounts"
   add_foreign_key "captain_units", "captain_brands"
   add_foreign_key "captain_units", "inboxes"
+  add_foreign_key "captain_units", "inboxes", column: "concierge_inbox_id"
   add_foreign_key "conversation_crm_insights", "accounts"
   add_foreign_key "conversation_crm_insights", "contacts"
   add_foreign_key "conversation_crm_insights", "conversations"
