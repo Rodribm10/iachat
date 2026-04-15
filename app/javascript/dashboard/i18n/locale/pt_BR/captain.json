@@ -602,6 +602,21 @@
         "NEXT": "Próximo",
         "BACK": "Voltar",
         "SAVE": "Salvar",
+        "CANCEL": "Cancelar",
+        "OFFSET_UNIT_LABEL": "min",
+        "STEP_LABELS": {
+          "WHEN": "1. Quando?",
+          "WHO": "2. Pra quem?",
+          "WHAT": "3. O quê?",
+          "REVIEW_TAB": "4. Revisão"
+        },
+        "REVIEW": {
+          "NAME": "Nome:",
+          "EVENT": "Evento:",
+          "OFFSET": "Offset (min):",
+          "UNITS": "Unidades:",
+          "MESSAGE": "Mensagem:"
+        },
         "FIELDS": {
           "NAME": "Nome da regra",
           "DESCRIPTION": "Descrição",

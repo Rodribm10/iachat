@@ -600,6 +600,21 @@
         "NEXT": "Next",
         "BACK": "Back",
         "SAVE": "Save",
+        "CANCEL": "Cancel",
+        "OFFSET_UNIT_LABEL": "min",
+        "STEP_LABELS": {
+          "WHEN": "1. When?",
+          "WHO": "2. Who?",
+          "WHAT": "3. What?",
+          "REVIEW_TAB": "4. Review"
+        },
+        "REVIEW": {
+          "NAME": "Name:",
+          "EVENT": "Event:",
+          "OFFSET": "Offset (min):",
+          "UNITS": "Units:",
+          "MESSAGE": "Message:"
+        },
         "FIELDS": {
           "NAME": "Rule name",
           "DESCRIPTION": "Description",
