@@ -80,4 +80,44 @@ RSpec.describe 'Api::V1::Accounts::Captain::Units', type: :request do
       expect(Captain::Unit.last.captain_brand_id).to eq(brands.first.id)
     end
   end
+
+  describe 'PATCH /api/v1/accounts/:account_id/captain/units/:id/concierge' do
+    let(:agent) { create(:user, account: account, role: :agent) }
+    let(:unit) do
+      Captain::Unit.create!(
+        account: account,
+        brand: Captain::Brand.where(account: account).first,
+        name: 'Unidade Teste'
+      )
+    end
+    let(:inbox) { create(:inbox, account: account) }
+
+    it 'blocks agents' do
+      patch "/api/v1/accounts/#{account.id}/captain/units/#{unit.id}/concierge",
+            params: { captain_unit: { concierge_inbox_id: inbox.id } },
+            headers: agent.create_new_auth_token, as: :json
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'updates concierge fields for admin' do
+      patch "/api/v1/accounts/#{account.id}/captain/units/#{unit.id}/concierge",
+            params: {
+              captain_unit: {
+                concierge_inbox_id: inbox.id,
+                concierge_config: {
+                  persona_name: 'Sofia',
+                  knowledge: '# Hotel\n',
+                  variables: { wifi_password: 'abc123' }
+                }
+              }
+            },
+            headers: admin.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:success)
+      unit.reload
+      expect(unit.concierge_inbox_id).to eq(inbox.id)
+      expect(unit.concierge_config['persona_name']).to eq('Sofia')
+      expect(unit.concierge_config.dig('variables', 'wifi_password')).to eq('abc123')
+    end
+  end
 end

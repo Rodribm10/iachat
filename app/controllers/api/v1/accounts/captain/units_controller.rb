@@ -1,9 +1,10 @@
 class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseController
   before_action :ensure_captain_enabled
-  before_action :set_unit, only: [:show, :update, :destroy]
+  before_action :set_unit, only: [:show, :update, :destroy, :update_concierge]
 
   def index
     @units = Current.account.captain_units.includes(:inboxes)
+    @units = filter_units_by_user_access(@units)
     render json: @units.map { |u| format_unit(u) }
   end
 
@@ -38,10 +39,30 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
     head :no_content
   end
 
+  def update_concierge
+    return render json: { error: 'Unauthorized' }, status: :unauthorized unless Current.user.administrator?
+
+    @unit.update!(concierge_params)
+    render json: format_unit(@unit)
+  rescue ActiveRecord::RecordInvalid
+    render json: { errors: @unit.errors.full_messages }, status: :unprocessable_entity
+  end
+
   private
 
   def ensure_captain_enabled
     # Dependendo da regra de negócio, pode-se verificar as features da conta aqui original
+  end
+
+  # Administrador vê todas as unidades; agente só vê unidades vinculadas a
+  # alguma caixa de entrada a qual ele tem acesso.
+  def filter_units_by_user_access(scope)
+    return scope if Current.user.administrator?
+
+    accessible_inbox_ids = Current.user.assigned_inboxes.pluck(:id)
+    return scope.none if accessible_inbox_ids.empty?
+
+    scope.joins(:inboxes).where(inboxes: { id: accessible_inbox_ids }).distinct
   end
 
   def default_brand
@@ -69,6 +90,13 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
     )
   end
 
+  def concierge_params
+    params.require(:captain_unit).permit(
+      :concierge_inbox_id,
+      concierge_config: [:persona_name, :knowledge, { variables: {} }]
+    )
+  end
+
   def inbox_ids_param
     return [] unless params[:captain_unit].key?(:inbox_ids)
 
@@ -90,7 +118,7 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
     end
   end
 
-  def format_unit(unit)
+  def format_unit(unit) # rubocop:disable Metrics/AbcSize
     inboxes = unit.inboxes.to_a
     {
       id: unit.id,
@@ -107,6 +135,13 @@ class Api::V1::Accounts::Captain::UnitsController < Api::V1::Accounts::BaseContr
       has_key: unit.inter_key_content.present? || unit.resolved_inter_key_path.present?,
       has_client_secret: unit.inter_client_secret.present?,
       proactive_pix_polling_enabled: unit.proactive_pix_polling_enabled
+    }.merge(format_concierge(unit))
+  end
+
+  def format_concierge(unit)
+    {
+      concierge_inbox_id: unit.concierge_inbox_id,
+      concierge_config: unit.concierge_config || {}
     }
   end
 end
