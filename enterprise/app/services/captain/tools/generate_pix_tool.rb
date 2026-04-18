@@ -4,7 +4,7 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
   NAME_WITH_LABEL_REGEX = /nome\s*[:\-]\s*([^\n\r,;]+)/i
   EMAIL_REGEX = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
   SUITE_REGEX = /su[ií]te\s+([^\n\r,.!?]+)/i
-  DDMMYYYY_REGEX = %r{\b(\d{1,2}/\d{1,2}/\d{2,4})\b}
+  DDMMYYYY_REGEX = %r{\b(\d{1,2}/\d{1,2}(?:/\d{2,4})?)\b}
   CURRENCY_REGEX = /r\$\s*([\d.,]+)/i
   TOTAL_AMOUNT_REGEX = /valor\s+total[^\n\r]{0,80}/i
   DEPOSIT_AMOUNT_REGEX = /(sinal|entrada)[^\n\r]{0,80}/i
@@ -611,9 +611,22 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
       begin
         Date.iso8601(string_value)
       rescue ArgumentError
-        nil
+        parse_date_without_year(string_value)
       end
     end
+  end
+
+  # DD/MM sem ano — assume ano corrente; se a data já passou, empurra para o próximo ano
+  def parse_date_without_year(string_value)
+    match = string_value.match(%r{\A(\d{1,2})/(\d{1,2})\z})
+    return nil unless match
+
+    day = match[1].to_i
+    month = match[2].to_i
+    candidate = Date.new(account_current_date.year, month, day)
+    candidate < account_current_date ? candidate.next_year : candidate
+  rescue ArgumentError
+    nil
   end
 
   def normalize_check_in_datetime(value)
