@@ -1,9 +1,10 @@
 # frozen_string_literal: true
+
 require 'digest'
 
 module LandingHostAiSyncable
   extend ActiveSupport::Concern
-  SYNC_METADATA_KEY = 'landing_promotion_sync'.freeze
+  SYNC_METADATA_KEY = 'landing_promotion_sync'
 
   included do
     after_save :sync_promotion_to_faq
@@ -23,7 +24,7 @@ module LandingHostAiSyncable
     end
 
     sync_active_promotions(active_entries)
-    cleanup_stale_synced_knowledge(active_entries.map { |entry| entry[:signature] })
+    cleanup_stale_synced_knowledge(active_entries.pluck(:signature))
     cleanup_legacy_aggregated_sync
   end
 
@@ -69,6 +70,8 @@ module LandingHostAiSyncable
   end
 
   def cleanup_stale_synced_knowledge(active_signatures)
+    return unless can_sync_to_portal?
+
     synced_articles.find_each do |article|
       signature = article.meta&.dig(SYNC_METADATA_KEY, 'promotion_signature')
       next if signature.present? && active_signatures.include?(signature)
@@ -88,6 +91,8 @@ module LandingHostAiSyncable
   end
 
   def cleanup_legacy_aggregated_sync
+    return unless can_sync_to_portal?
+
     legacy_article = portal.articles.find_by(
       "meta -> '#{SYNC_METADATA_KEY}' ->> 'landing_host_id' = ? AND (meta -> '#{SYNC_METADATA_KEY}' ->> 'promotion_signature') IS NULL",
       id.to_s
@@ -128,12 +133,12 @@ module LandingHostAiSyncable
     document.content = article.content
     document.status = :available
     document.metadata = (document.metadata || {})
-                      .merge(sync_metadata_for(signature: entry[:signature]))
-                      .merge('article_id' => article.id)
+                        .merge(sync_metadata_for(signature: entry[:signature]))
+                        .merge('article_id' => article.id)
     document.save!
   end
 
-  def find_synced_document(signature, article)
+  def find_synced_document(_signature, article)
     by_article = captain_assistant.documents.find_by("metadata ->> 'article_id' = ?", article.id.to_s)
     return by_article if by_article.present?
 
@@ -146,11 +151,13 @@ module LandingHostAiSyncable
     signature = article.meta&.dig(SYNC_METADATA_KEY, 'promotion_signature')
 
     document = captain_assistant.documents.find_by("metadata ->> 'article_id' = ?", article.id.to_s)
-    document ||= captain_assistant.documents.find_by(
-      "metadata -> '#{SYNC_METADATA_KEY}' ->> 'landing_host_id' = ? AND metadata -> '#{SYNC_METADATA_KEY}' ->> 'promotion_signature' = ?",
-      id.to_s,
-      signature
-    ) if signature.present?
+    if signature.present?
+      document ||= captain_assistant.documents.find_by(
+        "metadata -> '#{SYNC_METADATA_KEY}' ->> 'landing_host_id' = ? AND metadata -> '#{SYNC_METADATA_KEY}' ->> 'promotion_signature' = ?",
+        id.to_s,
+        signature
+      )
+    end
     document ||= captain_assistant.documents.find_by(external_link: article_public_url(article))
     document&.destroy!
   end

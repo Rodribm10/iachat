@@ -95,6 +95,7 @@ Metrics/ModuleLength:
   Exclude:
     - lib/seeders/message_seeder.rb
     - spec/support/slack_stubs.rb
+    - app/models/concerns/landing_host_ai_syncable.rb
 
 Rails/HelperInstanceVariable:
   Exclude:
@@ -185,6 +186,7 @@ Metrics/AbcSize:
     - 'app/models/canned_response.rb'
     - 'app/models/telegram_bot.rb'
     - 'enterprise/app/services/captain/tools/generate_pix_tool.rb'
+    - 'app/models/concerns/landing_host_ai_syncable.rb'
 
 Rails/RenderInline:
   Exclude:

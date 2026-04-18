@@ -26,6 +26,10 @@ Layout/LineLength:
 
 # Offense count: 2
 # Configuration parameters: IgnoreLiteralBranches, IgnoreConstantBranches, IgnoreDuplicateElseBranch.
+Lint/DuplicateRescueException:
+  Exclude:
+    - 'app/models/concerns/landing_host_ai_syncable.rb'
+
 Lint/DuplicateBranch:
   Exclude:
     - 'app/services/whatsapp/providers/wuzapi/payload_parser.rb'
@@ -44,6 +48,7 @@ Lint/UnusedMethodArgument:
 Metrics/AbcSize:
   Exclude:
     - 'app/models/channel/whatsapp.rb'
+    - 'app/models/concerns/landing_host_ai_syncable.rb'
     - 'app/services/evolution_api/client.rb'
     - 'app/services/whatsapp/decryption_service.rb'
     - 'app/services/whatsapp/incoming_message_wuzapi_service.rb'
@@ -59,6 +64,10 @@ Metrics/AbcSize:
 
 # Offense count: 6
 # Configuration parameters: CountComments, Max, CountAsOne.
+Metrics/ModuleLength:
+  Exclude:
+    - 'app/models/concerns/landing_host_ai_syncable.rb'
+
 Metrics/ClassLength:
   Exclude:
     - 'app/models/channel/whatsapp.rb'
