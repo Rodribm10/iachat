@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_15_040957) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_19_023642) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -365,6 +365,36 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_15_040957) do
     t.datetime "updated_at", null: false
     t.string "phone_number"
     t.index ["account_id"], name: "index_captain_configurations_on_account_id"
+  end
+
+  create_table "captain_contact_memories", force: :cascade do |t|
+    t.bigint "account_id", null: false
+    t.bigint "contact_id", null: false
+    t.string "memory_type", null: false
+    t.text "content", null: false
+    t.text "evidence", null: false
+    t.float "confidence", null: false
+    t.string "scope", default: "global", null: false
+    t.vector "embedding", limit: 1536
+    t.bigint "source_conversation_id"
+    t.bigint "source_unit_id"
+    t.bigint "source_inbox_id"
+    t.datetime "expires_at"
+    t.datetime "last_verified_at", null: false
+    t.datetime "superseded_at"
+    t.bigint "superseded_by_id"
+    t.datetime "deleted_at"
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_id", "contact_id"], name: "idx_ccm_recall", where: "((deleted_at IS NULL) AND (superseded_at IS NULL))"
+    t.index ["account_id"], name: "index_captain_contact_memories_on_account_id"
+    t.index ["contact_id"], name: "index_captain_contact_memories_on_contact_id"
+    t.index ["deleted_at"], name: "idx_ccm_hard_delete", where: "(deleted_at IS NOT NULL)"
+    t.index ["embedding"], name: "idx_ccm_embedding", opclass: :vector_cosine_ops, using: :ivfflat
+    t.index ["source_conversation_id"], name: "idx_ccm_source_conversation"
+    t.index ["source_unit_id", "memory_type", "created_at"], name: "idx_ccm_analytics"
+    t.index ["superseded_by_id"], name: "idx_ccm_superseded", where: "(superseded_at IS NOT NULL)"
   end
 
   create_table "captain_conversation_insights", force: :cascade do |t|
@@ -2074,6 +2104,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_15_040957) do
   add_foreign_key "captain_assets", "captain_suites"
   add_foreign_key "captain_brands", "accounts"
   add_foreign_key "captain_configurations", "accounts"
+  add_foreign_key "captain_contact_memories", "accounts"
+  add_foreign_key "captain_contact_memories", "contacts"
   add_foreign_key "captain_conversation_insights", "accounts"
   add_foreign_key "captain_conversation_insights", "captain_units"
   add_foreign_key "captain_conversation_insights", "inboxes", name: "fk_rails_inbox_id"
