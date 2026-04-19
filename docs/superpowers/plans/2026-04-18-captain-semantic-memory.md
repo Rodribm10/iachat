@@ -825,11 +825,11 @@ class Captain::ContactMemories::ExtractionService
   private
 
   def call_llm
-    client = RubyLLM.chat(model: EXTRACTION_MODEL)
-    client.with_temperature(0)
-    client.with_response_format({ type: 'json_object' })
-    response = client.ask(build_prompt)
-    response.content.to_s
+    RubyLLM.chat(model: EXTRACTION_MODEL)
+           .with_temperature(0)
+           .with_params(response_format: { type: 'json_object' })
+           .ask(build_prompt)
+           .content.to_s
   end
 
   def build_prompt
