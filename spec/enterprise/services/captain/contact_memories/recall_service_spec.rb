@@ -62,8 +62,9 @@ RSpec.describe Captain::ContactMemories::RecallService do
 
     it 'skips memories with NULL embedding' do
       create(:captain_contact_memory, contact: contact, account: account, embedding: nil)
+      valid = create(:captain_contact_memory, contact: contact, account: account, embedding: Array.new(1536, 0.1))
       result = described_class.new(contact: contact, query_text: 'x').call
-      expect(result).to eq([])
+      expect(result).to eq([valid])
     end
   end
 end
