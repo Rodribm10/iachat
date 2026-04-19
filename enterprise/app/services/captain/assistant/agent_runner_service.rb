@@ -12,10 +12,14 @@ class Captain::Assistant::AgentRunnerService
     /\bi don't (know|have|have access)\b/i,
     /\bcan'?t (access|help|provide)\b/i
   ].freeze
+  # Patterns must imply an actual price answer, not casual mentions of
+  # stay types. E.g. "Vou te transferir pra Daniela pra confirmar a
+  # Stilo pra pernoite" legitimately mentions "pernoite" but is a
+  # handoff, NOT a price response — keep the guardrail from hijacking it.
   FAQ_PRICE_PATTERNS = [
     /r\$\s*\d+/i,
     /\b\d+[,.]?\d*\s*(reais|real)\b/i,
-    /\b(preco|preço|valor|diaria|diária|pernoite|sinal)\b/i
+    /\b(preco|preço|valor|preços|valores|cust[ao])\b/i
   ].freeze
   FAQ_NOT_FOUND_FALLBACK = 'Consultei o FAQ e não encontrei essa informação cadastrada ainda. Posso te ajudar com outro tema ou te transferir para um atendente.'.freeze
 
@@ -369,8 +373,14 @@ class Captain::Assistant::AgentRunnerService
     assistant_agent = build_orchestrator_agent_with_memory
     scenario_agents = @assistant.scenarios.enabled.map(&:agent)
 
+    # Orchestrator can hand off INTO any scenario. Scenarios do NOT hand off
+    # back to the orchestrator — that creates a ping-pong where the scenario
+    # calls handoff_to_jasmine mid-flow, the orchestrator resumes the turn,
+    # and responses get duplicated or routed through the FAQ guardrail. When
+    # a customer changes topic mid-scenario, pick_starting_agent on the next
+    # turn already routes back to the orchestrator based on conversation
+    # state — no manual handoff needed from the scenario side.
     assistant_agent.register_handoffs(*scenario_agents) if scenario_agents.any?
-    scenario_agents.each { |scenario_agent| scenario_agent.register_handoffs(assistant_agent) }
 
     [assistant_agent] + scenario_agents
   end
