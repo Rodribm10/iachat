@@ -107,3 +107,9 @@ captain_contact_memory_silence_detector_job:
   cron: '*/10 * * * *'
   class: 'Captain::ContactMemories::SilenceDetectorJob'
   queue: scheduled_jobs
+
+# weekly - Sundays at 03:00 UTC - TTL aging + LRU cap of contact memories
+captain_contact_memory_aging_job:
+  cron: '0 3 * * 0'
+  class: 'Captain::ContactMemories::AgingJob'
+  queue: scheduled_jobs
