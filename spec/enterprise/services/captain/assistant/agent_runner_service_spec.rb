@@ -62,7 +62,7 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
       expect(assistant).to receive(:scenarios).and_return(scenarios_relation)
       expect(scenario).to receive(:agent).and_return(mock_scenario_agent)
       expect(mock_agent).to receive(:register_handoffs).with(mock_scenario_agent)
-      expect(mock_scenario_agent).to receive(:register_handoffs).with(mock_agent)
+      expect(mock_scenario_agent).not_to receive(:register_handoffs)
 
       service.generate_response(message_history: message_history)
     end

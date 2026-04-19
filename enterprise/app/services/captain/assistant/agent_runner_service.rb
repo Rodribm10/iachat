@@ -454,17 +454,20 @@ class Captain::Assistant::AgentRunnerService
     assistant_agent = build_orchestrator_agent_with_memory
     scenario_agents = @assistant.scenarios.enabled.map(&:agent)
 
-    # Bidirectional handoff: orchestrator -> scenarios AND scenarios -> orchestrator.
-    # Historical note: removing the back-edge looks attractive (prevents ping-pong)
-    # but in practice the scenario LLM uses handoff_to_orchestrator as a "fallback"
-    # when it gets confused. Without that fallback, the LLM keeps calling other
-    # available tools (faq_lookup, etc.) in a loop — observed real-world incident
-    # where Daniela called faq_lookup dozens of times in a runaway. Keep the edge.
-    # Ping-pong is instead contained by max_turns in generate_response AND by
-    # explicit prompt rules in the scenario instruction forbidding gratuitous
-    # handoffs.
+    # Unidirectional handoff: orchestrator -> scenarios only.
+    #
+    # Historically we also registered scenarios -> orchestrator as a safety
+    # valve so a confused scenario could escape to Jasmine. In practice this
+    # caused ping-pong INSIDE a single run: orchestrator hands off to Daniela,
+    # Daniela immediately hands back, Jasmine responds with "Vou te transferir
+    # para a Daniela" AFTER the user was already with Daniela.
+    #
+    # The runaway-loop fear that originally justified the back-edge (Daniela
+    # spamming faq_lookup when confused) is now contained by TOOL_LOOP_THRESHOLD
+    # / MAX_TURNS_PER_MESSAGE in generate_response — any repeated tool call or
+    # turn exhaustion triggers bot_handoff to a human. So the back-edge is no
+    # longer a required safety net, and removing it fixes the ping-pong.
     assistant_agent.register_handoffs(*scenario_agents) if scenario_agents.any?
-    scenario_agents.each { |scenario_agent| scenario_agent.register_handoffs(assistant_agent) }
 
     [assistant_agent] + scenario_agents
   end
