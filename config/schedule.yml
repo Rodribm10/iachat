@@ -101,3 +101,9 @@ landing_hosts_promotion_sync_scheduler_job:
   cron: '0 * * * *'
   class: 'LandingHosts::PromotionSyncSchedulerJob'
   queue: scheduled_jobs
+
+# every 10 minutes - detects silent conversations for memory extraction
+captain_contact_memory_silence_detector_job:
+  cron: '*/10 * * * *'
+  class: 'Captain::ContactMemories::SilenceDetectorJob'
+  queue: scheduled_jobs
