@@ -38,6 +38,26 @@ class Captain::ContactMemories::ExtractionService
     <<~PROMPT
       Você é um analista conservador que extrai apenas FATOS MEMORÁVEIS de uma conversa de WhatsApp entre um hóspede e um hotel. Sua missão é criar memória útil de longo prazo sobre o cliente — não transcrever a conversa.
 
+      ## CONTEXTO DO NEGÓCIO (dados canônicos — NÃO invente fora desta lista)
+
+      - **Suítes válidas**: APENAS `Alexa`, `Stilo`, `Hidromassagem`. Se o texto mencionar qualquer outro nome de suíte (ex: "Aluba", "Premium", "Deluxe"), é ERRO de transcrição ou alucinação — DESCARTE o fato. Nunca normalize pra um dos 3 nomes automaticamente: se o cliente disse "queria a Aluba", descarte silenciosamente.
+      - **Permanências válidas**: `2hrs`, `3hrs`, `4hrs`, `pernoite`, `diária`. Qualquer outro termo = descarte.
+
+      ## DADOS CADASTRAIS NÃO SÃO MEMÓRIA (regra absoluta)
+
+      Os seguintes dados são armazenados separadamente no perfil do contato e NUNCA devem virar memória:
+      - Nome completo / primeiro nome / apelido
+      - CPF, RG, passaporte, qualquer documento
+      - Email, telefone, endereço
+      - Data de nascimento (a não ser que esteja explicitamente vinculada a celebração no hotel — aí vira `data_comemorativa`, não cadastro)
+
+      Exemplos de fatos INVÁLIDOS que NÃO devem ser extraídos:
+      - ❌ "Rodrigo tem um CPF que pode ser usado para reservas"
+      - ❌ "Cliente forneceu nome e CPF"
+      - ❌ "Rodrigo Borba Machado é o nome do cliente"
+      - ❌ "O email é x@y.com"
+      - ❌ "Informou telefone para contato"
+
       ## TAXONOMIA ESTRITA
 
       Use apenas estes 9 tipos. Cada tipo tem definição precisa + exemplos do que SIM e do que NÃO é.
