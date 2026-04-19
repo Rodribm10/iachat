@@ -2,6 +2,7 @@ require 'agents'
 require 'agents/instrumentation'
 require 'json'
 
+# rubocop:disable Metrics/ClassLength
 class Captain::Assistant::AgentRunnerService
   include Integrations::LlmInstrumentationConstants
 
@@ -58,6 +59,8 @@ class Captain::Assistant::AgentRunnerService
   private
 
   def build_context(message_history)
+    last_active_scenario_agent = extract_last_scenario_agent(message_history)
+
     conversation_history = message_history.map do |msg|
       content = extract_text_from_content(msg[:content])
 
@@ -73,12 +76,63 @@ class Captain::Assistant::AgentRunnerService
 
     {
       session_id: "#{@assistant.account_id}_#{@conversation&.display_id}",
-      # Always start each turn from the orchestrator agent so factual questions
-      # don't remain trapped inside a previously active scenario agent.
-      current_agent: assistant_agent_name,
+      # Default: start each turn from the orchestrator (Jasmine).
+      # Exception: if there is an active workflow (e.g. pending reservation),
+      # continue with the last active scenario agent so multi-turn flows
+      # like reservations don't get interrupted by the orchestrator stealing the turn.
+      current_agent: pick_starting_agent(last_active_scenario_agent),
       conversation_history: conversation_history,
       state: build_state
     }
+  end
+
+  # Reads the last assistant message that came from a scenario (not the orchestrator).
+  # Returns nil if no scenario was recently active.
+  def extract_last_scenario_agent(message_history)
+    return nil if message_history.blank?
+
+    orchestrator = assistant_agent_name
+    last_assistant = message_history.reverse.find do |msg|
+      next false unless msg[:role] == 'assistant'
+
+      name = msg[:agent_name].to_s
+      name.present? && name != orchestrator
+    end
+    last_assistant&.dig(:agent_name)
+  end
+
+  # Picks which agent should start the next turn:
+  # - If there is an active workflow on this conversation (e.g. reservation pending),
+  #   continue with the last scenario agent that was active.
+  # - Otherwise, default to the orchestrator (Jasmine).
+  def pick_starting_agent(last_scenario_agent)
+    default = assistant_agent_name
+    return default if @conversation.blank?
+    return default if last_scenario_agent.blank?
+
+    return last_scenario_agent if active_workflow?
+
+    default
+  end
+
+  # Detects if the conversation is mid-workflow (e.g. ongoing reservation).
+  # Safe to extend: any condition here keeps the user inside the active scenario.
+  def active_workflow?
+    return false if @conversation.blank?
+
+    if defined?(Captain::Reservation)
+      pending_reservation = Captain::Reservation
+                            .where(conversation_id: @conversation.id)
+                            .where.not(status: %w[cancelled completed])
+                            .exists?
+      return true if pending_reservation
+    end
+
+    label_list = @conversation.respond_to?(:label_list) ? @conversation.label_list : nil
+    Array(label_list).any? { |label| label.to_s.match?(/aguardando|pending|em_andamento/i) }
+  rescue StandardError => e
+    Rails.logger.warn("[Captain V2] active_workflow? check failed: #{e.message}")
+    false
   end
 
   def assistant_agent_name
@@ -120,6 +174,8 @@ class Captain::Assistant::AgentRunnerService
   def enforce_faq_guardrail(response, result, original_query:)
     return response unless faq_feature_enabled?
     return response if response['response'] == 'conversation_handoff'
+    # Scenario agents have authoritative data in their own instructions — skip guardrail
+    return response if response['agent_name'].present? && response['agent_name'] != assistant_agent_name
 
     guardrail_reason = faq_guardrail_reason(response['response'])
     return response if guardrail_reason.blank?
@@ -254,6 +310,7 @@ class Captain::Assistant::AgentRunnerService
     }
   end
 
+  # rubocop:disable Metrics/MethodLength
   def extract_json_objects(text)
     objects = []
     start_index = nil
@@ -291,6 +348,7 @@ class Captain::Assistant::AgentRunnerService
 
     objects
   end
+  # rubocop:enable Metrics/MethodLength
 
   def build_state
     state = {
@@ -308,13 +366,46 @@ class Captain::Assistant::AgentRunnerService
   end
 
   def build_and_wire_agents
-    assistant_agent = @assistant.agent
+    assistant_agent = build_orchestrator_agent_with_memory
     scenario_agents = @assistant.scenarios.enabled.map(&:agent)
 
     assistant_agent.register_handoffs(*scenario_agents) if scenario_agents.any?
     scenario_agents.each { |scenario_agent| scenario_agent.register_handoffs(assistant_agent) }
 
     [assistant_agent] + scenario_agents
+  end
+
+  # Builds the orchestrator agent and wraps its instructions lambda with
+  # optional Captain ContactMemory recall. Delegates to MemoryPromptInjector.
+  def build_orchestrator_agent_with_memory
+    default_agent = @assistant.agent
+    return default_agent unless memory_injector.recall_enabled?
+
+    original_instructions = default_agent.instance_variable_get(:@instructions)
+    injector = memory_injector
+    wrapped = lambda do |context|
+      base_prompt = original_instructions.respond_to?(:call) ? original_instructions.call(context) : original_instructions.to_s
+      injector.append_memory_block(base_prompt, last_user_message_from_context(context))
+    end
+
+    default_agent.instance_variable_set(:@instructions, wrapped)
+    default_agent
+  end
+
+  def last_user_message_from_context(context)
+    history = context&.context&.dig(:conversation_history) || []
+    last_user = history.reverse.find { |msg| msg[:role].to_sym == :user }
+    return '' if last_user.blank?
+
+    extract_text_from_content(last_user[:content], as_string: true).to_s
+  end
+
+  def build_system_prompt_with_memory(message_text)
+    memory_injector.append_memory_block(@assistant.agent_instructions(nil), message_text)
+  end
+
+  def memory_injector
+    @memory_injector ||= Captain::Assistant::MemoryPromptInjector.new(conversation: @conversation)
   end
 
   def install_instrumentation(runner)
@@ -412,3 +503,4 @@ class Captain::Assistant::AgentRunnerService
     end
   end
 end
+# rubocop:enable Metrics/ClassLength
