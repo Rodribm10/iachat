@@ -1,6 +1,12 @@
 class CreateCaptainContactMemories < ActiveRecord::Migration[7.1]
   # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
   def change
+    # NOTE: source_conversation_id, source_unit_id, source_inbox_id, and
+    # superseded_by_id are intentionally plain bigints WITHOUT foreign keys.
+    # Rationale: preserve memory history and audit trail even if the source
+    # conversation/unit/inbox is hard-deleted (LGPD compliance for customer
+    # data retention, see spec §10). Application code must tolerate
+    # dangling references gracefully.
     create_table :captain_contact_memories do |t|
       t.references :account, null: false, foreign_key: true
       t.references :contact, null: false, foreign_key: true

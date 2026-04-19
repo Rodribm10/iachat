@@ -107,19 +107,21 @@ CREATE TABLE captain_contact_memories (
   confidence              FLOAT NOT NULL,
   scope                   VARCHAR NOT NULL DEFAULT 'global',
   embedding               vector(1536),
-  source_conversation_id  BIGINT REFERENCES conversations(id),
-  source_unit_id          BIGINT REFERENCES captain_units(id),
-  source_inbox_id         BIGINT REFERENCES inboxes(id),
+  source_conversation_id  BIGINT,
+  source_unit_id          BIGINT,
+  source_inbox_id         BIGINT,
   expires_at              TIMESTAMP,
   last_verified_at        TIMESTAMP NOT NULL,
   superseded_at           TIMESTAMP,
-  superseded_by_id        BIGINT REFERENCES captain_contact_memories(id),
+  superseded_by_id        BIGINT,
   deleted_at              TIMESTAMP,
   metadata                JSONB NOT NULL DEFAULT '{}',
   created_at              TIMESTAMP NOT NULL,
   updated_at              TIMESTAMP NOT NULL
 );
 ```
+
+**Observação — FKs secundárias:** `source_conversation_id`, `source_unit_id`, `source_inbox_id` e `superseded_by_id` são `BIGINT` simples sem `FOREIGN KEY`. Manter a referência mesmo após o registro de origem ser hard-deletado é essencial pra auditoria LGPD (§10) e pra relatórios históricos por unidade (§3 decisão 3). App-layer precisa tratar referências órfãs graciosamente.
 
 ### 6.2 Índices
 
