@@ -66,6 +66,16 @@ class Captain::Scenario < ApplicationRecord
     "#{title} Agent".parameterize(separator: '_')
   end
 
+  # Scenarios can use a different model than the orchestrator (Assistant).
+  # Rationale: orchestrator does simple routing (cheap model suffices),
+  # scenarios handle complex flows (tool calling, strict rules) and benefit
+  # from a stronger model. Falls back to the global CAPTAIN_OPEN_AI_MODEL
+  # (used by the orchestrator) when SCENARIO-specific override is unset.
+  def agent_model
+    scenario_model = InstallationConfig.find_by(name: 'CAPTAIN_OPEN_AI_MODEL_SCENARIO')&.value.presence
+    scenario_model || super
+  end
+
   def agent_tools
     resolved_tools.map { |tool| resolve_tool_instance(tool) }
   end
