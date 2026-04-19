@@ -3,6 +3,10 @@ class CaptainListener < BaseListener
 
   def conversation_resolved(event)
     conversation = extract_conversation_and_account(event)[0]
+    return if conversation.blank?
+
+    Captain::ContactMemories::ExtractFromConversationJob.perform_later(conversation.id)
+
     assistant = conversation.inbox.captain_assistant
 
     return unless conversation.inbox.captain_active?
