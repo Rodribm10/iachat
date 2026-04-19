@@ -44,6 +44,7 @@ class Captain::Assistant::AgentRunnerService
   MAX_TURNS_PER_MESSAGE = 15           # Cap inside a single run() call
   MAX_TURNS_PER_CONVERSATION = 30      # Cap across the whole conversation lifetime
   TOOL_LOOP_THRESHOLD = 3              # Same (tool_name, args) invoked N+ times = loop
+  RUNNER_TIMEOUT_SECS = 45             # Kill runner.run if LLM/HTTP hangs past this
 
   # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
   def generate_response(message_history: [])
@@ -59,9 +60,12 @@ class Captain::Assistant::AgentRunnerService
     runner = add_callbacks_to_runner(runner) if @callbacks.any?
     install_instrumentation(runner)
     # max_turns is the hard safety cap: each "turn" = one LLM call + optional tool calls.
-    # 100 allowed runaway loops (LLM calling faq_lookup indefinitely when confused).
     # MAX_TURNS_PER_MESSAGE is plenty for normal flows while keeping a burn-budget ceiling.
-    result = runner.run(message_to_process, context: context, max_turns: MAX_TURNS_PER_MESSAGE)
+    # Timeout guards against HTTP hangs on the LLM side (OpenAI slow / network flake):
+    # without it, the job hangs indefinitely and no post-hoc loop detection ever fires.
+    result = Timeout.timeout(RUNNER_TIMEOUT_SECS) do
+      runner.run(message_to_process, context: context, max_turns: MAX_TURNS_PER_MESSAGE)
+    end
 
     if tool_loop_detected?(result)
       Rails.logger.error("[Captain V2] Tool loop detected on conv #{@conversation&.id}. Triggering bot_handoff.")
@@ -71,6 +75,10 @@ class Captain::Assistant::AgentRunnerService
 
     increment_conversation_turn_count!
     process_agent_result(result, original_query: message_to_process)
+  rescue Timeout::Error
+    Rails.logger.error("[Captain V2] runner.run timed out after #{RUNNER_TIMEOUT_SECS}s on conv #{@conversation&.id}. Triggering bot_handoff.")
+    trigger_bot_handoff!
+    bot_handoff_response('A IA demorou mais do que o esperado. Transferindo para atendimento humano.')
   rescue StandardError => e
     # when running the agent runner service in a rake task, the conversation might not have an account associated
     # for regular production usage, it will run just fine
