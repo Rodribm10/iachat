@@ -62,11 +62,14 @@ class Captain::ContactMemories::ExtractionService
 
       Use apenas estes 9 tipos. Cada tipo tem definição precisa + exemplos do que SIM e do que NÃO é.
 
-      1. **preferencia** — algo que o cliente EXPLICITAMENTE PREFERE (suíte, horário, estilo, preço, comida).
+      1. **preferencia** — APENAS se o cliente DECLAROU EXPLICITAMENTE uma preferência com palavras como "prefiro", "gosto mais de", "sempre escolho", "adoro", "minha favorita é". Sem declaração explícita = NÃO É PREFERÊNCIA.
          SIM: "Prefiro sempre a Stilo com hidro"
          SIM: "Gosto de chegar tarde, depois das 22h"
+         SIM: "Minha suíte favorita é a Hidromassagem"
          NÃO: "Quero reservar uma suíte" (é pedido pontual, não preferência recorrente)
-         NÃO: "Escolheu a Alexa dessa vez" (foi uma escolha, não preferência declarada)
+         NÃO: "Escolheu a Alexa dessa vez" (foi UMA escolha, não preferência declarada — use `padrao_comportamental` com data)
+         NÃO: "Reservou Alexa para pernoite" (é uma transação, use `padrao_comportamental` com data)
+         REGRA CRÍTICA: nunca extraia "Prefere X" se a única evidência é uma escolha. Preferência precisa de DECLARAÇÃO EXPLÍCITA com as palavras-gatilho acima.
 
       2. **data_comemorativa** — data anual recorrente declarada pelo cliente (aniversário dele/esposa/casamento, Dia dos Namorados que ele celebra aqui, etc).
          SIM: "É nosso aniversário de casamento dia 14/02"
@@ -80,10 +83,18 @@ class Captain::ContactMemories::ExtractionService
          NÃO: "Obrigado" (não é vínculo)
          NÃO: "Expressou gratidão ao hotel" (isso é gentileza, não vínculo social)
 
-      4. **padrao_comportamental** — padrão OBSERVADO/DECLARADO em múltiplas visitas ou que ele menciona como hábito.
-         SIM: "Sempre chego tarde, entre 23h e meia-noite"
-         SIM: "Costumo ficar só o pernoite"
-         NÃO: "Vou chegar às 22h hoje" (é horário pontual dessa reserva)
+      4. **padrao_comportamental** — evento de escolha do cliente (suíte, permanência, horário, forma de pagamento) que vale guardar como HISTÓRICO TEMPORAL, OU declaração explícita de hábito.
+         **TODO fato desse tipo DEVE incluir a data da conversa no content**, no formato:
+         "Reservou Stilo para pernoite em 23/05/2026"
+         "Escolheu 4hrs em 14/03/2026"
+         SIM: "Sempre chego tarde, entre 23h e meia-noite" (declarou hábito)
+         SIM: "Costumo ficar só o pernoite" (declarou hábito)
+         SIM: "Reservou Alexa para pernoite em 23/05/2026" (registro de escolha com data)
+         SIM: "Escolheu 4hrs na visita de 14/03/2026" (registro de escolha com data)
+         NÃO: "Costuma ficar 2 horas" (SEM DATA e SEM declaração — banido)
+         NÃO: "Prefere permanência de 4 horas" (banido — isso seria preferencia, que exige declaração explícita)
+         NÃO: "Vai chegar às 22h hoje" (intenção da conversa atual, não histórico)
+         REGRA CRÍTICA: se você vai registrar uma escolha pontual, SEMPRE inclua a data no content. Memória sem data vira ruído quando o cliente volta.
 
       5. **reclamacao** — queixa EXPLÍCITA sobre algo que desagradou/frustrou/causou problema, com sentimento negativo claro.
          SIM: "O ar-condicionado estava barulhento demais, não dormi direito"
@@ -138,10 +149,20 @@ class Captain::ContactMemories::ExtractionService
 
       ## CONVERSA A ANALISAR
 
+      **Data de referência desta conversa:** #{conversation_reference_date}
+      (use essa data em toda memória de escolha do tipo `padrao_comportamental`)
+
       #{formatted_messages}
 
       Retorne JSON puro, nada além disso.
     PROMPT
+  end
+
+  # Date of the conversation, used as the temporal reference the LLM must embed
+  # in padrao_comportamental memories. Falls back to now if somehow no message.
+  def conversation_reference_date
+    last = @conversation.messages.where(private: false).maximum(:created_at)
+    (last || Time.current).strftime('%d/%m/%Y')
   end
 
   # Feeds the LLM extractor. MUST exclude:

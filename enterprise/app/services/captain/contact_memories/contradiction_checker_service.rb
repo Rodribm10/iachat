@@ -1,6 +1,11 @@
 class Captain::ContactMemories::ContradictionCheckerService
-  MAX_CANDIDATES = 3
-  DISTANCE_THRESHOLD = 0.6
+  MAX_CANDIDATES = 5
+  # Distances are cosine — lower = more similar (0 = identical, 2 = opposite).
+  # DEDUP_THRESHOLD: below this, treat as duplicate and auto-supersede (no LLM call).
+  # CONFLICT_THRESHOLD: between DEDUP and this, ask the LLM if they contradict.
+  # Above CONFLICT_THRESHOLD: ignore — unrelated facts.
+  DEDUP_THRESHOLD = 0.15
+  CONFLICT_THRESHOLD = 0.6
   CHECK_MODEL = 'gpt-4o-mini'.freeze
 
   def initialize(memory:)
@@ -11,13 +16,19 @@ class Captain::ContactMemories::ContradictionCheckerService
     return if @memory.embedding.blank?
 
     candidates.each do |candidate|
-      candidate.supersede_by!(@memory) if contradicts?(candidate, @memory)
+      candidate.supersede_by!(@memory) if should_supersede?(candidate)
     end
   rescue StandardError => e
     Rails.logger.error("[ContradictionChecker] call failed: #{e.class}: #{e.message} (memory_id=#{@memory&.id})")
   end
 
   private
+
+  def should_supersede?(candidate)
+    # Near-duplicate: auto-supersede without asking LLM (same topic, new wins).
+    # Otherwise fall back to LLM contradiction check for ambiguous overlap.
+    candidate.neighbor_distance < DEDUP_THRESHOLD || contradicts?(candidate, @memory)
+  end
 
   def candidates
     Captain::ContactMemory
@@ -28,7 +39,7 @@ class Captain::ContactMemories::ContradictionCheckerService
       .where.not(embedding: nil)
       .nearest_neighbors(:embedding, @memory.embedding, distance: 'cosine')
       .first(MAX_CANDIDATES)
-      .select { |c| c.neighbor_distance < DISTANCE_THRESHOLD }
+      .select { |c| c.neighbor_distance < CONFLICT_THRESHOLD }
   end
 
   def contradicts?(fact_a, fact_b)
