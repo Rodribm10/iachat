@@ -83,6 +83,9 @@ Rails.application.routes.draw do
               end
               member do
                 get :pix
+                post :cancel
+                post :mark_as_paid
+                post :regenerate_pix
               end
             end
             resource :tasks, only: [], controller: 'tasks' do
@@ -101,7 +104,11 @@ Rails.application.routes.draw do
               end
             end
             namespace :reports do
-              resource :operational, only: [:show], controller: 'reports/operational'
+              resource :operational, only: [:show], controller: :operational
+              resource :executive, only: [:show], controller: :executive do
+                get :drilldown
+                post :deliver
+              end
               resources :insights, only: [:index, :show] do
                 post :generate, on: :collection
               end
@@ -218,6 +225,13 @@ Rails.application.routes.draw do
               resources :labels, only: [:create, :index]
               resources :notes
               post :call, on: :member, to: 'calls#create' if ChatwootApp.enterprise?
+              if ChatwootApp.enterprise?
+                resources :memories, only: %i[index update destroy], controller: 'memories' do
+                  collection do
+                    delete :bulk_destroy, path: ''
+                  end
+                end
+              end
             end
           end
           resources :csat_survey_responses, only: [:index] do
