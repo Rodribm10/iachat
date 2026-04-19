@@ -4,7 +4,7 @@ class Api::V1::Accounts::Contacts::MemoriesController < Api::V1::Accounts::BaseC
 
   def index
     @memories = Captain::ContactMemory.active.for_contact(@contact.id).order(created_at: :desc)
-    authorize(@memories.first || Captain::ContactMemory.new(account: @contact.account)) if @memories.any?
+    authorize(@memories.first || Captain::ContactMemory.new(account: @contact.account))
     render json: { data: @memories.as_json(except: :embedding) }
   end
 
