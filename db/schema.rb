@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_19_023642) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_19_024929) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -2104,8 +2104,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_19_023642) do
   add_foreign_key "captain_assets", "captain_suites"
   add_foreign_key "captain_brands", "accounts"
   add_foreign_key "captain_configurations", "accounts"
-  add_foreign_key "captain_contact_memories", "accounts"
-  add_foreign_key "captain_contact_memories", "contacts"
+  add_foreign_key "captain_contact_memories", "accounts", on_delete: :cascade
+  add_foreign_key "captain_contact_memories", "contacts", on_delete: :cascade
   add_foreign_key "captain_conversation_insights", "accounts"
   add_foreign_key "captain_conversation_insights", "captain_units"
   add_foreign_key "captain_conversation_insights", "inboxes", name: "fk_rails_inbox_id"
