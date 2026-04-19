@@ -14,6 +14,7 @@ import ContactConversations from './ContactConversations.vue';
 import ConversationAction from './ConversationAction.vue';
 import ConversationParticipant from './ConversationParticipant.vue';
 import ContactInfo from './contact/ContactInfo.vue';
+import ContactMemories from './contact/ContactMemories.vue';
 import ContactNotes from './contact/ContactNotes.vue';
 import ScheduledMessages from './scheduledMessages/ScheduledMessages.vue';
 import ConversationInfo from './ConversationInfo.vue';
@@ -335,6 +336,18 @@ onMounted(() => {
               "
             >
               <ContactNotes :contact-id="contactId" />
+            </AccordionItem>
+          </div>
+          <div v-else-if="element.name === 'contact_memories'">
+            <AccordionItem
+              :title="$t('CONVERSATION_SIDEBAR.ACCORDION.CONTACT_MEMORIES')"
+              :is-open="isContactSidebarItemOpen('is_contact_memories_open')"
+              compact
+              @toggle="
+                value => toggleSidebarUIState('is_contact_memories_open', value)
+              "
+            >
+              <ContactMemories :contact-id="contactId" />
             </AccordionItem>
           </div>
         </template>
