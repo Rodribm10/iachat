@@ -1,5 +1,5 @@
 class Captain::ContactMemories::RecallService
-  TIMEOUT_SECONDS = 0.5
+  TIMEOUT_SECONDS = 2.0
   DEFAULT_TOP_K = 5
 
   def initialize(contact:, query_text:, unit_id: nil, top_k: DEFAULT_TOP_K)
