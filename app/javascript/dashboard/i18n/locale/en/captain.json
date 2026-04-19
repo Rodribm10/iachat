@@ -423,14 +423,6 @@
         "SUCCESS_MESSAGE": "FAQ deleted successfully",
         "ERROR_MESSAGE": "An error occurred while deleting FAQ, please try again."
       }
-    },
-    "MEMORY": {
-      "LOADING": "Loading…",
-      "EMPTY": "No memories for this contact yet.",
-      "CONFIRM_DELETE": "Forget this memory?",
-      "CONFIRM_FORGET_ALL": "Forget ALL memories for this contact? This cannot be undone after 30 days.",
-      "FORGET": "Forget",
-      "FORGET_ALL": "Forget all"
     }
   },
   "CAPTAIN_REPORTS": {

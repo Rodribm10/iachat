@@ -396,6 +396,28 @@
         "PARTIALLY_FULFILLED": "Partially Fulfilled",
         "UNFULFILLED": "Unfulfilled"
       }
+    },
+    "CONTACT_MEMORIES": {
+      "LOADING": "Carregando memórias…",
+      "EMPTY_TITLE": "Nenhuma memória ainda",
+      "EMPTY_HINT": "Memórias aparecem aqui conforme o cliente conversa.",
+      "FORGET": "Esquecer",
+      "FORGET_ALL": "Esquecer todas",
+      "CONFIRM_DELETE": "Esquecer esta memória?",
+      "CONFIRM_FORGET_ALL": "Esquecer TODAS as memórias deste cliente? Não pode ser desfeito após 30 dias.",
+      "ERROR_LOADING": "Falha ao carregar memórias",
+      "CONFIDENCE": "Confiança",
+      "TYPE_LABELS": {
+        "preferencia": "Preferência",
+        "data_comemorativa": "Data especial",
+        "vinculo_social": "Vínculo social",
+        "padrao_comportamental": "Padrão",
+        "reclamacao": "Reclamação",
+        "feedback_positivo": "Elogio",
+        "restricao": "Restrição",
+        "vinculo_comercial": "Vínculo comercial",
+        "contexto_pessoal": "Pessoal"
+      }
     }
   },
   "SCHEDULED_MESSAGES": {

@@ -425,14 +425,6 @@
         "SUCCESS_MESSAGE": "FAQ excluída com sucesso",
         "ERROR_MESSAGE": "Ocorreu um erro ao excluir a FAQ, por favor tente novamente."
       }
-    },
-    "MEMORY": {
-      "LOADING": "Carregando…",
-      "EMPTY": "Sem memórias para este contato ainda.",
-      "CONFIRM_DELETE": "Esquecer esta memória?",
-      "CONFIRM_FORGET_ALL": "Esquecer TODAS as memórias deste contato? Após 30 dias não é possível desfazer.",
-      "FORGET": "Esquecer",
-      "FORGET_ALL": "Esquecer tudo"
     }
   },
   "CAPTAIN_REPORTS": {

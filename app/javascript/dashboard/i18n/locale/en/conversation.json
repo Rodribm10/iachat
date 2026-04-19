@@ -407,6 +407,28 @@
         "PARTIALLY_FULFILLED": "Partially Fulfilled",
         "UNFULFILLED": "Unfulfilled"
       }
+    },
+    "CONTACT_MEMORIES": {
+      "LOADING": "Loading memories…",
+      "EMPTY_TITLE": "No memories yet",
+      "EMPTY_HINT": "Memories appear here as the customer chats over time.",
+      "FORGET": "Forget",
+      "FORGET_ALL": "Forget all memories",
+      "CONFIRM_DELETE": "Forget this memory?",
+      "CONFIRM_FORGET_ALL": "Forget ALL memories for this customer? This cannot be undone after 30 days.",
+      "ERROR_LOADING": "Failed to load memories",
+      "CONFIDENCE": "Confidence",
+      "TYPE_LABELS": {
+        "preferencia": "Preference",
+        "data_comemorativa": "Date",
+        "vinculo_social": "Social",
+        "padrao_comportamental": "Pattern",
+        "reclamacao": "Complaint",
+        "feedback_positivo": "Praise",
+        "restricao": "Restriction",
+        "vinculo_comercial": "Commercial",
+        "contexto_pessoal": "Personal"
+      }
     }
   },
   "SCHEDULED_MESSAGES": {
