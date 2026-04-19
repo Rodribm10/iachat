@@ -13,7 +13,7 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
   let(:mock_runner) { instance_double(Agents::Runner) }
   let(:mock_agent) { instance_double(Agents::Agent) }
   let(:mock_scenario_agent) { instance_double(Agents::Agent) }
-  let(:mock_result) { instance_double(Agents::RunResult, output: { 'response' => 'Test response' }, context: nil) }
+  let(:mock_result) { instance_double(Agents::RunResult, output: { 'response' => 'Test response' }, context: nil, messages: []) }
 
   let(:message_history) do
     [
@@ -93,7 +93,7 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
       expect(mock_runner).to receive(:run).with(
         'I need help with my account',
         context: expected_context,
-        max_turns: 100
+        max_turns: 15
       )
 
       service.generate_response(message_history: message_history)
@@ -251,7 +251,7 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
     end
 
     context 'when agent result is a string' do
-      let(:mock_result) { instance_double(Agents::RunResult, output: 'Simple string response', context: nil) }
+      let(:mock_result) { instance_double(Agents::RunResult, output: 'Simple string response', context: nil, messages: []) }
 
       it 'formats string response correctly' do
         result = service.generate_response(message_history: message_history)
@@ -272,7 +272,8 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
             {"response":"Rodrigo, valor total R$ 260,00.","reasoning":"Primeira resposta","reaction_emoji":"💰"}
             {"response":"Rodrigo, para confirmar a reserva, o sinal é R$ 130,00. Posso gerar o Pix?","reasoning":"Resposta final","reaction_emoji":"💰"}
           JSON_OUTPUT
-          context: nil
+          context: nil,
+          messages: []
         )
       end
 

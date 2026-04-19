@@ -39,7 +39,18 @@ class Captain::Assistant::AgentRunnerService
     @callbacks = callbacks
   end
 
+  # Hard ceilings to prevent runaway token burn. See memory file
+  # feedback_never_touch_captain_without_safety_caps.md — two real-world incidents.
+  MAX_TURNS_PER_MESSAGE = 15           # Cap inside a single run() call
+  MAX_TURNS_PER_CONVERSATION = 30      # Cap across the whole conversation lifetime
+  TOOL_LOOP_THRESHOLD = 3              # Same (tool_name, args) invoked N+ times = loop
+
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
   def generate_response(message_history: [])
+    if conversation_turn_limit_exceeded?
+      return bot_handoff_response('Conversa atingiu o limite de interações automáticas. Transferindo para atendimento humano.')
+    end
+
     agents = build_and_wire_agents
     context = build_context(message_history)
     message_to_process = extract_last_user_message(message_history)
@@ -49,10 +60,16 @@ class Captain::Assistant::AgentRunnerService
     install_instrumentation(runner)
     # max_turns is the hard safety cap: each "turn" = one LLM call + optional tool calls.
     # 100 allowed runaway loops (LLM calling faq_lookup indefinitely when confused).
-    # 15 is plenty for normal flows (greeting -> handoff -> coleta -> tool calls -> resposta)
-    # while keeping a burn-budget ceiling per message.
-    result = runner.run(message_to_process, context: context, max_turns: 15)
+    # MAX_TURNS_PER_MESSAGE is plenty for normal flows while keeping a burn-budget ceiling.
+    result = runner.run(message_to_process, context: context, max_turns: MAX_TURNS_PER_MESSAGE)
 
+    if tool_loop_detected?(result)
+      Rails.logger.error("[Captain V2] Tool loop detected on conv #{@conversation&.id}. Triggering bot_handoff.")
+      trigger_bot_handoff!
+      return bot_handoff_response('Detectei um comportamento repetitivo. Transferindo para atendimento humano.')
+    end
+
+    increment_conversation_turn_count!
     process_agent_result(result, original_query: message_to_process)
   rescue StandardError => e
     # when running the agent runner service in a rake task, the conversation might not have an account associated
@@ -63,8 +80,68 @@ class Captain::Assistant::AgentRunnerService
 
     error_response(e.message)
   end
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
   private
+
+  # --- Rate limiting / runaway protection ---
+
+  # True when this conversation already burned the per-conversation turn budget.
+  # Anything beyond MAX_TURNS_PER_CONVERSATION is flagged as runaway and we hand
+  # off to a human. The counter lives on conversation.custom_attributes so it
+  # survives Sidekiq restarts and is queryable from dashboards.
+  def conversation_turn_limit_exceeded?
+    return false if @conversation.blank?
+
+    count = @conversation.custom_attributes.to_h['captain_turn_count'].to_i
+    count >= MAX_TURNS_PER_CONVERSATION
+  end
+
+  def increment_conversation_turn_count!
+    return if @conversation.blank?
+
+    attrs = @conversation.custom_attributes.to_h
+    attrs['captain_turn_count'] = attrs['captain_turn_count'].to_i + 1
+    # rubocop:disable Rails/SkipsModelValidations
+    @conversation.update_columns(custom_attributes: attrs)
+    # rubocop:enable Rails/SkipsModelValidations
+  rescue StandardError => e
+    Rails.logger.warn("[Captain V2] increment_conversation_turn_count! failed: #{e.message}")
+  end
+
+  # Inspects the messages emitted during the run and flags repeated tool
+  # invocations with identical arguments as a runaway loop. Real incident
+  # that motivated this: Daniela called faq_lookup('preço pernoite alexa')
+  # dozens of times in the same run, burning tokens silently.
+  def tool_loop_detected?(result)
+    tool_signatures = Array(result&.messages).flat_map do |msg|
+      tool_calls = msg[:tool_calls] || msg['tool_calls'] || []
+      Array(tool_calls).map do |tc|
+        name = (tc[:name] || tc['name']).to_s
+        args = tc[:arguments] || tc['arguments']
+        args_str = args.is_a?(Hash) ? args.to_json : args.to_s
+        "#{name}|#{args_str}"
+      end
+    end.reject(&:empty?)
+
+    return false if tool_signatures.empty?
+
+    tool_signatures.tally.any? { |_, count| count >= TOOL_LOOP_THRESHOLD }
+  end
+
+  def trigger_bot_handoff!
+    return if @conversation.blank?
+
+    @conversation.bot_handoff! if @conversation.respond_to?(:bot_handoff!)
+  rescue StandardError => e
+    Rails.logger.warn("[Captain V2] trigger_bot_handoff! failed: #{e.message}")
+  end
+
+  def bot_handoff_response(message)
+    { 'response' => message, 'reasoning' => 'Runaway protection triggered', 'reaction_emoji' => '' }
+  end
+
+  # --- End rate limiting / runaway protection ---
 
   def build_context(message_history)
     last_active_scenario_agent = extract_last_scenario_agent(message_history)
