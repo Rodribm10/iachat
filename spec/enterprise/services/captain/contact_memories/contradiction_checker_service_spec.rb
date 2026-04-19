@@ -57,5 +57,20 @@ RSpec.describe Captain::ContactMemories::ContradictionCheckerService do
       expect { described_class.new(memory: embeddingless).call }.not_to raise_error
       expect(old_fact.reload.superseded_by_id).to be_nil
     end
+
+    context 'when LLM raises during contradiction check' do
+      it 'does not supersede when LLM raises' do
+        old_fact
+        chat_double = instance_double(RubyLLM::Chat)
+        allow(chat_double).to receive(:with_temperature).and_return(chat_double)
+        allow(chat_double).to receive(:ask).and_raise(StandardError, 'LLM down')
+        allow(RubyLLM).to receive(:chat).and_return(chat_double)
+
+        # Exercise the real rescue path inside contradicts? (no stub here)
+        real_service = described_class.new(memory: new_fact)
+        expect { real_service.call }.not_to raise_error
+        expect(old_fact.reload.superseded_by_id).to be_nil
+      end
+    end
   end
 end
