@@ -36,28 +36,91 @@ class Captain::ContactMemories::ExtractionService
 
   def build_prompt
     <<~PROMPT
-      Você é um analista que extrai FATOS MEMORÁVEIS de uma conversa de WhatsApp entre um hóspede e um hotel.
+      Você é um analista conservador que extrai apenas FATOS MEMORÁVEIS de uma conversa de WhatsApp entre um hóspede e um hotel. Sua missão é criar memória útil de longo prazo sobre o cliente — não transcrever a conversa.
 
-      Taxonomia (SÓ use estes tipos, caso contrário descarte o fato):
-      #{Captain::ContactMemory::MEMORY_TYPES.join(', ')}
+      ## TAXONOMIA ESTRITA
 
-      Para cada fato, retorne JSON com:
-      - memory_type (um dos tipos acima)
-      - content (frase curta, português, max 1000 chars)
-      - evidence (trecho LITERAL da conversa que sustenta o fato — obrigatório)
-      - confidence (0.0 a 1.0)
-      - scope ('global' na maioria dos casos; 'unit:<id>' só se o fato for operacional de uma unidade específica)
+      Use apenas estes 9 tipos. Cada tipo tem definição precisa + exemplos do que SIM e do que NÃO é.
 
-      Regras INVIOLÁVEIS:
-      1. Se não houver evidência textual clara, NÃO extraia o fato.
-      2. Máximo 5 fatos por conversa. Extraia só os realmente memoráveis.
-      3. Se a conversa não tem nada memorável, retorne {"facts": []}.
-      4. Nunca invente fatos. Se em dúvida, descarte.
+      1. **preferencia** — algo que o cliente EXPLICITAMENTE PREFERE (suíte, horário, estilo, preço, comida).
+         SIM: "Prefiro sempre a Stilo com hidro"
+         SIM: "Gosto de chegar tarde, depois das 22h"
+         NÃO: "Quero reservar uma suíte" (é pedido pontual, não preferência recorrente)
+         NÃO: "Escolheu a Alexa dessa vez" (foi uma escolha, não preferência declarada)
 
-      Conversa:
+      2. **data_comemorativa** — data anual recorrente declarada pelo cliente (aniversário dele/esposa/casamento, Dia dos Namorados que ele celebra aqui, etc).
+         SIM: "É nosso aniversário de casamento dia 14/02"
+         SIM: "Aniversário da minha esposa em 3/8"
+         NÃO: "Quero reservar dia 20/04" (é data da reserva, não data comemorativa)
+         NÃO: "Ontem foi meu aniversário" (só comemora aqui se mencionar que TRADICIONALMENTE vem)
+
+      3. **vinculo_social** — relacionamento social duradouro com outra pessoa mencionada (esposa, marido, filho, amigo, colega).
+         SIM: "Sempre venho com minha esposa Mariana"
+         SIM: "Indicado pelo Márcio, meu amigo"
+         NÃO: "Obrigado" (não é vínculo)
+         NÃO: "Expressou gratidão ao hotel" (isso é gentileza, não vínculo social)
+
+      4. **padrao_comportamental** — padrão OBSERVADO/DECLARADO em múltiplas visitas ou que ele menciona como hábito.
+         SIM: "Sempre chego tarde, entre 23h e meia-noite"
+         SIM: "Costumo ficar só o pernoite"
+         NÃO: "Vou chegar às 22h hoje" (é horário pontual dessa reserva)
+
+      5. **reclamacao** — queixa EXPLÍCITA sobre algo que desagradou/frustrou/causou problema, com sentimento negativo claro.
+         SIM: "O ar-condicionado estava barulhento demais, não dormi direito"
+         SIM: "Achei péssimo o atendimento da recepcionista X"
+         NÃO: "Tem estacionamento?" (é PERGUNTA, não reclamação)
+         NÃO: "Vocês aceitam pet?" (é dúvida)
+         NÃO: "Poderia ter chegado mais cedo" (é observação, sem queixa)
+
+      6. **feedback_positivo** — elogio EXPLÍCITO sobre pessoa, serviço ou experiência específica.
+         SIM: "A Dona Cida do café é maravilhosa, sempre muito atenciosa"
+         SIM: "Foi a melhor estadia que tive, amei a limpeza"
+         NÃO: "Obrigado" ou "Agradeceu o atendimento" (cortesia genérica, não elogio memorável)
+         NÃO: "Foi incentivado a aproveitar o aniversário" (isso é resposta do atendente, não fala do cliente)
+
+      7. **restricao** — restrição médica, alérgica, dietética ou de mobilidade que afeta hospedagem.
+         SIM: "Sou alérgico a amendoim"
+         SIM: "Não posso subir escadas, preciso de quarto térreo"
+         NÃO: "O hotel não aceita pet" (é regra do hotel, não restrição do cliente)
+         NÃO: "Hoje vou comer só frutas" (preferência pontual, não restrição médica)
+
+      8. **vinculo_comercial** — relação comercial/profissional declarada que afeta tratamento (funcionário de empresa parceira, influenciador, agente de viagem, desconto corporativo).
+         SIM: "Sou funcionário da Caixa, tenho desconto corp"
+         SIM: "Trabalho com turismo, venho avaliar o hotel"
+         NÃO: "Fez uma reserva para X" (é reserva, não vínculo comercial)
+         NÃO: "Já veio 3 vezes" (frequência não é vínculo comercial)
+
+      9. **contexto_pessoal** — fato pessoal relevante que afeta o atendimento (profissão, local onde mora, situação de vida).
+         SIM: "Sou caminhoneiro, viajo sempre, preciso hospedagem rápida"
+         SIM: "Moro em Luziânia, venho no fim de semana"
+         NÃO: "Me chamo Rodrigo" (nome vai nos dados cadastrais, não é memória)
+         NÃO: "Informou CPF e email" (dados cadastrais, não memória)
+         NÃO: "Está interessado em reservar" (intenção da conversa, não perfil)
+
+      ## REGRAS ABSOLUTAS (violação = FATO DESCARTADO)
+
+      1. **Evidência OBRIGATÓRIA**: cada fato precisa de um trecho LITERAL da conversa. Se não tem trecho claro, não extraia.
+      2. **Perguntas/dúvidas NÃO são reclamação nem memória**: se o cliente fez uma pergunta ("tem X?", "aceita Y?"), isso é informação que ele queria, não fato sobre ele.
+      3. **Cortesia genérica NÃO é feedback**: "obrigado", "tá bom", "ok" NÃO viram feedback_positivo.
+      4. **Eventos pontuais da conversa atual NÃO são memória**: "reservou para tal dia", "escolheu Alexa", "informou CPF" — isso é registro de transação, não fato memorável sobre o cliente.
+      5. **Ações do atendente NÃO são memória do cliente**: se o bot "incentivou X" ou "ofereceu Y", isso descreve o atendente, não o cliente. Ignore.
+      6. **Máximo 5 fatos por conversa**. Se há dúvida entre extrair ou não, DESCARTE. Qualidade > quantidade.
+      7. **Se a conversa não tem NADA realmente memorável**, retorne `{"facts": []}`. Isso é o comportamento normal e esperado da maioria das conversas transacionais.
+
+      ## FORMATO DE SAÍDA
+
+      JSON: `{"facts": [{...}, ...]}` onde cada fato tem:
+      - `memory_type`: um dos 9 tipos acima
+      - `content`: frase curta em português, 3ª pessoa ("Prefere Stilo com hidro"), max 1000 chars
+      - `evidence`: trecho LITERAL da conversa que prova o fato (copiar aspas do cliente)
+      - `confidence`: 0.0 a 1.0 (use ≥0.9 só se for totalmente explícito, 0.7-0.89 se for forte inferência, <0.7 descarte)
+      - `scope`: `global` na maioria dos casos. Use `unit:<id>` apenas para reclamação/feedback sobre algo específico de UMA unidade.
+
+      ## CONVERSA A ANALISAR
+
       #{formatted_messages}
 
-      Retorne JSON no formato: {"facts": [{...}, ...]}
+      Retorne JSON puro, nada além disso.
     PROMPT
   end
 
