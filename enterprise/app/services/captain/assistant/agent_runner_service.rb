@@ -376,20 +376,24 @@ class Captain::Assistant::AgentRunnerService
   end
 
   # Builds the orchestrator agent and wraps its instructions lambda with
-  # optional Captain ContactMemory recall. Delegates to MemoryPromptInjector.
+  # optional Captain ContactMemory recall. Uses Agents::Agent#clone (public
+  # API) so the original agent stays immutable and thread-safe.
   def build_orchestrator_agent_with_memory
     default_agent = @assistant.agent
     return default_agent unless memory_injector.recall_enabled?
 
-    original_instructions = default_agent.instance_variable_get(:@instructions)
-    injector = memory_injector
-    wrapped = lambda do |context|
-      base_prompt = original_instructions.respond_to?(:call) ? original_instructions.call(context) : original_instructions.to_s
-      injector.append_memory_block(base_prompt, last_user_message_from_context(context))
-    end
+    original_instructions = default_agent.instructions
+    default_agent.clone(instructions: build_wrapped_instructions(original_instructions))
+  end
 
-    default_agent.instance_variable_set(:@instructions, wrapped)
-    default_agent
+  # Returns a lambda that delegates to build_system_prompt_with_memory, so
+  # the runtime path and the test-facing helper share ONE implementation.
+  def build_wrapped_instructions(original_instructions)
+    lambda do |context|
+      base_prompt = original_instructions.respond_to?(:call) ? original_instructions.call(context) : original_instructions.to_s
+      query_text = last_user_message_from_context(context)
+      build_system_prompt_with_memory(query_text, base_prompt)
+    end
   end
 
   def last_user_message_from_context(context)
@@ -400,10 +404,15 @@ class Captain::Assistant::AgentRunnerService
     extract_text_from_content(last_user[:content], as_string: true).to_s
   end
 
-  def build_system_prompt_with_memory(message_text)
-    memory_injector.append_memory_block(@assistant.agent_instructions(nil), message_text)
+  # Canonical method: takes the query + pre-built base prompt and returns
+  # the final prompt with an optional <memoria_cliente> block appended.
+  # Both the runtime lambda and specs call through this method.
+  def build_system_prompt_with_memory(query_text, base_prompt)
+    memory_injector.append_memory_block(base_prompt, query_text)
   end
 
+  # Memoized per service instance. Safe because AgentRunnerService is
+  # constructed fresh per conversation turn.
   def memory_injector
     @memory_injector ||= Captain::Assistant::MemoryPromptInjector.new(conversation: @conversation)
   end

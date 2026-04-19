@@ -17,12 +17,16 @@ RSpec.describe 'Captain semantic memory integration' do
   end
 
   it 'injects <memoria_cliente> block into system prompt when recall flag is on' do
-    expect(runner.send(:build_system_prompt_with_memory, 'Hi there')).to include('<memoria_cliente>')
+    result = runner.send(:build_system_prompt_with_memory, 'Hi there', 'base_system_prompt')
+    expect(result).to include('<memoria_cliente>')
+    expect(result).to include('base_system_prompt')
   end
 
   it 'skips injection when recall flag is off' do
     account.update!(custom_attributes: {})
-    expect(runner.send(:build_system_prompt_with_memory, 'Hi there')).not_to include('<memoria_cliente>')
+    result = runner.send(:build_system_prompt_with_memory, 'Hi there', 'base_system_prompt')
+    expect(result).not_to include('<memoria_cliente>')
+    expect(result).to eq('base_system_prompt')
   end
 end
 # rubocop:enable RSpec/DescribeClass
