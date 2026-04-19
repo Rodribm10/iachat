@@ -5,15 +5,26 @@ class Captain::ContactMemories::SilenceDetectorJob < ApplicationJob
 
   def perform
     Account.where("custom_attributes->>'captain_contact_memory_extraction_enabled' = 'true'").find_each do |account|
-      elegible_conversation_ids(account).each do |conv_id|
-        Captain::ContactMemories::ExtractFromConversationJob.perform_later(conv_id)
-      end
+      process_account(account)
+    rescue StandardError => e
+      Rails.logger.error("[SilenceDetectorJob] account=#{account.id} failed: #{e.class}: #{e.message}")
+      ChatwootExceptionTracker.new(e, account: account).capture_exception
     end
   end
 
   private
 
-  def elegible_conversation_ids(account)
+  def process_account(account)
+    eligible_conversation_ids(account).each do |conv_id|
+      Captain::ContactMemories::ExtractFromConversationJob.perform_later(conv_id)
+    end
+  end
+
+  # Intentionally no `.where('messages.created_at < ?', SILENCE_THRESHOLD.ago)` pre-filter here:
+  # that would let a conversation with ANY old message + a recent one be incorrectly
+  # classified as silent. The HAVING MAX(...) clause alone is the correct semantics.
+  # If this full-join becomes a perf issue at scale, rewrite as NOT EXISTS subquery.
+  def eligible_conversation_ids(account)
     Conversation
       .where(account_id: account.id)
       .joins(:messages)

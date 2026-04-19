@@ -49,4 +49,27 @@ RSpec.describe Captain::ContactMemories::SilenceDetectorJob do
     expect { described_class.perform_now }
       .not_to have_enqueued_job(Captain::ContactMemories::ExtractFromConversationJob)
   end
+
+  it 'continues processing other accounts when one account raises' do
+    bad_account = create(:account, custom_attributes: { 'captain_contact_memory_extraction_enabled' => true })
+    bad_contact = create(:contact, account: bad_account)
+    create(:conversation, account: bad_account, contact: bad_contact)
+
+    good_account = create(:account, custom_attributes: { 'captain_contact_memory_extraction_enabled' => true })
+    good_contact = create(:contact, account: good_account)
+    good_conv = create(:conversation, account: good_account, contact: good_contact)
+    create(:message, conversation: good_conv, account: good_account)
+    age_all_messages(good_conv, 35.minutes.ago)
+
+    original = described_class.instance_method(:eligible_conversation_ids)
+    allow_any_instance_of(described_class).to receive(:eligible_conversation_ids) do |instance, acc| # rubocop:disable RSpec/AnyInstance
+      raise StandardError, 'boom' if acc.id == bad_account.id
+
+      original.bind_call(instance, acc)
+    end
+    allow(ChatwootExceptionTracker).to receive(:new).and_return(instance_double(ChatwootExceptionTracker, capture_exception: true))
+
+    expect { described_class.perform_now }
+      .to have_enqueued_job(Captain::ContactMemories::ExtractFromConversationJob).with(good_conv.id)
+  end
 end
