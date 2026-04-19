@@ -64,4 +64,22 @@ RSpec.describe Captain::ContactMemories::ExtractFromConversationJob do
     described_class.perform_now(conversation.id)
     expect(Captain::ContactMemory.last.expires_at).to be_nil
   end
+
+  it 'rolls back all facts and does not enqueue jobs if any fact fails to persist' do
+    bad_facts = [
+      { memory_type: 'preferencia', content: 'A', evidence: 'x', confidence: 0.9, scope: 'global' },
+      { memory_type: 'invalid_type_not_in_enum', content: 'B', evidence: 'y', confidence: 0.9, scope: 'global' }
+    ]
+    allow_any_instance_of(Captain::ContactMemories::ExtractionService) # rubocop:disable RSpec/AnyInstance
+      .to receive(:call).and_return(bad_facts)
+
+    expect do
+      expect { described_class.perform_now(conversation.id) }.to raise_error(ActiveRecord::RecordInvalid)
+    end.not_to change(Captain::ContactMemory, :count)
+
+    embedding_jobs = ActiveJob::Base.queue_adapter.enqueued_jobs.select do |j|
+      j[:job] == Captain::ContactMemories::UpdateEmbeddingJob
+    end
+    expect(embedding_jobs).to be_empty
+  end
 end

@@ -21,7 +21,9 @@ class Captain::ContactMemories::ExtractFromConversationJob < ApplicationJob
     facts = Captain::ContactMemories::ExtractionService.new(conversation: conversation).call
     return if facts.blank?
 
-    facts.each { |fact| persist_fact(fact, conversation) }
+    unit_id = resolve_unit_id(conversation)
+    created_memory_ids = persist_all(facts, conversation, unit_id)
+    enqueue_embedding_jobs(created_memory_ids)
   end
 
   private
@@ -30,12 +32,23 @@ class Captain::ContactMemories::ExtractFromConversationJob < ApplicationJob
     Captain::ContactMemory.exists?(source_conversation_id: conversation.id)
   end
 
-  def persist_fact(fact, conversation)
-    memory = Captain::ContactMemory.create!(build_attributes(fact, conversation))
-    Captain::ContactMemories::UpdateEmbeddingJob.perform_later(memory.id, run_contradiction_check: true)
+  def persist_all(facts, conversation, unit_id)
+    Captain::ContactMemory.transaction do
+      facts.map { |fact| persist_fact(fact, conversation, unit_id).id }
+    end
   end
 
-  def build_attributes(fact, conversation)
+  def enqueue_embedding_jobs(memory_ids)
+    memory_ids.each do |id|
+      Captain::ContactMemories::UpdateEmbeddingJob.perform_later(id, run_contradiction_check: true)
+    end
+  end
+
+  def persist_fact(fact, conversation, unit_id)
+    Captain::ContactMemory.create!(build_attributes(fact, conversation, unit_id))
+  end
+
+  def build_attributes(fact, conversation, unit_id)
     ttl = TTL_BY_TYPE[fact[:memory_type]]
     {
       account_id: conversation.account_id,
@@ -46,7 +59,7 @@ class Captain::ContactMemories::ExtractFromConversationJob < ApplicationJob
       confidence: fact[:confidence],
       scope: fact[:scope],
       source_conversation_id: conversation.id,
-      source_unit_id: resolve_unit_id(conversation),
+      source_unit_id: unit_id,
       source_inbox_id: conversation.inbox_id,
       last_verified_at: Time.current,
       expires_at: ttl&.from_now
