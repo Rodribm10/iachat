@@ -425,6 +425,14 @@
         "SUCCESS_MESSAGE": "FAQ excluída com sucesso",
         "ERROR_MESSAGE": "Ocorreu um erro ao excluir a FAQ, por favor tente novamente."
       }
+    },
+    "MEMORY": {
+      "LOADING": "Carregando…",
+      "EMPTY": "Sem memórias para este contato ainda.",
+      "CONFIRM_DELETE": "Esquecer esta memória?",
+      "CONFIRM_FORGET_ALL": "Esquecer TODAS as memórias deste contato? Após 30 dias não é possível desfazer.",
+      "FORGET": "Esquecer",
+      "FORGET_ALL": "Esquecer tudo"
     }
   },
   "CAPTAIN_REPORTS": {
@@ -439,7 +447,38 @@
       "DASHBOARD": "Dashboard",
       "INSIGHTS": "Insights IA",
       "OPERATIONAL": "Operacional",
+      "EXECUTIVE": "Executivo",
       "LANDING_PAGES": "Landing Pages"
+    },
+    "EXECUTIVE": {
+      "LOADING": "Carregando digest executivo...",
+      "NO_DATA": "Sem insights gerados para o período. Rode a análise semanal pra ver os dados aqui.",
+      "TITLE": "Digest Executivo",
+      "SUBTITLE": "Mesmo relatório enviado ao Mattermost, com drill-down e filtros.",
+      "DELIVER_BUTTON": "Enviar ao Mattermost agora",
+      "DELIVER_SUCCESS": "Digest enfileirado. Vai chegar no Mattermost em instantes.",
+      "DELIVER_ERROR": "Falha ao disparar o digest. Veja o log do Rails.",
+      "CONVERSATIONS": "Conversas",
+      "MESSAGES": "Mensagens",
+      "UNITS_ANALYZED": "Unidades analisadas",
+      "INSIGHTS_COUNT": "Insights gerados",
+      "UNIT_TABLE": "Comparativo por unidade",
+      "COL_UNIT": "Unidade",
+      "COL_CONVS": "Conversas",
+      "COL_DELTA": "vs semana anterior",
+      "COL_AI_RATE": "Taxa de acerto IA",
+      "COL_FAILURES": "Falhas",
+      "AI_FAILURES": "Onde a Angelina errou (clique pra ver conversas)",
+      "OPPORTUNITIES": "Oportunidades — o que clientes pediram",
+      "OPPORTUNITIES_HINT": "Clique em uma oportunidade pra ver as conversas reais onde foi mencionada.",
+      "COMPLAINTS": "Reclamações recorrentes",
+      "PRAISES": "Elogios recorrentes",
+      "RECOMMENDATIONS": "Recomendações da IA",
+      "DRILLDOWN_TITLE": "Conversas relacionadas",
+      "NO_CONVERSATIONS_FOUND": "Nenhuma conversa encontrada com essas palavras no período.",
+      "NO_CONVERSATIONS_HINT": "A descrição do insight é uma abstração da IA. Se nenhuma palavra-chave bateu com o texto literal das conversas, nada é retornado. Tente clicar em outro item mais específico.",
+      "SEARCH_TOKENS": "Palavras buscadas",
+      "OPEN_CONVERSATION": "Abrir no Chatwoot"
     },
     "LP": {
       "LOADING": "Carregando dados...",
@@ -517,8 +556,23 @@
       "FAILED": "Falhou"
     },
     "OPERATIONAL": {
-      "COMING_SOON": "Em breve",
-      "COMING_SOON_DESC": "Os dados operacionais em tempo real (reservas, cobranças Pix, etc.) estarão disponíveis aqui em breve."
+      "LOADING": "Carregando dados operacionais...",
+      "NO_DATA": "Sem dados operacionais para o período selecionado.",
+      "CONVERSATIONS_SECTION": "Conversas",
+      "RESERVATIONS_SECTION": "Reservas",
+      "TOTAL": "Total",
+      "RESOLVED": "Resolvidas",
+      "OPEN": "Em aberto",
+      "AVG_RESOLUTION": "Tempo médio de resolução",
+      "RES_TOTAL": "Total de reservas",
+      "RES_PAID": "Pagas",
+      "RES_EXPIRED": "Expiradas",
+      "RES_REVENUE": "Receita paga",
+      "BY_INBOX": "Volume por canal",
+      "RESOLUTION_RATE_TOOLTIP": "Taxa de resolução",
+      "DAILY_DIST": "Distribuição por dia",
+      "HOURLY_DIST": "Distribuição por hora",
+      "PEAK": "Pico"
     },
     "DASHBOARD": {
       "TOTAL_CONVERSATIONS": "Conversas analisadas",

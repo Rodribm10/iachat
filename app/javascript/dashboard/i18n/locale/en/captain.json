@@ -423,6 +423,14 @@
         "SUCCESS_MESSAGE": "FAQ deleted successfully",
         "ERROR_MESSAGE": "An error occurred while deleting FAQ, please try again."
       }
+    },
+    "MEMORY": {
+      "LOADING": "Loading…",
+      "EMPTY": "No memories for this contact yet.",
+      "CONFIRM_DELETE": "Forget this memory?",
+      "CONFIRM_FORGET_ALL": "Forget ALL memories for this contact? This cannot be undone after 30 days.",
+      "FORGET": "Forget",
+      "FORGET_ALL": "Forget all"
     }
   },
   "CAPTAIN_REPORTS": {
@@ -437,7 +445,38 @@
       "DASHBOARD": "Dashboard",
       "INSIGHTS": "AI Insights",
       "OPERATIONAL": "Operational",
+      "EXECUTIVE": "Executive",
       "LANDING_PAGES": "Landing Pages"
+    },
+    "EXECUTIVE": {
+      "LOADING": "Loading executive digest...",
+      "NO_DATA": "No insights for the period. Run the weekly analysis to see data here.",
+      "TITLE": "Executive Digest",
+      "SUBTITLE": "Same report sent to Mattermost, with drill-down and filters.",
+      "DELIVER_BUTTON": "Send to Mattermost now",
+      "DELIVER_SUCCESS": "Digest queued. It will arrive in Mattermost shortly.",
+      "DELIVER_ERROR": "Failed to dispatch the digest. Check Rails log.",
+      "CONVERSATIONS": "Conversations",
+      "MESSAGES": "Messages",
+      "UNITS_ANALYZED": "Units analyzed",
+      "INSIGHTS_COUNT": "Insights generated",
+      "UNIT_TABLE": "Comparative by unit",
+      "COL_UNIT": "Unit",
+      "COL_CONVS": "Conversations",
+      "COL_DELTA": "vs previous week",
+      "COL_AI_RATE": "AI success rate",
+      "COL_FAILURES": "Failures",
+      "AI_FAILURES": "Where Angelina failed (click to see conversations)",
+      "OPPORTUNITIES": "Opportunities — what customers asked for",
+      "OPPORTUNITIES_HINT": "Click an opportunity to see real conversations where it was mentioned.",
+      "COMPLAINTS": "Recurring complaints",
+      "PRAISES": "Recurring praises",
+      "RECOMMENDATIONS": "AI Recommendations",
+      "DRILLDOWN_TITLE": "Related conversations",
+      "NO_CONVERSATIONS_FOUND": "No conversations found with those keywords in the period.",
+      "NO_CONVERSATIONS_HINT": "The insight description is an AI abstraction. If no keyword matches the literal conversation text, nothing is returned. Try clicking a more specific item.",
+      "SEARCH_TOKENS": "Keywords searched",
+      "OPEN_CONVERSATION": "Open in Chatwoot"
     },
     "LP": {
       "LOADING": "Loading data...",
@@ -515,8 +554,23 @@
       "FAILED": "Failed"
     },
     "OPERATIONAL": {
-      "COMING_SOON": "Coming soon",
-      "COMING_SOON_DESC": "Real-time operational data (reservations, Pix charges, etc.) will be available here soon."
+      "LOADING": "Loading operational data...",
+      "NO_DATA": "No operational data for the selected period.",
+      "CONVERSATIONS_SECTION": "Conversations",
+      "RESERVATIONS_SECTION": "Reservations",
+      "TOTAL": "Total",
+      "RESOLVED": "Resolved",
+      "OPEN": "Open",
+      "AVG_RESOLUTION": "Avg resolution time",
+      "RES_TOTAL": "Total reservations",
+      "RES_PAID": "Paid",
+      "RES_EXPIRED": "Expired",
+      "RES_REVENUE": "Paid revenue",
+      "BY_INBOX": "Volume by inbox",
+      "RESOLUTION_RATE_TOOLTIP": "Resolution rate",
+      "DAILY_DIST": "Daily distribution",
+      "HOURLY_DIST": "Hourly distribution",
+      "PEAK": "Peak"
     },
     "DASHBOARD": {
       "TOTAL_CONVERSATIONS": "Analyzed conversations",
