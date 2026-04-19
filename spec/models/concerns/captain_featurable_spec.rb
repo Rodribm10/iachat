@@ -112,6 +112,34 @@ RSpec.describe CaptainFeaturable do
     end
   end
 
+  describe '#captain_contact_memory_extraction_enabled?' do
+    let(:account) { create(:account) }
+
+    it 'returns false by default' do
+      expect(account.captain_contact_memory_extraction_enabled?).to be(false)
+    end
+
+    it 'returns true when flag set in custom_attributes' do
+      account.custom_attributes = { 'captain_contact_memory_extraction_enabled' => true }
+      account.save!
+      expect(account.captain_contact_memory_extraction_enabled?).to be(true)
+    end
+  end
+
+  describe '#captain_contact_memory_recall_enabled?' do
+    let(:account) { create(:account) }
+
+    it 'returns false by default' do
+      expect(account.captain_contact_memory_recall_enabled?).to be(false)
+    end
+
+    it 'returns true when flag set in custom_attributes' do
+      account.custom_attributes = { 'captain_contact_memory_recall_enabled' => true }
+      account.save!
+      expect(account.captain_contact_memory_recall_enabled?).to be(true)
+    end
+  end
+
   describe 'integration with existing captain_preferences' do
     it 'enabled? methods use the same logic as captain_preferences[:features]' do
       account.update!(captain_features: { 'editor' => true, 'copilot' => true })
