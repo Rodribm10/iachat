@@ -28,5 +28,47 @@ RSpec.describe 'Captain semantic memory integration' do
     expect(result).not_to include('<memoria_cliente>')
     expect(result).to eq('base_system_prompt')
   end
+
+  describe 'end-to-end learning and recall' do
+    let(:attrs) do
+      {
+        'captain_contact_memory_extraction_enabled' => true,
+        'captain_contact_memory_recall_enabled' => true
+      }
+    end
+
+    it 'learns from a resolved conversation and recalls in a new one' do
+      # 1. Old conversation — learning phase
+      old_conv = create(:conversation, account: account, contact: contact)
+      create(:message, conversation: old_conv, message_type: :incoming, content: 'quero sempre a Stilo com hidro')
+      create(:message, conversation: old_conv, message_type: :outgoing, content: 'combinado')
+
+      allow_any_instance_of(Captain::ContactMemories::ExtractionService).to receive(:call).and_return( # rubocop:disable RSpec/AnyInstance
+        [
+          {
+            memory_type: 'preferencia',
+            content: 'Prefere Stilo com hidro',
+            evidence: 'disse quero sempre a Stilo',
+            confidence: 0.95,
+            scope: 'global'
+          }
+        ]
+      )
+
+      # Simulate conversation.resolved → extraction job
+      Captain::ContactMemories::ExtractFromConversationJob.perform_now(old_conv.id)
+
+      # Simulate embedding job completing (UpdateEmbeddingJob was enqueued but not run here)
+      last_memory = Captain::ContactMemory.where(content: 'Prefere Stilo com hidro').last
+      last_memory.update!(embedding: Array.new(1536, 0.1))
+
+      # 2. New conversation — recall phase
+      new_conv = create(:conversation, account: account, contact: contact)
+      new_runner = Captain::Assistant::AgentRunnerService.new(assistant: assistant, conversation: new_conv)
+
+      result = new_runner.send(:build_system_prompt_with_memory, 'oi, quero reservar', 'base_system_prompt')
+      expect(result).to include('Prefere Stilo com hidro')
+    end
+  end
 end
 # rubocop:enable RSpec/DescribeClass
