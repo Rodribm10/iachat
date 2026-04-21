@@ -70,8 +70,11 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
 
     contact = @conversation.contact
     hydrate_contact_identity_from_conversation!(contact, @conversation)
-    return missing_cpf_response if contact_cpf(contact).blank?
-    return missing_name_response if valid_contact_name?(contact.name).blank?
+
+    missing = []
+    missing << 'name' if valid_contact_name?(contact.name).blank?
+    missing << 'cpf'  if contact_cpf(contact).blank?
+    return missing_identity_response(missing) if missing.any?
 
     # Verifica se já existe reserva pendente de pagamento
     pending = Captain::Reservation.where(conversation_id: @conversation.id, status: 'pending_payment').last
@@ -147,11 +150,66 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
       break if cpf.present? && name.present? && email.present?
     end
 
+    # Fallback: quando o cliente responde só com o nome cru logo após a IA
+    # perguntar "qual seu nome completo?", a regex com prefixo `nome:` não
+    # pega. Procuramos pelo pattern pergunta->resposta nas mensagens.
+    name ||= extract_name_from_qa_pattern(conversation)
+
     {
       cpf: cpf,
       name: name,
       email: email
     }.compact
+  end
+
+  # Lê as mensagens na ordem em que aconteceram, acha a última vez em que o
+  # agente perguntou pelo nome completo, e pega a próxima mensagem do cliente
+  # como candidata a nome. Aceita só se o texto parecer de fato um nome
+  # (2+ palavras alfabéticas de 3+ letras, sem dígitos).
+  def extract_name_from_qa_pattern(conversation)
+    all_msgs = conversation.messages
+                           .where(private: false)
+                           .reorder(created_at: :asc)
+                           .to_a
+
+    last_ask = nil
+    all_msgs.each do |m|
+      next unless m.message_type.to_s == 'outgoing'
+
+      content = normalize_text(m.content)
+      next if content.blank?
+      next unless content.match?(/nome\s+completo|confirmar.*nome|seu\s+nome/i)
+
+      last_ask = m
+    end
+    return if last_ask.nil?
+
+    answer = all_msgs.find do |m|
+      m.message_type.to_s == 'incoming' &&
+        m.sender_type.to_s == 'Contact' &&
+        m.created_at > last_ask.created_at
+    end
+    return if answer.nil?
+
+    raw = normalize_text(answer.content)
+    extract_name_run_from_text(raw)
+  end
+
+  # Extrai um "run" alfabético de 2-6 palavras (3+ letras cada) de dentro
+  # de um texto que pode conter CPF, vírgulas, etc.
+  # Ex: "Rodrigo Borba Machado, 00251938131" → "Rodrigo Borba Machado"
+  # Ex: "Ta ok" → nil (primeira palavra tem 2 letras)
+  # Ex: "00251938131" → nil (só dígitos)
+  def extract_name_run_from_text(text)
+    normalized = normalize_text(text).gsub(/[,;:]/, ' ').squish
+    return if normalized.blank?
+
+    tokens = normalized.split(/\s+/)
+    alpha_tokens = tokens.take_while { |w| w.match?(/\A[\p{L}'\-]+\z/u) && w.length >= 3 }
+    return if alpha_tokens.length < 2
+    return if alpha_tokens.length > 6
+
+    alpha_tokens.join(' ').titleize
   end
 
   def extract_email_from_text(text)
@@ -196,24 +254,36 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
   end
 
   def missing_cpf_response
-    normalize_payload(
-      {
-        formatted_message: 'Para gerar o Pix e seguir com sua reserva, preciso do seu CPF com 11 dígitos. ' \
-                           'Pode me enviar agora? Se preferir, pode mandar só os números.',
-        success: true,
-        requires_input: true,
-        missing_field: 'cpf'
-      }
-    )
+    missing_identity_response(['cpf'])
   end
 
   def missing_name_response
+    missing_identity_response(['name'])
+  end
+
+  # Quando CPF e nome faltam juntos, pede os dois em UMA única mensagem
+  # pra evitar aquele vai-e-vem de "preciso do CPF" / "preciso do nome".
+  def missing_identity_response(missing_fields)
+    has_name = missing_fields.include?('name')
+    has_cpf  = missing_fields.include?('cpf')
+
+    msg = if has_name && has_cpf
+            'Perfeito! Pra fechar a reserva e gerar o Pix, me manda numa única mensagem: ' \
+              'seu nome completo e seu CPF (11 dígitos). Exemplo: "João da Silva, 12345678900".'
+          elsif has_cpf
+            'Para gerar o Pix e seguir com sua reserva, preciso do seu CPF com 11 dígitos. ' \
+              'Pode me enviar agora? Se preferir, pode mandar só os números.'
+          else
+            'Perfeito. Para gerar o Pix, preciso confirmar seu nome completo. Pode me informar?'
+          end
+
     normalize_payload(
       {
-        formatted_message: 'Perfeito. Para gerar o Pix, preciso confirmar seu nome completo. Pode me informar?',
+        formatted_message: msg,
         success: true,
         requires_input: true,
-        missing_field: 'name'
+        missing_fields: missing_fields,
+        missing_field: missing_fields.first
       }
     )
   end
