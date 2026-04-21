@@ -440,7 +440,10 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
     mapped_error = map_pix_error_message(e)
     return mapped_error if mapped_error.is_a?(Hash)
 
-    tool_feedback_response(mapped_error)
+    # Erro real na geração do Pix deve voltar success: false pra LLM
+    # cair no fluxo de fallback (generate_reservation_link) em vez de
+    # alucinar que o Pix foi gerado.
+    error_response(mapped_error)
   end
 
   def map_pix_error_message(error)
