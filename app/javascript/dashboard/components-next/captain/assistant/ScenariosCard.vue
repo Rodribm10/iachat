@@ -26,6 +26,10 @@ const props = defineProps({
     type: String,
     required: true,
   },
+  triggerKeywords: {
+    type: String,
+    default: '',
+  },
   instruction: {
     type: String,
     required: true,
@@ -58,6 +62,7 @@ const state = reactive({
   id: '',
   title: '',
   description: '',
+  trigger_keywords: '',
   instruction: '',
 });
 
@@ -74,6 +79,7 @@ const startEdit = () => {
     id: props.id,
     title: props.title,
     description: props.description,
+    trigger_keywords: props.triggerKeywords || '',
     instruction: props.instruction,
     tools: props.tools,
   });
@@ -222,6 +228,22 @@ const renderInstruction = instruction => () =>
         :message="descriptionError"
         :message-type="descriptionError ? 'error' : 'info'"
         show-character-count
+      />
+      <TextArea
+        v-model="state.trigger_keywords"
+        :label="
+          t('CAPTAIN.ASSISTANTS.SCENARIOS.ADD.NEW.FORM.TRIGGER_KEYWORDS.LABEL')
+        "
+        :placeholder="
+          t(
+            'CAPTAIN.ASSISTANTS.SCENARIOS.ADD.NEW.FORM.TRIGGER_KEYWORDS.PLACEHOLDER'
+          )
+        "
+        :message="
+          t('CAPTAIN.ASSISTANTS.SCENARIOS.ADD.NEW.FORM.TRIGGER_KEYWORDS.HELP')
+        "
+        message-type="info"
+        rows="8"
       />
       <Editor
         v-model="state.instruction"

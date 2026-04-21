@@ -17,6 +17,8 @@ import ResponsesIndex from './responses/Index.vue';
 import ResponsesPendingIndex from './responses/Pending.vue';
 import CustomToolsIndex from './tools/Index.vue';
 import ReservationsIndex from './reservations/Index.vue';
+import RoletaIndex from './roleta/Index.vue';
+import FunnelIndex from './funnel/Index.vue';
 import LifecycleIndex from './lifecycle/Index.vue';
 import LifecycleRules from './lifecycle/Rules.vue';
 import LifecycleSettings from './lifecycle/Settings.vue';
@@ -139,6 +141,18 @@ export const routes = [
     path: frontendURL('accounts/:accountId/captain/reservations'),
     component: ReservationsIndex,
     name: 'captain_reservations_index',
+    meta,
+  },
+  {
+    path: frontendURL('accounts/:accountId/captain/roleta'),
+    component: RoletaIndex,
+    name: 'captain_roleta_index',
+    meta,
+  },
+  {
+    path: frontendURL('accounts/:accountId/captain/funnel'),
+    component: FunnelIndex,
+    name: 'captain_funnel_index',
     meta,
   },
   {

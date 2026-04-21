@@ -7,12 +7,14 @@ import { useI18n } from 'vue-i18n';
 import SettingsLayout from '../../SettingsLayout.vue';
 import BaseSettingsHeader from '../../components/BaseSettingsHeader.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
+import CaptainReportsAPI from 'dashboard/api/captain/reports';
 
 const { t } = useI18n();
 const store = useStore();
 
 const inboxes = useMapGetter('inboxes/getInboxes');
 const insights = useMapGetter('captainReports/getInsights');
+const operational = useMapGetter('captainReports/getOperational');
 const uiFlags = useMapGetter('captainReports/getUIFlags');
 const assistants = useMapGetter('captainAssistants/getRecords');
 
@@ -27,6 +29,7 @@ const tabs = [
   { key: 'dashboard' },
   { key: 'insights' },
   { key: 'operational' },
+  { key: 'executive' },
   { key: 'landing_pages' },
 ];
 
@@ -95,6 +98,133 @@ function getPeriodDates(period) {
   };
 }
 
+// ── Executive tab state ──
+const execData = ref(null);
+const execLoading = ref(false);
+const execDelivering = ref(false);
+const drilldown = reactive({
+  open: false,
+  title: '',
+  query: '',
+  loading: false,
+  conversations: [],
+  tokens: [],
+});
+
+const fetchExecutive = async () => {
+  const { period_start, period_end } = getPeriodDates(selectedPeriod.value);
+  if (!period_start || !period_end) return;
+  execLoading.value = true;
+  try {
+    const { data } = await CaptainReportsAPI.getExecutive({
+      period_start,
+      period_end,
+    });
+    execData.value = data;
+  } catch {
+    execData.value = null;
+  } finally {
+    execLoading.value = false;
+  }
+};
+
+const openDrilldown = async (title, query) => {
+  drilldown.open = true;
+  drilldown.title = title;
+  drilldown.query = query;
+  drilldown.loading = true;
+  drilldown.conversations = [];
+  drilldown.tokens = [];
+  const { period_start, period_end } = getPeriodDates(selectedPeriod.value);
+  try {
+    const { data } = await CaptainReportsAPI.drilldown({
+      query,
+      period_start,
+      period_end,
+      ...(selectedInboxId.value && { inbox_id: selectedInboxId.value }),
+    });
+    drilldown.conversations = data.conversations || [];
+    drilldown.tokens = data.tokens || [];
+  } catch {
+    drilldown.conversations = [];
+    drilldown.tokens = [];
+  } finally {
+    drilldown.loading = false;
+  }
+};
+
+const closeDrilldown = () => {
+  drilldown.open = false;
+};
+
+const deliverExecutive = async () => {
+  if (execDelivering.value) return;
+  const { period_start, period_end } = getPeriodDates(selectedPeriod.value);
+  execDelivering.value = true;
+  try {
+    await CaptainReportsAPI.deliverExecutive({ period_start, period_end });
+    useAlert(t('CAPTAIN_REPORTS.EXECUTIVE.DELIVER_SUCCESS'));
+  } catch {
+    useAlert(t('CAPTAIN_REPORTS.EXECUTIVE.DELIVER_ERROR'));
+  } finally {
+    execDelivering.value = false;
+  }
+};
+
+const execUnits = computed(() => execData.value?.unit_ranking || []);
+const execAiPerf = computed(() => execData.value?.ai_performance || []);
+const execOpportunities = computed(
+  () => execData.value?.customer_opportunities || []
+);
+const execComplaints = computed(() => execData.value?.complaints || []);
+const execPraises = computed(() => execData.value?.praises || []);
+const execRecommendations = computed(
+  () => execData.value?.recommendations || []
+);
+
+const aiPerfByUnit = unitId => {
+  if (!execAiPerf.value) return null;
+  return execAiPerf.value.find(p => p.unit_id === unitId);
+};
+
+const successRateColor = rate => {
+  if (rate === null || rate === undefined) return 'text-n-slate-9';
+  if (rate >= 85) return 'text-n-teal-11';
+  if (rate >= 70) return 'text-n-amber-11';
+  return 'text-n-ruby-11';
+};
+
+const deltaClass = pct => {
+  if (pct === null || pct === undefined) return 'text-n-slate-9';
+  if (pct > 0) return 'text-n-teal-11';
+  if (pct < 0) return 'text-n-ruby-11';
+  return 'text-n-slate-9';
+};
+
+const formatDelta = pct => {
+  if (pct === null || pct === undefined) return '';
+  const sign = pct > 0 ? '+' : '';
+  let arrow = '→';
+  if (pct > 0) arrow = '↑';
+  else if (pct < 0) arrow = '↓';
+  return `${arrow} ${sign}${pct}%`;
+};
+
+const fetchOperational = async () => {
+  const { period_start, period_end } = getPeriodDates(selectedPeriod.value);
+  if (!period_start || !period_end) return;
+  const params = {
+    period_start,
+    period_end,
+    ...(selectedInboxId.value && { inbox_id: selectedInboxId.value }),
+  };
+  try {
+    await store.dispatch('captainReports/fetchOperational', params);
+  } catch {
+    // silent - UI mostra fallback
+  }
+};
+
 const fetchLpStats = async () => {
   const user = store.getters['auth/getCurrentUser'];
   const accountId =
@@ -150,13 +280,16 @@ watch(hasProcessingInsights, newVal => {
 
 watch(activeTab, async tab => {
   if (tab === 'landing_pages') await fetchLpStats();
+  if (tab === 'operational') await fetchOperational();
+  if (tab === 'executive') await fetchExecutive();
 });
 
 watch([customStartDate, customEndDate], async () => {
   if (selectedPeriod.value !== 'custom') return;
-  if (activeTab.value !== 'landing_pages') return;
   if (!customStartDate.value || !customEndDate.value) return;
-  await fetchLpStats();
+  if (activeTab.value === 'landing_pages') await fetchLpStats();
+  if (activeTab.value === 'operational') await fetchOperational();
+  if (activeTab.value === 'executive') await fetchExecutive();
 });
 
 // Auto-expand first done insight when loaded
@@ -189,11 +322,15 @@ const onFilterChange = async event => {
     inbox_id: selectedInboxId.value,
   });
   if (activeTab.value === 'landing_pages') await fetchLpStats();
+  if (activeTab.value === 'operational') await fetchOperational();
+  if (activeTab.value === 'executive') await fetchExecutive();
 };
 
 const onPeriodChange = async event => {
   selectedPeriod.value = event.target.value;
   if (activeTab.value === 'landing_pages') await fetchLpStats();
+  if (activeTab.value === 'operational') await fetchOperational();
+  if (activeTab.value === 'executive') await fetchExecutive();
 };
 
 const onGenerateInsight = async () => {
@@ -287,9 +424,68 @@ const tabLabel = key => {
     dashboard: t('CAPTAIN_REPORTS.TABS.DASHBOARD'),
     insights: t('CAPTAIN_REPORTS.TABS.INSIGHTS'),
     operational: t('CAPTAIN_REPORTS.TABS.OPERATIONAL'),
+    executive: t('CAPTAIN_REPORTS.TABS.EXECUTIVE'),
     landing_pages: 'Landing Pages',
   };
   return map[key] || key;
+};
+
+// ── Operational computeds ──
+const opsLoading = computed(() => uiFlags.value?.isFetchingOperational);
+
+const opsData = computed(() => operational.value);
+
+const opsConversations = computed(() => opsData.value?.conversations || {});
+const opsReservations = computed(() => opsData.value?.reservations || {});
+const opsByInbox = computed(() => opsData.value?.by_inbox || []);
+const opsHourly = computed(() => opsData.value?.hourly_distribution || []);
+const opsDaily = computed(() => opsData.value?.daily_distribution || []);
+
+const opsHourlyMax = computed(() => {
+  if (!opsHourly.value.length) return 1;
+  return Math.max(...opsHourly.value.map(h => h.count), 1);
+});
+
+const opsDailyMax = computed(() => {
+  if (!opsDaily.value.length) return 1;
+  return Math.max(...opsDaily.value.map(d => d.count), 1);
+});
+
+const opsByInboxMax = computed(() => {
+  if (!opsByInbox.value.length) return 1;
+  return Math.max(...opsByInbox.value.map(r => r.total), 1);
+});
+
+const hourlyAxisLabels = ['00h', '06h', '12h', '18h', '23h'];
+
+const opsPeakHour = computed(() => {
+  if (!opsHourly.value.length) return null;
+  const peak = opsHourly.value.reduce((a, b) => (a.count >= b.count ? a : b));
+  return peak.count > 0 ? peak.hour : null;
+});
+
+const formatBrlFromCents = cents => {
+  if (!cents) return 'R$ 0,00';
+  return (cents / 100).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+};
+
+const formatMinutes = minutes => {
+  if (!minutes || minutes < 0) return '—';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}min`;
+};
+
+const formatHour = hour => `${String(hour).padStart(2, '0')}:00`;
+
+const formatShortDate = dateStr => {
+  if (!dateStr) return '—';
+  const [, month, day] = dateStr.split('-');
+  return `${day}/${month}`;
 };
 
 const lpMaxClicks = computed(() => {
@@ -1473,20 +1669,720 @@ const maxHandoffCount = computed(() =>
 
         <!-- Tab: Operacional -->
         <div v-else-if="activeTab === 'operational'">
+          <!-- Loading -->
           <div
+            v-if="opsLoading"
+            class="flex flex-col items-center justify-center gap-4 py-20 text-center"
+          >
+            <span
+              class="i-lucide-loader-2 size-8 animate-spin text-n-slate-9"
+            />
+            <p class="mb-0 text-sm text-n-slate-10">
+              {{ t('CAPTAIN_REPORTS.OPERATIONAL.LOADING') }}
+            </p>
+          </div>
+
+          <!-- Empty state -->
+          <div
+            v-else-if="!opsData || (opsConversations.total || 0) === 0"
             class="flex flex-col items-center justify-center gap-4 py-20 text-center"
           >
             <div
-              class="flex size-16 items-center justify-center rounded-full bg-n-amber-2"
+              class="flex size-16 items-center justify-center rounded-full bg-n-slate-3"
             >
-              <span class="i-lucide-construction size-8 text-n-amber-9" />
+              <span class="i-lucide-bar-chart-3 size-8 text-n-slate-9" />
             </div>
-            <p class="mb-0 text-base font-medium text-n-slate-12">
-              {{ t('CAPTAIN_REPORTS.OPERATIONAL.COMING_SOON') }}
-            </p>
             <p class="mb-0 max-w-sm text-sm text-n-slate-10">
-              {{ t('CAPTAIN_REPORTS.OPERATIONAL.COMING_SOON_DESC') }}
+              {{ t('CAPTAIN_REPORTS.OPERATIONAL.NO_DATA') }}
             </p>
+          </div>
+
+          <!-- Report -->
+          <div v-else class="space-y-6">
+            <!-- KPIs Conversas -->
+            <div>
+              <p
+                class="mb-3 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+              >
+                {{ t('CAPTAIN_REPORTS.OPERATIONAL.CONVERSATIONS_SECTION') }}
+              </p>
+              <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                  <p class="text-2xl font-bold text-n-slate-12">
+                    {{ (opsConversations.total || 0).toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-n-slate-9">
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.TOTAL') }}
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                  <p class="text-2xl font-bold text-n-teal-11">
+                    {{ (opsConversations.resolved || 0).toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-n-slate-9">
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.RESOLVED') }}
+                    <span class="font-medium">
+                      ({{ opsConversations.resolution_rate || 0 }}%)
+                    </span>
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                  <p class="text-2xl font-bold text-n-amber-11">
+                    {{ (opsConversations.open || 0).toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-n-slate-9">
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.OPEN') }}
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                  <p class="text-2xl font-bold text-n-slate-12">
+                    {{ formatMinutes(opsConversations.avg_resolution_minutes) }}
+                  </p>
+                  <p class="mt-1 text-xs text-n-slate-9">
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.AVG_RESOLUTION') }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- KPIs Reservas -->
+            <div>
+              <p
+                class="mb-3 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+              >
+                {{ t('CAPTAIN_REPORTS.OPERATIONAL.RESERVATIONS_SECTION') }}
+              </p>
+              <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                  <p class="text-2xl font-bold text-n-slate-12">
+                    {{ (opsReservations.total || 0).toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-n-slate-9">
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.RES_TOTAL') }}
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                  <p class="text-2xl font-bold text-n-teal-11">
+                    {{ (opsReservations.paid || 0).toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-n-slate-9">
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.RES_PAID') }}
+                    <span class="font-medium">
+                      ({{ opsReservations.conversion_rate || 0 }}%)
+                    </span>
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                  <p class="text-2xl font-bold text-n-ruby-11">
+                    {{ (opsReservations.expired || 0).toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-n-slate-9">
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.RES_EXPIRED') }}
+                  </p>
+                </div>
+                <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                  <p class="text-2xl font-bold text-n-teal-11">
+                    {{ formatBrlFromCents(opsReservations.total_paid_cents) }}
+                  </p>
+                  <p class="mt-1 text-xs text-n-slate-9">
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.RES_REVENUE') }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ranking por canal (só quando não filtrou por inbox) -->
+            <div
+              v-if="opsByInbox.length"
+              class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+            >
+              <p
+                class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+              >
+                {{ t('CAPTAIN_REPORTS.OPERATIONAL.BY_INBOX') }}
+              </p>
+              <div class="space-y-2">
+                <div
+                  v-for="row in opsByInbox"
+                  :key="row.inbox_id"
+                  class="flex items-center gap-3"
+                >
+                  <span
+                    class="w-32 shrink-0 truncate text-xs font-medium text-n-slate-12"
+                    :title="row.inbox_name"
+                  >
+                    {{ row.inbox_name }}
+                  </span>
+                  <div class="flex-1 rounded-full bg-n-slate-3 h-2">
+                    <div
+                      class="h-2 rounded-full bg-n-blue-8 transition-all"
+                      :style="{
+                        width:
+                          Math.round((row.total / opsByInboxMax) * 100) + '%',
+                      }"
+                    />
+                  </div>
+                  <span
+                    class="w-10 shrink-0 text-right text-xs font-semibold text-n-slate-11"
+                  >
+                    {{ row.total }}
+                  </span>
+                  <span
+                    class="w-14 shrink-0 text-right text-xs text-n-slate-9"
+                    :title="
+                      t('CAPTAIN_REPORTS.OPERATIONAL.RESOLUTION_RATE_TOOLTIP')
+                    "
+                  >
+                    {{ row.resolution_rate }}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Distribuição por dia + Distribuição por hora -->
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <!-- Daily -->
+              <div
+                v-if="opsDaily.length"
+                class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+              >
+                <p
+                  class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                >
+                  {{ t('CAPTAIN_REPORTS.OPERATIONAL.DAILY_DIST') }}
+                </p>
+                <div class="flex h-40 items-end gap-1">
+                  <div
+                    v-for="day in opsDaily"
+                    :key="day.date"
+                    class="group relative flex-1"
+                  >
+                    <div
+                      class="w-full rounded-t bg-n-blue-7 transition-all group-hover:bg-n-blue-9"
+                      :style="{
+                        height:
+                          Math.max(
+                            Math.round((day.count / opsDailyMax) * 100),
+                            day.count > 0 ? 3 : 0
+                          ) + '%',
+                      }"
+                      :title="`${formatShortDate(day.date)}: ${day.count}`"
+                    />
+                  </div>
+                </div>
+                <div
+                  class="mt-2 flex justify-between text-[10px] text-n-slate-9"
+                >
+                  <span>{{ formatShortDate(opsDaily[0]?.date) }}</span>
+                  <span>
+                    {{ formatShortDate(opsDaily[opsDaily.length - 1]?.date) }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Hourly -->
+              <div
+                v-if="opsHourly.length"
+                class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+              >
+                <div class="mb-4 flex items-baseline justify-between">
+                  <p
+                    class="text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                  >
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.HOURLY_DIST') }}
+                  </p>
+                  <p
+                    v-if="opsPeakHour !== null"
+                    class="text-xs text-n-slate-10"
+                  >
+                    {{ t('CAPTAIN_REPORTS.OPERATIONAL.PEAK') }}:
+                    <span class="font-semibold text-n-slate-12">
+                      {{ formatHour(opsPeakHour) }}
+                    </span>
+                  </p>
+                </div>
+                <div class="flex h-40 items-end gap-px">
+                  <div
+                    v-for="slot in opsHourly"
+                    :key="slot.hour"
+                    class="group relative flex-1"
+                  >
+                    <div
+                      class="w-full rounded-t bg-n-amber-7 transition-all group-hover:bg-n-amber-9"
+                      :style="{
+                        height:
+                          Math.max(
+                            Math.round((slot.count / opsHourlyMax) * 100),
+                            slot.count > 0 ? 3 : 0
+                          ) + '%',
+                      }"
+                      :title="`${formatHour(slot.hour)}: ${slot.count}`"
+                    />
+                  </div>
+                </div>
+                <div
+                  class="mt-2 flex justify-between text-[10px] text-n-slate-9"
+                >
+                  <span v-for="label in hourlyAxisLabels" :key="label">
+                    {{ label }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Executivo -->
+        <div v-else-if="activeTab === 'executive'">
+          <!-- Loading -->
+          <div
+            v-if="execLoading"
+            class="flex flex-col items-center justify-center gap-4 py-20 text-center"
+          >
+            <span
+              class="i-lucide-loader-2 size-8 animate-spin text-n-slate-9"
+            />
+            <p class="mb-0 text-sm text-n-slate-10">
+              {{ t('CAPTAIN_REPORTS.EXECUTIVE.LOADING') }}
+            </p>
+          </div>
+
+          <!-- Empty -->
+          <div
+            v-else-if="!execData || execData.empty"
+            class="flex flex-col items-center justify-center gap-4 py-20 text-center"
+          >
+            <div
+              class="flex size-16 items-center justify-center rounded-full bg-n-slate-3"
+            >
+              <span class="i-lucide-briefcase size-8 text-n-slate-9" />
+            </div>
+            <p class="mb-0 max-w-sm text-sm text-n-slate-10">
+              {{ t('CAPTAIN_REPORTS.EXECUTIVE.NO_DATA') }}
+            </p>
+          </div>
+
+          <!-- Report -->
+          <div v-else class="space-y-6">
+            <!-- Header with deliver button -->
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="mb-1 text-base font-semibold text-n-slate-12">
+                  {{ t('CAPTAIN_REPORTS.EXECUTIVE.TITLE') }}
+                </h3>
+                <p class="mb-0 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.EXECUTIVE.SUBTITLE') }}
+                </p>
+              </div>
+              <Button
+                :label="t('CAPTAIN_REPORTS.EXECUTIVE.DELIVER_BUTTON')"
+                icon="i-lucide-send"
+                color="slate"
+                :is-loading="execDelivering"
+                @click="deliverExecutive"
+              />
+            </div>
+
+            <!-- KPIs topo -->
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-slate-12">
+                  {{ (execData.totals.conversations || 0).toLocaleString() }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.EXECUTIVE.CONVERSATIONS') }}
+                </p>
+                <p
+                  v-if="execData.totals.conversations_delta_pct !== null"
+                  class="mt-1 text-xs font-medium"
+                  :class="deltaClass(execData.totals.conversations_delta_pct)"
+                >
+                  {{ formatDelta(execData.totals.conversations_delta_pct) }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-slate-12">
+                  {{ (execData.totals.messages || 0).toLocaleString() }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.EXECUTIVE.MESSAGES') }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-slate-12">
+                  {{ execData.totals.units_analyzed || 0 }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.EXECUTIVE.UNITS_ANALYZED') }}
+                </p>
+              </div>
+              <div class="rounded-2xl border border-n-weak bg-n-alpha-1 p-4">
+                <p class="text-2xl font-bold text-n-slate-12">
+                  {{ execData.totals.insights_analyzed || 0 }}
+                </p>
+                <p class="mt-1 text-xs text-n-slate-9">
+                  {{ t('CAPTAIN_REPORTS.EXECUTIVE.INSIGHTS_COUNT') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Tabela comparativa por unidade -->
+            <div
+              v-if="execUnits.length"
+              class="rounded-2xl border border-n-weak bg-n-alpha-1 overflow-hidden"
+            >
+              <div class="border-b border-n-weak px-5 py-3">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                >
+                  {{ t('CAPTAIN_REPORTS.EXECUTIVE.UNIT_TABLE') }}
+                </p>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                  <thead>
+                    <tr
+                      class="border-b border-n-weak text-left text-xs text-n-slate-9"
+                    >
+                      <th class="px-4 py-2 font-medium">
+                        {{ t('CAPTAIN_REPORTS.EXECUTIVE.COL_UNIT') }}
+                      </th>
+                      <th class="px-4 py-2 text-right font-medium">
+                        {{ t('CAPTAIN_REPORTS.EXECUTIVE.COL_CONVS') }}
+                      </th>
+                      <th class="px-4 py-2 text-right font-medium">
+                        {{ t('CAPTAIN_REPORTS.EXECUTIVE.COL_DELTA') }}
+                      </th>
+                      <th class="px-4 py-2 text-right font-medium">
+                        {{ t('CAPTAIN_REPORTS.EXECUTIVE.COL_AI_RATE') }}
+                      </th>
+                      <th class="px-4 py-2 text-right font-medium">
+                        {{ t('CAPTAIN_REPORTS.EXECUTIVE.COL_FAILURES') }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="(unit, idx) in execUnits"
+                      :key="unit.unit_id"
+                      class="border-b border-n-weak last:border-0 hover:bg-n-alpha-2"
+                    >
+                      <td class="px-4 py-3">
+                        <span class="font-medium text-n-slate-12">
+                          {{ idx + 1 }}. {{ unit.unit_name }}
+                        </span>
+                      </td>
+                      <td
+                        class="px-4 py-3 text-right font-semibold text-n-slate-12"
+                      >
+                        {{ unit.conversations.toLocaleString() }}
+                      </td>
+                      <td
+                        class="px-4 py-3 text-right text-xs font-medium"
+                        :class="deltaClass(unit.conversations_delta_pct)"
+                      >
+                        {{ formatDelta(unit.conversations_delta_pct) || '—' }}
+                      </td>
+                      <td
+                        class="px-4 py-3 text-right font-semibold"
+                        :class="
+                          successRateColor(
+                            aiPerfByUnit(unit.unit_id)?.success_rate_pct
+                          )
+                        "
+                      >
+                        {{
+                          aiPerfByUnit(unit.unit_id)?.success_rate_pct !==
+                            null &&
+                          aiPerfByUnit(unit.unit_id)?.success_rate_pct !==
+                            undefined
+                            ? aiPerfByUnit(unit.unit_id).success_rate_pct + '%'
+                            : '—'
+                        }}
+                      </td>
+                      <td class="px-4 py-3 text-right text-n-slate-11">
+                        {{ aiPerfByUnit(unit.unit_id)?.failures_count || 0 }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Falhas da IA (drill-down) -->
+            <div
+              v-if="execAiPerf.length"
+              class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+            >
+              <p
+                class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+              >
+                {{ t('CAPTAIN_REPORTS.EXECUTIVE.AI_FAILURES') }}
+              </p>
+              <div class="space-y-3">
+                <div
+                  v-for="(unitPerf, uIdx) in execAiPerf.filter(
+                    u => u.top_failures?.length
+                  )"
+                  :key="'af-' + uIdx"
+                  class="border-l-2 border-n-ruby-6 pl-3"
+                >
+                  <p class="mb-2 text-xs font-medium text-n-slate-11">
+                    {{ unitPerf.unit_name }} —
+                    <span :class="successRateColor(unitPerf.success_rate_pct)">
+                      {{ unitPerf.success_rate_pct || 0 }}%
+                    </span>
+                  </p>
+                  <div class="space-y-1">
+                    <button
+                      v-for="(fail, fIdx) in unitPerf.top_failures"
+                      :key="'af-' + uIdx + '-' + fIdx"
+                      type="button"
+                      class="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-xs text-n-slate-11 hover:bg-n-alpha-2"
+                      @click="
+                        openDrilldown(
+                          fail.description,
+                          fail.example || fail.description
+                        )
+                      "
+                    >
+                      <span class="flex-1">
+                        {{ fail.description }}
+                      </span>
+                      <span
+                        class="shrink-0 rounded-full bg-n-ruby-2 px-2 py-0.5 text-n-ruby-11"
+                      >
+                        {{ fail.frequency
+                        }}{{ t('CAPTAIN_REPORTS.INSIGHT.TIMES') }}
+                      </span>
+                      <span
+                        class="i-lucide-external-link size-3 text-n-slate-9"
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Oportunidades (clicáveis) -->
+            <div
+              v-if="execOpportunities.length"
+              class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+            >
+              <p
+                class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+              >
+                {{ t('CAPTAIN_REPORTS.EXECUTIVE.OPPORTUNITIES') }}
+              </p>
+              <p class="mb-3 text-xs text-n-slate-9 italic">
+                {{ t('CAPTAIN_REPORTS.EXECUTIVE.OPPORTUNITIES_HINT') }}
+              </p>
+              <div class="space-y-1">
+                <button
+                  v-for="(opp, idx) in execOpportunities"
+                  :key="'op-' + idx"
+                  type="button"
+                  class="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left text-sm text-n-slate-12 hover:bg-n-alpha-2"
+                  @click="
+                    openDrilldown(
+                      opp.opportunity,
+                      opp.example || opp.opportunity
+                    )
+                  "
+                >
+                  <span class="flex-1 font-medium">{{ opp.opportunity }}</span>
+                  <span
+                    class="shrink-0 rounded-full bg-n-amber-2 px-2 py-0.5 text-xs text-n-amber-11"
+                  >
+                    {{ opp.frequency }}{{ t('CAPTAIN_REPORTS.INSIGHT.TIMES') }}
+                  </span>
+                  <span class="i-lucide-external-link size-3 text-n-slate-9" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Reclamações + Elogios side by side -->
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div
+                v-if="execComplaints.length"
+                class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+              >
+                <p
+                  class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                >
+                  {{ t('CAPTAIN_REPORTS.EXECUTIVE.COMPLAINTS') }}
+                </p>
+                <div class="space-y-1">
+                  <button
+                    v-for="(c, idx) in execComplaints.slice(0, 8)"
+                    :key="'cp-' + idx"
+                    type="button"
+                    class="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-n-slate-11 hover:bg-n-alpha-2"
+                    @click="openDrilldown(c.text, c.text)"
+                  >
+                    <span class="text-n-ruby-9">•</span>
+                    <span class="flex-1 italic">{{ c.text }}</span>
+                    <span class="shrink-0 text-n-slate-9">
+                      {{ c.frequency }}{{ t('CAPTAIN_REPORTS.INSIGHT.TIMES') }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div
+                v-if="execPraises.length"
+                class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+              >
+                <p
+                  class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                >
+                  {{ t('CAPTAIN_REPORTS.EXECUTIVE.PRAISES') }}
+                </p>
+                <div class="space-y-1">
+                  <button
+                    v-for="(p, idx) in execPraises.slice(0, 8)"
+                    :key="'pr-' + idx"
+                    type="button"
+                    class="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-n-slate-11 hover:bg-n-alpha-2"
+                    @click="openDrilldown(p.text, p.text)"
+                  >
+                    <span class="text-n-teal-9">•</span>
+                    <span class="flex-1 italic">{{ p.text }}</span>
+                    <span class="shrink-0 text-n-slate-9">
+                      {{ p.frequency }}{{ t('CAPTAIN_REPORTS.INSIGHT.TIMES') }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recomendações da IA -->
+            <div
+              v-if="execRecommendations.length"
+              class="rounded-2xl border border-n-weak bg-n-alpha-1 p-5"
+            >
+              <p
+                class="mb-4 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+              >
+                {{ t('CAPTAIN_REPORTS.EXECUTIVE.RECOMMENDATIONS') }}
+              </p>
+              <ol class="list-decimal space-y-2 pl-5 text-sm text-n-slate-11">
+                <li
+                  v-for="(rec, idx) in execRecommendations"
+                  :key="'rec-' + idx"
+                >
+                  {{ rec }}
+                </li>
+              </ol>
+            </div>
+          </div>
+
+          <!-- Drilldown modal -->
+          <div
+            v-if="drilldown.open"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            @click.self="closeDrilldown"
+          >
+            <div
+              class="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-n-background shadow-2xl"
+            >
+              <div
+                class="flex items-start justify-between border-b border-n-weak px-5 py-4"
+              >
+                <div class="flex-1">
+                  <p
+                    class="mb-1 text-xs font-semibold uppercase tracking-wide text-n-slate-9"
+                  >
+                    {{ t('CAPTAIN_REPORTS.EXECUTIVE.DRILLDOWN_TITLE') }}
+                  </p>
+                  <p class="mb-0 text-sm font-medium text-n-slate-12">
+                    {{ drilldown.title }}
+                  </p>
+                  <div
+                    v-if="drilldown.tokens.length"
+                    class="mt-2 flex flex-wrap items-center gap-1"
+                  >
+                    <span class="text-xs text-n-slate-9">
+                      {{ t('CAPTAIN_REPORTS.EXECUTIVE.SEARCH_TOKENS') }}:
+                    </span>
+                    <span
+                      v-for="tk in drilldown.tokens"
+                      :key="tk"
+                      class="rounded-full bg-n-alpha-2 px-2 py-0.5 text-xs text-n-slate-11"
+                    >
+                      {{ tk }}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="ml-3 rounded-lg p-1 text-n-slate-9 hover:bg-n-alpha-2"
+                  @click="closeDrilldown"
+                >
+                  <span class="i-lucide-x size-5" />
+                </button>
+              </div>
+
+              <div class="max-h-[60vh] overflow-y-auto px-5 py-4">
+                <div
+                  v-if="drilldown.loading"
+                  class="flex items-center justify-center py-10"
+                >
+                  <span
+                    class="i-lucide-loader-2 size-6 animate-spin text-n-slate-9"
+                  />
+                </div>
+
+                <div
+                  v-else-if="!drilldown.conversations.length"
+                  class="py-8 text-center"
+                >
+                  <p class="mb-2 text-sm text-n-slate-11">
+                    {{ t('CAPTAIN_REPORTS.EXECUTIVE.NO_CONVERSATIONS_FOUND') }}
+                  </p>
+                  <p class="mb-0 text-xs text-n-slate-9 italic">
+                    {{ t('CAPTAIN_REPORTS.EXECUTIVE.NO_CONVERSATIONS_HINT') }}
+                  </p>
+                </div>
+
+                <div v-else class="space-y-2">
+                  <a
+                    v-for="conv in drilldown.conversations"
+                    :key="'dd-' + conv.id"
+                    :href="conv.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="block rounded-xl border border-n-weak p-4 hover:bg-n-alpha-2"
+                  >
+                    <div class="flex items-center justify-between gap-2">
+                      <p class="mb-0 font-medium text-n-slate-12">
+                        #{{ conv.id }} · {{ conv.contact_name || '—' }}
+                      </p>
+                      <span
+                        class="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                        :class="
+                          conv.status === 'resolved'
+                            ? 'bg-n-teal-2 text-n-teal-11'
+                            : 'bg-n-amber-2 text-n-amber-11'
+                        "
+                      >
+                        {{ conv.status }}
+                      </span>
+                    </div>
+                    <p class="mb-0 mt-1 text-xs text-n-slate-9">
+                      {{ conv.inbox_name }} ·
+                      {{ formatDate(conv.created_at.split('T')[0]) }}
+                    </p>
+                    <p
+                      class="mb-0 mt-2 flex items-center gap-1 text-xs text-n-brand"
+                    >
+                      <span class="i-lucide-external-link size-3" />
+                      {{ t('CAPTAIN_REPORTS.EXECUTIVE.OPEN_CONVERSATION') }}
+                    </p>
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

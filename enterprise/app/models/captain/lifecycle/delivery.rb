@@ -1,3 +1,45 @@
+# == Schema Information
+#
+# Table name: captain_lifecycle_deliveries
+#
+#  id                     :bigint           not null, primary key
+#  failure_reason         :text
+#  fire_at                :datetime         not null
+#  origin                 :string           default("scheduled_lifecycle"), not null
+#  rendered_body          :text
+#  sent_at                :datetime
+#  skip_reason            :string
+#  status                 :string           default("scheduled"), not null
+#  created_at             :datetime         not null
+#  updated_at             :datetime         not null
+#  account_id             :bigint           not null
+#  captain_reservation_id :bigint           not null
+#  conversation_id        :bigint
+#  inbox_id               :bigint
+#  lifecycle_rule_id      :bigint
+#  message_id             :bigint
+#
+# Indexes
+#
+#  idx_lifecycle_deliveries_cap_check                     (captain_reservation_id,origin,status)
+#  idx_lifecycle_deliveries_dashboard                     (account_id,status,fire_at)
+#  idx_lifecycle_deliveries_reservation                   (captain_reservation_id)
+#  idx_lifecycle_deliveries_rule                          (lifecycle_rule_id)
+#  idx_lifecycle_deliveries_scheduled                     (fire_at) WHERE ((status)::text = 'scheduled'::text)
+#  index_captain_lifecycle_deliveries_on_account_id       (account_id)
+#  index_captain_lifecycle_deliveries_on_conversation_id  (conversation_id)
+#  index_captain_lifecycle_deliveries_on_inbox_id         (inbox_id)
+#  index_captain_lifecycle_deliveries_on_message_id       (message_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (account_id => accounts.id)
+#  fk_rails_...  (captain_reservation_id => captain_reservations.id)
+#  fk_rails_...  (conversation_id => conversations.id)
+#  fk_rails_...  (inbox_id => inboxes.id)
+#  fk_rails_...  (lifecycle_rule_id => captain_lifecycle_rules.id)
+#  fk_rails_...  (message_id => messages.id)
+#
 class Captain::Lifecycle::Delivery < ApplicationRecord
   self.table_name = 'captain_lifecycle_deliveries'
 

@@ -335,12 +335,20 @@ class Captain::Llm::SystemPromptsService
             "summary": "Como os clientes reagiram aos preços informados",
             "objections_count": 2
           },
+          "customer_opportunities": [
+            { "opportunity": "Serviço, feature ou melhoria pedida por clientes (ex: check-in 24h, transfer do aeroporto)", "frequency": 3, "example": "Trecho da conversa que ilustra o pedido" }
+          ],
           "recommendations": [
             "Recomendação acionável baseada nos dados"
           ],
           "period_summary": "Resumo executivo de 2-3 linhas sobre a semana"
         }
         ```
+
+        IMPORTANTE — diferença entre campos:
+        - "faq_gaps": perguntas que clientes fizeram e a IA não soube responder (gap de CONHECIMENTO)
+        - "customer_opportunities": serviços/features/melhorias que clientes PEDIRAM ou perguntaram se existem (oportunidade de NEGÓCIO)
+        - "complaints": reclamações sobre o que já existe (problema a RESOLVER)
 
         Regras obrigatórias:
         - Se não houver dados suficientes para algum campo, retorne arrays vazios ou strings vazias

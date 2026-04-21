@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/ClassLength
 class Captain::ContactMemories::ExtractionService
   MAX_FACTS = 5
   MIN_CONFIDENCE = 0.5
@@ -37,6 +38,39 @@ class Captain::ContactMemories::ExtractionService
   def build_prompt
     <<~PROMPT
       Você é um analista conservador que extrai apenas FATOS MEMORÁVEIS de uma conversa de WhatsApp entre um hóspede e um hotel. Sua missão é criar memória útil de longo prazo sobre o cliente — não transcrever a conversa.
+
+      ## PRINCÍPIO ZERO — LITERALIDADE SOBRE INFERÊNCIA
+
+      Você extrai o que o cliente DISSE e o que ACONTECEU, não o que você acha que ele quis dizer ou o que provavelmente vai acontecer. Quando em dúvida entre registrar uma interpretação ou não registrar nada: NÃO REGISTRE. Memória errada é muito pior que memória ausente — memória errada contamina conversas futuras e faz o atendente mentir pro cliente.
+
+      ## REGRA DE OURO — AÇÃO CONSUMADA vs INTENÇÃO FUTURA
+
+      **NUNCA** registre como fato uma ação que o cliente apenas EXPRESSOU INTENÇÃO de fazer. Isso é o erro mais grave possível — contamina o recall e faz o bot afirmar falsidades nas próximas conversas.
+
+      ### Exemplo REAL de erro a não repetir:
+      - Cliente: "Maravilha, entro em contato amanhã para reservar"
+      - Bot: "Fico à disposição pra te ajudar amanhã"
+      - ❌ **ERRADO (alucinação)**: `padrao_comportamental` "Reservou Hidromassagem para pernoite em 21/04/2026"
+      - ✅ **CERTO**: nada. O cliente não reservou — disse que vai entrar em contato. Se amanhã ele reservar de fato, a conversa de amanhã vira memória.
+
+      ### Sinais de AÇÃO CONSUMADA (pode virar `padrao_comportamental` com data):
+      - Bot gerou Pix / enviou link de reserva **E** cliente confirmou recebimento ou pagou.
+      - Cliente disse explicitamente "paguei", "confirmado", "pode confirmar", "tá feito", "perfeito, pode marcar".
+      - Bot respondeu confirmando suíte + data + valor **E** cliente não desdisse.
+      - Registro de estadia: "fiquei na Alexa em 03/02", "nos hospedamos no fim de semana".
+
+      ### Sinais de INTENÇÃO FUTURA (NÃO MEMORIZE — retorne nada):
+      - "Entro em contato amanhã para reservar"
+      - "Vou querer reservar"
+      - "Pretendo fazer uma reserva"
+      - "Tô pensando em reservar"
+      - "Quero ver opções"
+      - "Depois eu vejo / me avise depois"
+      - "Amanhã eu decido"
+      - Qualquer conversa de orçamento/consulta sem fechamento concreto.
+
+      ### Teste antes de registrar ação:
+      Releia o último terço da conversa. A reserva foi EFETIVAMENTE fechada (Pix gerado + cliente aceitou, ou cliente disse "pode confirmar" + bot confirmou)? Se não conseguir apontar a virada de "intenção" pra "feito" com trecho literal, NÃO É AÇÃO CONSUMADA — é intenção efêmera e NÃO VIRA memória.
 
       ## CONTEXTO DO NEGÓCIO (dados canônicos — NÃO invente fora desta lista)
 
@@ -83,18 +117,20 @@ class Captain::ContactMemories::ExtractionService
          NÃO: "Obrigado" (não é vínculo)
          NÃO: "Expressou gratidão ao hotel" (isso é gentileza, não vínculo social)
 
-      4. **padrao_comportamental** — evento de escolha do cliente (suíte, permanência, horário, forma de pagamento) que vale guardar como HISTÓRICO TEMPORAL, OU declaração explícita de hábito.
+      4. **padrao_comportamental** — evento de escolha EFETIVAMENTE CONSUMADA pelo cliente (ver REGRA DE OURO), OU declaração explícita de hábito.
          **TODO fato desse tipo DEVE incluir a data da conversa no content**, no formato:
          "Reservou Stilo para pernoite em 23/05/2026"
          "Escolheu 4hrs em 14/03/2026"
          SIM: "Sempre chego tarde, entre 23h e meia-noite" (declarou hábito)
          SIM: "Costumo ficar só o pernoite" (declarou hábito)
-         SIM: "Reservou Alexa para pernoite em 23/05/2026" (registro de escolha com data)
-         SIM: "Escolheu 4hrs na visita de 14/03/2026" (registro de escolha com data)
+         SIM: "Reservou Alexa para pernoite em 23/05/2026" — APENAS se a reserva foi consumada (Pix gerado + cliente não desistiu, OU cliente disse "pode confirmar" + bot confirmou)
+         SIM: "Escolheu 4hrs na visita de 14/03/2026" — se efetivamente escolheu e fechou
          NÃO: "Costuma ficar 2 horas" (SEM DATA e SEM declaração — banido)
          NÃO: "Prefere permanência de 4 horas" (banido — isso seria preferencia, que exige declaração explícita)
          NÃO: "Vai chegar às 22h hoje" (intenção da conversa atual, não histórico)
-         REGRA CRÍTICA: se você vai registrar uma escolha pontual, SEMPRE inclua a data no content. Memória sem data vira ruído quando o cliente volta.
+         NÃO: "Reservou X" quando o cliente só disse "entro em contato amanhã para reservar" ou "quero reservar" (intenção futura — violação da REGRA DE OURO).
+         NÃO: "Reservou X" quando o bot apenas cotou preço e o cliente não fechou explicitamente.
+         REGRA CRÍTICA: se você vai registrar uma escolha pontual, (a) a ação DEVE ter sido consumada, e (b) SEMPRE inclua a data no content. Memória sem data vira ruído; memória sem consumação vira mentira.
 
       5. **reclamacao** — queixa EXPLÍCITA sobre algo que desagradou/frustrou/causou problema, com sentimento negativo claro.
          SIM: "O ar-condicionado estava barulhento demais, não dormi direito"
@@ -133,7 +169,7 @@ class Captain::ContactMemories::ExtractionService
       1. **Evidência OBRIGATÓRIA**: cada fato precisa de um trecho LITERAL da conversa. Se não tem trecho claro, não extraia.
       2. **Perguntas/dúvidas NÃO são reclamação nem memória**: se o cliente fez uma pergunta ("tem X?", "aceita Y?"), isso é informação que ele queria, não fato sobre ele.
       3. **Cortesia genérica NÃO é feedback**: "obrigado", "tá bom", "ok" NÃO viram feedback_positivo.
-      4. **Eventos pontuais da conversa atual NÃO são memória**: "reservou para tal dia", "escolheu Alexa", "informou CPF" — isso é registro de transação, não fato memorável sobre o cliente.
+      4. **Aplicar a REGRA DE OURO de ação-consumada vs intenção-futura**: "informou CPF" nunca é memória (é cadastro). "Escolheu X" ou "Reservou X em tal data" SÓ vira `padrao_comportamental` se a ação foi efetivamente CONSUMADA nesta conversa (Pix confirmado, cliente disse "pode marcar"+ bot confirmou, ou registro de estadia passada). Discussão/intenção sem fechamento = NÃO EXTRAIA.
       5. **Ações do atendente NÃO são memória do cliente**: se o bot "incentivou X" ou "ofereceu Y", isso descreve o atendente, não o cliente. Ignore.
       6. **Máximo 5 fatos por conversa**. Se há dúvida entre extrair ou não, DESCARTE. Qualidade > quantidade.
       7. **Se a conversa não tem NADA realmente memorável**, retorne `{"facts": []}`. Isso é o comportamento normal e esperado da maioria das conversas transacionais.
@@ -219,3 +255,4 @@ class Captain::ContactMemories::ExtractionService
     SCOPE_PATTERN.match?(value)
   end
 end
+# rubocop:enable Metrics/ClassLength

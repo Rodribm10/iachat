@@ -4,56 +4,49 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a **Chatwoot** customer engagement platform (open-source alternative to Intercom/Zendesk), customized for **fazer.ai**. It includes the **Synkra AIOS** framework overlay for AI-orchestrated development workflows.
+**Chatwoot** customizado para **fazer.ai** — plataforma de atendimento ao cliente multi-canal com IA (Captain). Multi-tenant SaaS para hotelaria, com integração de PIX/Inter, reservas e WhatsApp.
 
 **Tech Stack:**
 - Backend: Ruby 3.4.4 + Rails 7.1
-- Frontend: Vue 3 + Vite
-- Database: PostgreSQL with pgvector
-- Background Jobs: Sidekiq
-- Package Manager: **pnpm** (required, not npm/yarn)
+- Frontend: Vue 3 + Vite + Pinia
+- Database: PostgreSQL + pgvector
+- Background Jobs: Sidekiq (com sidekiq-cron)
+- Package Manager: **pnpm** (obrigatório — nunca npm/yarn)
 - Testing: RSpec (backend), Vitest (frontend)
+- Event system: Wisper (pub/sub)
+- Authorization: Pundit
 
 ## Development Commands
 
-### Starting the Application
+### Iniciar aplicação
 
 ```bash
-# Development server (Rails backend + Sidekiq + Vite)
-pnpm run dev
-
-# Individual processes:
-# - Rails backend: http://localhost:3001
-# - Sidekiq: background worker
-# - Vite: frontend dev server
+pnpm run dev           # overmind: Rails :3000 + Sidekiq + Vite
+pnpm run start:dev     # foreman (alternativo)
 ```
 
-### Testing
+### Testes
 
 ```bash
-# Frontend (Vitest) - CRITICAL: NO -- flag with pnpm test!
-pnpm test                    # Run all tests
-pnpm test <file>             # Run specific file (NOT pnpm test -- <file>)
-pnpm test:watch              # Watch mode
-pnpm test:coverage           # Coverage report
+# Frontend (Vitest) — CRÍTICO: sem -- com pnpm!
+pnpm test                      # todos
+pnpm test app/javascript/path  # arquivo específico (NÃO use pnpm test -- <file>)
+pnpm test:watch
+pnpm test:coverage
 
 # Backend (RSpec)
-bundle exec rspec                           # All specs
-bundle exec rspec spec/models/user_spec.rb  # Specific file
-bundle exec rspec spec/models/user_spec.rb:42  # Specific line
+bundle exec rspec                                    # todos
+bundle exec rspec spec/models/contact_spec.rb        # arquivo
+bundle exec rspec spec/models/contact_spec.rb:42     # linha específica
 ```
 
-### Code Quality
+### Qualidade de código
 
 ```bash
-# JavaScript/Vue linting
-pnpm run eslint              # Check
-pnpm run eslint:fix          # Auto-fix
-
-# Ruby linting
-bundle exec rubocop          # Check
-bundle exec rubocop -a       # Auto-fix
-pnpm run ruby:prettier       # Same as rubocop -a
+pnpm run eslint          # lint JS/Vue
+pnpm run eslint:fix      # auto-fix
+bundle exec rubocop      # lint Ruby
+bundle exec rubocop -a   # auto-fix Ruby
 ```
 
 ### Database
@@ -61,72 +54,102 @@ pnpm run ruby:prettier       # Same as rubocop -a
 ```bash
 bin/rails db:migrate
 bin/rails db:rollback
-bin/rails db:reset
-bin/rails db:seed
+bin/rails db:reset && bin/rails db:seed
 ```
 
-## Architecture Overview
+### i18n
 
-### Backend Structure
-
-```
-app/
-├── controllers/       # API endpoints (API::V1::Accounts::*)
-├── models/            # ActiveRecord models
-├── services/          # Business logic (Whatsapp::Providers::*, etc.)
-├── jobs/              # Sidekiq background jobs
-├── listeners/         # Wisper event subscribers (pub/sub)
-├── builders/          # Complex object construction
-├── finders/           # Query objects
-├── policies/          # Pundit authorization
-└── javascript/        # Vue.js frontend
-
-enterprise/app/        # Enterprise features (Captain AI, billing)
+```bash
+pnpm run sync:i18n       # sincroniza arquivo de tradução
 ```
 
-**Key Patterns:**
-- **Services:** Business logic extracted from models
-- **Builders:** Construct complex objects
-- **Finders:** Encapsulate complex queries
-- **Listeners:** Event-driven using Wisper
-- **Policies:** Pundit for authorization
-- **Jobs:** All async work in Sidekiq
+## Arquitetura Backend
 
-### Frontend Structure
+### Modelo de dados central
+
+```
+Account (tenant raiz)
+  ├── Inbox (canal: WhatsApp, Email, Facebook, Instagram, Twilio...)
+  │     └── Contact (cliente) via ContactInbox
+  ├── Conversation (central: status, priority, SLA, custom_attributes)
+  │     ├── Message (conteúdo, attachments, sender)
+  │     ├── Agent (assignee)
+  │     └── Label
+  ├── AutomationRule
+  ├── Campaign
+  └── Article (help center)
+```
+
+### Padrões Rails usados
+
+| Padrão | Onde | Função |
+|--------|------|--------|
+| **Services** | `app/services/` | Toda lógica de negócio fora dos models |
+| **Builders** | `app/builders/` | Construção de objetos complexos (ex: criar conversa + contato) |
+| **Finders** | `app/finders/` | Query objects encapsulados |
+| **Listeners** | `app/listeners/` | Subscribers Wisper para eventos de domínio |
+| **Policies** | `app/policies/` | Autorização Pundit por recurso |
+| **Jobs** | `app/jobs/` | Todo trabalho assíncrono via Sidekiq |
+
+### Estrutura de controllers
+
+```
+app/controllers/
+├── api/v1/accounts/{account_id}/  # Endpoints principais (Conversations, Contacts, Inboxes...)
+├── api/v1/widget/                 # Chat widget público
+└── enterprise/api/v1/accounts/captain/  # Captain AI (enterprise)
+```
+
+### Enterprise — Captain AI (`enterprise/app/`)
+
+Camada fazer.ai sobre o Chatwoot base:
+
+- **Models chave:** `Captain::Unit` (multi-unidade hoteleira), `Captain::Assistant`, `Captain::Reservation`, `Captain::PixCharge`, `Captain::Document`, `Captain::ConversationInsight`
+- **Integrações:** Inter API (pagamento PIX), WhatsApp, sincronização de reservas, webhooks
+- **AI features:** LLM (OpenAI), copilot, audio transcription, label suggestion, help center search
+- **Feature flags por account:** `captain_features` (Editor, Assistant, Copilot, LabelSuggestion, AudioTranscription, HelpCenterSearch)
+
+## Arquitetura Frontend
 
 ```
 app/javascript/
-├── dashboard/         # Agent dashboard (Vue 3 + Vue Router + Vuex)
-│   ├── routes/       # Page components
-│   ├── store/        # Vuex state
-│   ├── components/   # Reusable components
-│   ├── api/          # API clients
-│   └── i18n/         # Translations (en, pt_BR required!)
-├── widget/           # Customer chat widget
-├── sdk/              # Embeddable JavaScript SDK
-├── portal/           # Public help center
-└── shared/           # Shared utilities
+├── dashboard/         # Dashboard do agente (Vue 3 + Vue Router + Pinia)
+│   ├── routes/        # Componentes de página
+│   ├── store/         # Pinia stores (55+ módulos: conversations, contacts, captain*)
+│   ├── components/    # Componentes reutilizáveis
+│   ├── api/           # Clientes HTTP por recurso
+│   └── i18n/locale/   # Traduções (en + pt_BR SEMPRE)
+├── widget/            # Widget de chat embeddable
+├── sdk/               # SDK JS (build separado: pnpm run build:sdk)
+├── portal/            # Help center público
+└── shared/            # Utilities compartilhados
 ```
 
-**Vite Import Aliases:**
+**Aliases Vite:**
 - `components` → `app/javascript/dashboard/components`
 - `dashboard` → `app/javascript/dashboard`
 - `helpers` → `app/javascript/shared/helpers`
-- `shared`, `widget`, `survey`, `v3` → respective directories
+- `shared`, `widget`, `survey`, `v3` → diretórios equivalentes
 
-## Critical Conventions
+**Bibliotecas chave:** ProseMirror (rich text), ActionCable (real-time), Chart.js, Twilio Voice SDK
 
-### fazer.ai Branding
-**ALWAYS** style as `fazer.ai` (lowercase with dot), **NEVER** `Fazer.ai` or `FAZER.AI`
+## Convenções críticas
 
-### Internationalization
-**ALWAYS include pt_BR translations** for any new user-facing text
-- Location: `app/javascript/dashboard/i18n/locale/{en,pt_BR}/`
+### Branding
+`fazer.ai` — sempre minúsculo com ponto. Nunca `Fazer.ai` ou `FAZER.AI`.
 
-### Testing Philosophy
-- Add specs when modifying code (use judgment)
-- Test behavior, not implementation
-- Consider cross-stack impacts (backend ↔ frontend)
+### Internacionalização
+Qualquer texto visível ao usuário **exige** tradução em `en` e `pt_BR`:
+```
+app/javascript/dashboard/i18n/locale/en/
+app/javascript/dashboard/i18n/locale/pt_BR/
+```
+
+### Novos canais / integrações
+Siga o padrão existente em `app/services/whatsapp/` ou `app/services/instagram/` — nunca coloque lógica de canal no controller.
+
+### Background jobs
+Toda operação demorada vai para Sidekiq. Jobs em `app/jobs/`, enterprise em `enterprise/app/jobs/`.
 
 ---
 
@@ -146,9 +169,10 @@ This repository includes **Synkra AIOS** - an AI-orchestrated development system
 <!-- AIOS-MANAGED-START: quality -->
 ## Quality Gates
 
-- Rode `npm run lint`
-- Rode `npm run typecheck`
-- Rode `npm test`
+- Rode `pnpm run eslint`
+- Rode `bundle exec rubocop`
+- Rode `pnpm test`
+- Rode `bundle exec rspec`
 - Atualize checklist e file list da story antes de concluir
 <!-- AIOS-MANAGED-END: quality -->
 

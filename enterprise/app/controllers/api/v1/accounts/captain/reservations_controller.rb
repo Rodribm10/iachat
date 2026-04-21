@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/ClassLength
 class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::BaseController
   CONFIRMED_STATUSES = %i[scheduled active completed].freeze
   RESULTS_PER_PAGE = 25
@@ -9,7 +10,7 @@ class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::Ba
   before_action :set_current_page, only: [:index]
   before_action :set_per_page, only: [:index]
   before_action :set_reservations_scope
-  before_action :set_reservation, only: [:show, :pix]
+  before_action :set_reservation, only: [:show, :pix, :cancel, :mark_as_paid, :regenerate_pix]
 
   def index
     scoped = apply_filters(@reservations_scope)
@@ -54,11 +55,57 @@ class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::Ba
     }
   end
 
+  def cancel
+    reason = params[:reason].to_s.strip
+    @reservation.metadata ||= {}
+    @reservation.metadata['cancelled_by_user_id'] = current_user.id
+    @reservation.metadata['cancelled_at'] = Time.current.iso8601
+    @reservation.metadata['cancel_reason'] = reason if reason.present?
+    @reservation.update!(status: :cancelled)
+    @marker = Captain::Reservations::MarkerBuilder.build_for(@reservation)
+    render 'api/v1/accounts/captain/reservations/show'
+  end
+
+  def mark_as_paid
+    @reservation.metadata ||= {}
+    @reservation.metadata['manual_payment_by_user_id'] = current_user.id
+    @reservation.metadata['manual_payment_at'] = Time.current.iso8601
+    @reservation.metadata['manual_payment_note'] = params[:note].to_s.strip if params[:note].present?
+    @reservation.update!(status: :scheduled, payment_status: 'paid')
+    @reservation.current_pix_charge&.update!(status: 'paid') if @reservation.current_pix_charge.present?
+    @marker = Captain::Reservations::MarkerBuilder.build_for(@reservation)
+    render 'api/v1/accounts/captain/reservations/show'
+  end
+
+  def regenerate_pix
+    raise 'Reservation not configured for PIX' if @reservation.unit.blank?
+
+    @reservation.current_pix_charge&.update!(status: 'expired')
+    Captain::Inter::CobService.new(@reservation).call
+    @reservation.update!(status: :pending_payment)
+    @reservation.reload
+    @marker = Captain::Reservations::MarkerBuilder.build_for(@reservation)
+    render 'api/v1/accounts/captain/reservations/show'
+  rescue StandardError => e
+    render json: { error: "Falha ao regerar PIX: #{e.message}" }, status: :unprocessable_entity
+  end
+
   private
 
   def set_reservations_scope
-    @reservations_scope = Current.account.captain_reservations
-                                 .includes(:contact, :unit, :conversation, :current_pix_charge)
+    scope = Current.account.captain_reservations
+                   .includes(:contact, :unit, :conversation, :current_pix_charge)
+    @reservations_scope = filter_by_user_inbox_access(scope)
+  end
+
+  # Agentes só enxergam reservas em caixas de entrada que eles podem acessar.
+  def filter_by_user_inbox_access(scope)
+    return scope if Current.user.administrator?
+
+    accessible_inbox_ids = Current.user.assigned_inboxes.pluck(:id)
+    return scope.none if accessible_inbox_ids.empty?
+
+    scope.where(inbox_id: accessible_inbox_ids)
   end
 
   def set_reservation
@@ -191,3 +238,4 @@ class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::Ba
     @reservation.contact_inbox_id = contact_inbox.id
   end
 end
+# rubocop:enable Metrics/ClassLength

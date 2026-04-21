@@ -3,6 +3,7 @@
 # Table name: captain_units
 #
 #  id                             :bigint           not null, primary key
+#  concierge_config               :jsonb            not null
 #  inter_account_number           :string
 #  inter_cert_content             :text
 #  inter_cert_path                :string
@@ -27,20 +28,23 @@
 #  updated_at                     :datetime         not null
 #  account_id                     :bigint           not null
 #  captain_brand_id               :bigint           not null
+#  concierge_inbox_id             :bigint
 #  inbox_id                       :bigint
 #  inter_client_id                :string
 #  plug_play_id                   :string
 #
 # Indexes
 #
-#  index_captain_units_on_account_id        (account_id)
-#  index_captain_units_on_captain_brand_id  (captain_brand_id)
-#  index_captain_units_on_inbox_id          (inbox_id)
+#  index_captain_units_on_account_id          (account_id)
+#  index_captain_units_on_captain_brand_id    (captain_brand_id)
+#  index_captain_units_on_concierge_inbox_id  (concierge_inbox_id)
+#  index_captain_units_on_inbox_id            (inbox_id)
 #
 # Foreign Keys
 #
 #  fk_rails_...  (account_id => accounts.id)
 #  fk_rails_...  (captain_brand_id => captain_brands.id)
+#  fk_rails_...  (concierge_inbox_id => inboxes.id)
 #  fk_rails_...  (inbox_id => inboxes.id)
 #
 

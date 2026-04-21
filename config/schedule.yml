@@ -13,6 +13,21 @@ trigger_scheduled_items_job:
   class: 'TriggerScheduledItemsJob'
   queue: scheduled_jobs
 
+# Fallback pra draws da roleta revelados cujo callback do front falhou.
+# Executa a cada 5 minutos.
+captain_roleta_notify_revealed_scheduler_job:
+  cron: '*/5 * * * *'
+  class: 'Captain::Roleta::NotifyRevealedSchedulerJob'
+  queue: scheduled_jobs
+
+# Re-engajamento de clientes recorrentes que sumiram há 60+ dias.
+# Roda de hora em hora das 13h às 20h UTC (10h às 17h BRT).
+# O job verifica internamente se está em horário comercial BRT + dia útil.
+captain_retention_churn_outreach_scheduler_job:
+  cron: '5 13-20 * * 1-5'
+  class: 'Captain::Retention::ChurnOutreachSchedulerJob'
+  queue: scheduled_jobs
+
 # executed every minute.
 trigger_scheduled_messages_job:
   cron: '* * * * *'
@@ -100,6 +115,23 @@ captain_notification_scanner_job:
 landing_hosts_promotion_sync_scheduler_job:
   cron: '0 * * * *'
   class: 'LandingHosts::PromotionSyncSchedulerJob'
+  queue: scheduled_jobs
+
+# Sunday at 04:00 UTC (01:00 BRT)
+# Generates weekly LLM insights for every account + every captain unit.
+# Each account gets a global insight (all conversations) plus one per unit.
+captain_weekly_insights_job:
+  cron: '0 4 * * 0'
+  class: 'Captain::Reports::WeeklyInsightsJob'
+  queue: scheduled_jobs
+
+# Monday at 11:00 UTC (08:00 BRT)
+# Aggregates last week's insights and delivers the CEO Digest to Mattermost.
+# Requires per-account config in account.custom_attributes.ceo_digest
+# or fallback ENV CEO_DIGEST_MATTERMOST_WEBHOOK_URL.
+captain_ceo_digest_job:
+  cron: '0 11 * * 1'
+  class: 'Captain::Reports::CeoDigestJob'
   queue: scheduled_jobs
 
 # every 10 minutes - detects silent conversations for memory extraction

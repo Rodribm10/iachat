@@ -112,6 +112,13 @@ Rails.application.routes.draw do
               resources :insights, only: [:index, :show] do
                 post :generate, on: :collection
               end
+              resource :funnel, only: [:show], controller: :funnel
+            end
+            # Roleta da Sorte - tela de resgate na recepção + relatório semanal
+            resource :roleta, only: [], controller: 'roleta' do
+              get :pending
+              post :redeem
+              get :weekly_report
             end
           end
           resource :saml_settings, only: [:show, :create, :update, :destroy]
@@ -724,6 +731,11 @@ Rails.application.routes.draw do
   # Webhook do Banco Inter para notificações de PIX pago
   post '/api/v1/captain/webhooks/inter_pix',
        to: 'public/api/v1/captain/inter_webhooks#create',
+       defaults: { format: 'json' }
+
+  # Callback do front (reserva-1001) quando o cliente gira a roleta
+  post '/api/v1/captain/roleta/notify',
+       to: 'public/api/v1/captain/roulette_notifications#create',
        defaults: { format: 'json' }
 
   # ---------------------------------------------------------------------

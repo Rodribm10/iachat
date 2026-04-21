@@ -33,5 +33,29 @@ export default createStore({
         commit(mutations.SET_UI_FLAG, { fetchingItem: false });
       }
     },
+    cancel: async function cancel(_, { id, reason = '' }) {
+      try {
+        const response = await CaptainReservationsAPI.cancel(id, reason);
+        return response.data;
+      } catch (error) {
+        return throwErrorMessage(error);
+      }
+    },
+    markAsPaid: async function markAsPaid(_, { id, note = '' }) {
+      try {
+        const response = await CaptainReservationsAPI.markAsPaid(id, note);
+        return response.data;
+      } catch (error) {
+        return throwErrorMessage(error);
+      }
+    },
+    regeneratePix: async function regeneratePix(_, id) {
+      try {
+        const response = await CaptainReservationsAPI.regeneratePix(id);
+        return response.data;
+      } catch (error) {
+        return throwErrorMessage(error);
+      }
+    },
   }),
 });

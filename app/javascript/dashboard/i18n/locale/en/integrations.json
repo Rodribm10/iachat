@@ -689,6 +689,11 @@
                 "PLACEHOLDER": "Describe how and where this scenario will be used",
                 "ERROR": "Scenario description is required"
               },
+              "TRIGGER_KEYWORDS": {
+                "LABEL": "When to use this scenario (triggers)",
+                "PLACEHOLDER": "USE WHEN:\n- Customer wants to book\n- Customer asks about price\n\nEXAMPLE TRIGGERS:\n- \"I want to book saturday\"\n- \"how much is it?\"\n\nDO NOT USE WHEN:\n- Customer just wants to see photos",
+                "HELP": "Optional but recommended. Use this field to teach the AI WHEN to route to this scenario. Clearer examples mean better routing accuracy."
+              },
               "INSTRUCTION": {
                 "LABEL": "How to handle",
                 "PLACEHOLDER": "Describe how and where this scenario will be handled",

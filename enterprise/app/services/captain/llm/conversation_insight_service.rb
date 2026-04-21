@@ -99,6 +99,7 @@ class Captain::Llm::ConversationInsightService < Llm::BaseAiService
     base['ai_failures'] = merge_by_description(base['ai_failures'], result['ai_failures'])
     base['faq_gaps'] = merge_by_question(base['faq_gaps'], result['faq_gaps'])
     base['most_requested_suites'] = merge_by_suite(base['most_requested_suites'], result['most_requested_suites'])
+    base['customer_opportunities'] = merge_by_opportunity(base['customer_opportunities'], result['customer_opportunities'])
   end
 
   def merge_sentiment!(base, result)
@@ -129,6 +130,10 @@ class Captain::Llm::ConversationInsightService < Llm::BaseAiService
     merge_arrays_by_key(arr_a, arr_b, 'suite', 'count')
   end
 
+  def merge_by_opportunity(arr_a, arr_b)
+    merge_arrays_by_key(arr_a, arr_b, 'opportunity', 'frequency')
+  end
+
   def merge_arrays_by_key(arr_a, arr_b, label_key, count_key)
     merged = ((arr_a || []) + (arr_b || [])).group_by { |item| item[label_key] }
     merged
@@ -155,6 +160,7 @@ class Captain::Llm::ConversationInsightService < Llm::BaseAiService
       'highlights' => { 'praises' => [], 'complaints' => [] },
       'most_requested_suites' => [],
       'price_reactions' => { 'summary' => '', 'objections_count' => 0 },
+      'customer_opportunities' => [],
       'recommendations' => [],
       'period_summary' => 'Sem conversas suficientes para análise no período.'
     }

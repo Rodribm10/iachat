@@ -2,12 +2,22 @@ class Api::V1::Accounts::Captain::Reports::OperationalController < Api::V1::Acco
   def show
     period_start = parse_date(params[:period_start], Time.zone.today.beginning_of_month)
     period_end = parse_date(params[:period_end], Time.zone.today)
-    unit = params[:unit_id].present? ? Current.account.captain_units.find_by(id: params[:unit_id]) : nil
-
-    render json: build_operational_report(unit, period_start, period_end)
+    render json: build_operational_report(find_unit, find_inbox, period_start, period_end)
   end
 
   private
+
+  def find_unit
+    return nil if params[:unit_id].blank?
+
+    Current.account.captain_units.find_by(id: params[:unit_id])
+  end
+
+  def find_inbox
+    return nil if params[:inbox_id].blank?
+
+    Current.account.inboxes.find_by(id: params[:inbox_id])
+  end
 
   def parse_date(param, default)
     param.present? ? Date.parse(param) : default
@@ -15,17 +25,20 @@ class Api::V1::Accounts::Captain::Reports::OperationalController < Api::V1::Acco
     default
   end
 
-  def build_operational_report(unit, period_start, period_end)
-    conversations = scoped_conversations(unit, period_start, period_end)
+  def build_operational_report(unit, inbox, period_start, period_end)
+    conversations = scoped_conversations(unit, inbox, period_start, period_end)
 
     {
       period: { start: period_start, end: period_end },
       unit_id: unit&.id,
       unit_name: unit&.name,
+      inbox_id: inbox&.id,
+      inbox_name: inbox&.name,
       conversations: conversation_metrics(conversations),
-      reservations: reservation_metrics(unit, period_start, period_end),
+      reservations: reservation_metrics(unit, inbox, period_start, period_end),
       hourly_distribution: hourly_distribution(conversations),
-      daily_distribution: daily_distribution(conversations, period_start, period_end)
+      daily_distribution: daily_distribution(conversations, period_start, period_end),
+      by_inbox: inbox.nil? ? by_inbox_breakdown(conversations) : []
     }
   end
 
@@ -42,8 +55,8 @@ class Api::V1::Accounts::Captain::Reports::OperationalController < Api::V1::Acco
     }
   end
 
-  def reservation_metrics(unit, period_start, period_end)
-    reservations = scoped_reservations(unit, period_start, period_end)
+  def reservation_metrics(unit, inbox, period_start, period_end)
+    reservations = scoped_reservations(unit, inbox, period_start, period_end)
     paid = reservations.where(status: 'paid')
     expired = reservations.where(status: 'expired')
 
@@ -73,19 +86,52 @@ class Api::V1::Accounts::Captain::Reports::OperationalController < Api::V1::Acco
     end
   end
 
-  def scoped_conversations(unit, period_start, period_end)
+  def scoped_conversations(unit, inbox, period_start, period_end)
     scope = Current.account.conversations.where(created_at: period_start.beginning_of_day..period_end.end_of_day)
-    if unit
+    if inbox
+      scope = scope.where(inbox_id: inbox.id)
+    elsif unit
       inbox_ids = unit.inboxes.pluck(:id)
       scope = scope.where(inbox_id: inbox_ids) if inbox_ids.any?
     end
     scope
   end
 
-  def scoped_reservations(unit, period_start, period_end)
+  def scoped_reservations(unit, inbox, period_start, period_end)
     scope = Current.account.captain_reservations.where(created_at: period_start.beginning_of_day..period_end.end_of_day)
-    scope = scope.where(captain_unit_id: unit.id) if unit
+    if inbox
+      conversation_ids = Current.account.conversations.where(inbox_id: inbox.id).pluck(:id)
+      scope = scope.where(conversation_id: conversation_ids)
+    elsif unit
+      scope = scope.where(captain_unit_id: unit.id)
+    end
     scope
+  end
+
+  def by_inbox_breakdown(conversations)
+    resolved_int = Conversation.statuses['resolved']
+    open_int = Conversation.statuses['open']
+    inbox_data = conversations.group(:inbox_id).pluck(
+      :inbox_id,
+      Arel.sql('COUNT(*)'),
+      Arel.sql("COUNT(*) FILTER (WHERE status = #{resolved_int})"),
+      Arel.sql("COUNT(*) FILTER (WHERE status = #{open_int})")
+    )
+    inbox_names = Current.account.inboxes.where(id: inbox_data.map(&:first)).pluck(:id, :name).to_h
+
+    rows = inbox_data.map { |inbox_id, total, resolved, open| build_inbox_row(inbox_id, total, resolved, open, inbox_names) }
+    rows.sort_by { |row| -row[:total] }
+  end
+
+  def build_inbox_row(inbox_id, total, resolved, open, inbox_names)
+    {
+      inbox_id: inbox_id,
+      inbox_name: inbox_names[inbox_id] || "Canal ##{inbox_id}",
+      total: total,
+      resolved: resolved,
+      open: open,
+      resolution_rate: safe_rate(resolved, total)
+    }
   end
 
   def avg_resolution_minutes(conversations)

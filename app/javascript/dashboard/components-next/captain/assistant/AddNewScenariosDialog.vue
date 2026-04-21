@@ -21,6 +21,7 @@ const state = reactive({
   id: '',
   title: '',
   description: '',
+  trigger_keywords: '',
   instruction: '',
 });
 
@@ -55,6 +56,7 @@ const resetState = () => {
     id: '',
     title: '',
     description: '',
+    trigger_keywords: '',
     instruction: '',
   });
 };
@@ -118,6 +120,24 @@ const onClickCancel = () => {
           :message="descriptionError"
           :message-type="descriptionError ? 'error' : 'info'"
           show-character-count
+        />
+        <TextArea
+          v-model="state.trigger_keywords"
+          :label="
+            t(
+              'CAPTAIN.ASSISTANTS.SCENARIOS.ADD.NEW.FORM.TRIGGER_KEYWORDS.LABEL'
+            )
+          "
+          :placeholder="
+            t(
+              'CAPTAIN.ASSISTANTS.SCENARIOS.ADD.NEW.FORM.TRIGGER_KEYWORDS.PLACEHOLDER'
+            )
+          "
+          :message="
+            t('CAPTAIN.ASSISTANTS.SCENARIOS.ADD.NEW.FORM.TRIGGER_KEYWORDS.HELP')
+          "
+          message-type="info"
+          rows="8"
         />
         <Editor
           v-model="state.instruction"

@@ -419,6 +419,18 @@ const menuItems = computed(() => {
           to: accountScopedRoute('captain_reservations_index'),
         },
         {
+          name: 'Roleta',
+          label: t('SIDEBAR.CAPTAIN_ROLETA'),
+          activeOn: ['captain_roleta_index'],
+          to: accountScopedRoute('captain_roleta_index'),
+        },
+        {
+          name: 'Funnel',
+          label: t('SIDEBAR.CAPTAIN_FUNNEL'),
+          activeOn: ['captain_funnel_index'],
+          to: accountScopedRoute('captain_funnel_index'),
+        },
+        {
           name: 'Reports',
           label: t('SIDEBAR.CAPTAIN_REPORTS'),
           activeOn: ['captain_settings_reports'],

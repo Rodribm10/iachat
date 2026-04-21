@@ -284,6 +284,7 @@ onMounted(() => {
             :key="scenario.id"
             :title="scenario.title"
             :description="scenario.description"
+            :trigger-keywords="scenario.trigger_keywords"
             :instruction="scenario.instruction"
             :tools="scenario.tools"
             :is-selected="bulkSelectedIds.has(scenario.id)"

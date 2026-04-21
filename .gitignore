@@ -129,3 +129,10 @@ Thumbs.db
 .env.aios
 .env.backup*
 reference/chatwoot-develop
+
+# Credentials / secrets — NUNCA commitar
+docs/acessos_vps.md
+docs/acessos*.md
+**/acessos_vps*
+**/*_secrets.md
+**/*.credentials

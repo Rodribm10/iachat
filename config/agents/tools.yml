@@ -59,3 +59,13 @@
   title: 'Gerar Link de Reserva'
   description: 'Gera um link da pagina publica de reserva ja pre-preenchida, pronto para o cliente revisar e pagar'
   icon: 'link'
+
+- id: get_reserva_preco
+  title: 'Consultar Preco da Reserva'
+  description: 'Consulta o preco oficial de uma suite no banco de reservas (categoria + permanencia + periodo da semana)'
+  icon: 'currency-dollar'
+
+- id: generate_roleta_link
+  title: 'Oferecer Roleta da Sorte'
+  description: 'Oferece ao cliente uma roleta de brindes apos a reserva ser fechada. Envia a mensagem de agradecimento + link automaticamente.'
+  icon: 'gift'

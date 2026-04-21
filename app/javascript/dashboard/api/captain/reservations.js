@@ -25,6 +25,18 @@ class CaptainReservations extends ApiClient {
   pix(id) {
     return axios.get(`${this.url}/${id}/pix`);
   }
+
+  cancel(id, reason = '') {
+    return axios.post(`${this.url}/${id}/cancel`, { reason });
+  }
+
+  markAsPaid(id, note = '') {
+    return axios.post(`${this.url}/${id}/mark_as_paid`, { note });
+  }
+
+  regeneratePix(id) {
+    return axios.post(`${this.url}/${id}/regenerate_pix`, {});
+  }
 }
 
 export default new CaptainReservations();

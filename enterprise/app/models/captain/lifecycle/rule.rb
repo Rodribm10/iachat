@@ -1,5 +1,36 @@
 # frozen_string_literal: true
 
+# == Schema Information
+#
+# Table name: captain_lifecycle_rules
+#
+#  id                 :bigint           not null, primary key
+#  description        :text
+#  enabled            :boolean          default(TRUE), not null
+#  event              :string           not null
+#  filters            :jsonb            not null
+#  message_body       :text             not null
+#  message_payload    :jsonb
+#  message_type       :string           default("text"), not null
+#  name               :string           not null
+#  offset_minutes     :integer          default(0), not null
+#  priority           :integer          default(50), not null
+#  created_at         :datetime         not null
+#  updated_at         :datetime         not null
+#  account_id         :bigint           not null
+#  created_by_user_id :bigint
+#
+# Indexes
+#
+#  idx_on_account_id_enabled_event_2d8b8a9942           (account_id,enabled,event)
+#  index_captain_lifecycle_rules_on_account_id          (account_id)
+#  index_captain_lifecycle_rules_on_created_by_user_id  (created_by_user_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (account_id => accounts.id)
+#  fk_rails_...  (created_by_user_id => users.id)
+#
 class Captain::Lifecycle::Rule < ApplicationRecord
   self.table_name = 'captain_lifecycle_rules'
 

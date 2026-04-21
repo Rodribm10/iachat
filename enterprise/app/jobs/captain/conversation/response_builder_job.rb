@@ -19,6 +19,33 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     /\AYou are part of Captain,/i
   ].freeze
 
+  # Padrões que indicam vazamento de "pensamento" / instrução interna em qualquer parte da mensagem.
+  # Se a resposta contém qualquer um destes, ela está descrevendo o que fazer em vez de fazer.
+  # Bloqueia e força handoff humano para evitar que o cliente veja conteúdo interno.
+  THOUGHT_LEAK_PATTERNS = [
+    # Narração em terceira pessoa sobre o próprio assistente
+    /\b(jasmine|a\s+ia|o\s+assistente|o\s+bot)\s+(deve|deveria|precisa|tem\s+que|nunca\s+deve|n[ãa]o\s+deve)\b/i,
+    # Instrução condicional vazada
+    /\bquando\s+o\s+cliente\s+(fa[zç]er|disser|pedir|perguntar|falar|usar|mencionar|informar)\b/i,
+    # Comandos imperativos pra IA disfarçados de resposta
+    /\b(busque|consulte|acione|chame|use)\s+(a\s+)?ferramenta\b/i,
+    /\b(passe|envie|repasse)\s+para\s+(ele|ela|o\s+cliente)\b/i,
+    # Nomes técnicos de tools/handoffs nunca devem aparecer ao cliente
+    /\bhandoff_to_/i,
+    /\bcaptain--tools--/i,
+    /\b(daniela_reservas|maria_fotos|disponibilidade_suites|outras_unidades)\b/i,
+    /\bhandoff_imediato\b/i,
+    # Descrições meta de fluxo
+    /\b(fluxo\s+correto|gatilhos?\s+de\s+exemplo|antes\s+de\s+responder|antes\s+de\s+gerar)\b/i,
+    # JSON cru / blocos de schema
+    /\A\s*[{\[]/,
+    /"reasoning"\s*:/,
+    /"reaction_emoji"\s*:/,
+    # Liquid não renderizado
+    /\{\{\s*\w+\s*\}\}/,
+    /\{%\s*\w+/
+  ].freeze
+
   retry_on ActiveStorage::FileNotFoundError, attempts: 3, wait: 2.seconds
   retry_on Faraday::BadRequestError, attempts: 3, wait: 2.seconds
 
@@ -270,7 +297,10 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
 
   def system_prompt_leak?(content)
     text = content.is_a?(String) ? content.strip : content.to_s.strip
-    SYSTEM_PROMPT_LEAK_PATTERNS.any? { |pattern| text.match?(pattern) }
+    return true if SYSTEM_PROMPT_LEAK_PATTERNS.any? { |pattern| text.match?(pattern) }
+    return true if THOUGHT_LEAK_PATTERNS.any? { |pattern| text.match?(pattern) }
+
+    false
   end
 
   def create_outgoing_message(message_content, agent_name: nil)

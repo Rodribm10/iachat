@@ -11,11 +11,15 @@ class Captain::Payments::ConfirmationService
   end
 
   def perform
+    was_already_paid = reservation.payment_status.to_s == 'paid'
+
     ActiveRecord::Base.transaction do
       mark_reservation_paid!
       sync_conversation_labels!
       create_internal_note_once!
     end
+
+    enqueue_roulette_offer! unless was_already_paid
 
     Rails.logger.info "[PaymentConfirmation] Reserva #{@reservation.id} confirmada (#{source_label})"
   end
@@ -76,5 +80,13 @@ class Captain::Payments::ConfirmationService
     metadata['payment_confirmed_source'] ||= source
     metadata['payment_confirmed_payload'] ||= payload if payload.present?
     reservation.update_column(:metadata, metadata)
+  end
+
+  # Dispara a oferta da Roleta da Sorte após confirmação.
+  # Fora da transação — roleta é side effect; se falhar, confirmação continua válida.
+  def enqueue_roulette_offer!
+    Captain::Payments::OfferRouletteJob.perform_later(reservation.id)
+  rescue StandardError => e
+    Rails.logger.warn("[PaymentConfirmation] falha ao enfileirar roleta reserva=#{reservation.id}: #{e.class} - #{e.message}")
   end
 end

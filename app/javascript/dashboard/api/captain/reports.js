@@ -21,6 +21,18 @@ class CaptainReportsAPI extends ApiClient {
   generateInsight(data) {
     return axios.post(`${this.url}/insights/generate`, data);
   }
+
+  getExecutive(params = {}) {
+    return axios.get(`${this.url}/executive`, { params });
+  }
+
+  drilldown(params = {}) {
+    return axios.get(`${this.url}/executive/drilldown`, { params });
+  }
+
+  deliverExecutive(params = {}) {
+    return axios.post(`${this.url}/executive/deliver`, params);
+  }
 }
 
 export default new CaptainReportsAPI();

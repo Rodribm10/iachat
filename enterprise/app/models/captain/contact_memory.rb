@@ -3,25 +3,41 @@
 # Table name: captain_contact_memories
 #
 #  id                     :bigint           not null, primary key
-#  account_id             :bigint           not null
-#  contact_id             :bigint           not null
-#  memory_type            :string           not null
-#  content                :text             not null
-#  evidence               :text             not null
 #  confidence             :float            not null
-#  scope                  :string           not null, default: 'global'
+#  content                :text             not null
+#  deleted_at             :datetime
 #  embedding              :vector(1536)
-#  source_conversation_id :bigint
-#  source_unit_id         :bigint
-#  source_inbox_id        :bigint
+#  evidence               :text             not null
 #  expires_at             :datetime
 #  last_verified_at       :datetime         not null
+#  memory_type            :string           not null
+#  metadata               :jsonb            not null
+#  scope                  :string           default("global"), not null
 #  superseded_at          :datetime
-#  superseded_by_id       :bigint
-#  deleted_at             :datetime
-#  metadata               :jsonb            not null, default: {}
 #  created_at             :datetime         not null
 #  updated_at             :datetime         not null
+#  account_id             :bigint           not null
+#  contact_id             :bigint           not null
+#  source_conversation_id :bigint
+#  source_inbox_id        :bigint
+#  source_unit_id         :bigint
+#  superseded_by_id       :bigint
+#
+# Indexes
+#
+#  idx_ccm_analytics                             (source_unit_id,memory_type,created_at)
+#  idx_ccm_embedding                             (embedding) USING ivfflat
+#  idx_ccm_hard_delete                           (deleted_at) WHERE (deleted_at IS NOT NULL)
+#  idx_ccm_recall                                (account_id,contact_id) WHERE ((deleted_at IS NULL) AND (superseded_at IS NULL))
+#  idx_ccm_source_conversation                   (source_conversation_id)
+#  idx_ccm_superseded                            (superseded_by_id) WHERE (superseded_at IS NOT NULL)
+#  index_captain_contact_memories_on_account_id  (account_id)
+#  index_captain_contact_memories_on_contact_id  (contact_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (account_id => accounts.id) ON DELETE => cascade
+#  fk_rails_...  (contact_id => contacts.id) ON DELETE => cascade
 #
 class Captain::ContactMemory < ApplicationRecord
   self.table_name = 'captain_contact_memories'

@@ -547,7 +547,14 @@
         "RESET_BUTTON": "Restaurar Padrão",
         "USING_DEFAULT": "Usando prompt padrão do sistema",
         "USING_CUSTOM": "Usando prompt customizado",
-        "VALIDATION_ERROR": "O prompt não pode ficar em branco. Use 'Restaurar Padrão' para voltar ao padrão do sistema."
+        "VALIDATION_ERROR": "O prompt não pode ficar em branco. Use 'Restaurar Padrão' para voltar ao padrão do sistema.",
+        "SYSTEM_LABEL": "Prompt Base do Sistema",
+        "SYSTEM_DESCRIPTION": "Estrutura técnica do Captain — contexto, identidade e handoff. Altere só se souber o que está fazendo.",
+        "SYSTEM_PLACEHOLDER": "Prompt base do sistema (contexto, identidade, handoff)...",
+        "ASSISTANT_LABEL": "Instruções do Assistente",
+        "ASSISTANT_DESCRIPTION": "Configure aqui o comportamento, regras, tom e personalidade específicos deste assistente.",
+        "ASSISTANT_PLACEHOLDER": "Defina as instruções específicas do assistente: tom de voz, regras de negócio, restrições, fluxos de atendimento...",
+        "DIVIDER_LABEL": "✏️ início das configurações do assistente"
       },
       "OPTIONS": {
         "EDIT_ASSISTANT": "Editar Assistente",
@@ -681,6 +688,11 @@
                 "LABEL": "Descrição",
                 "PLACEHOLDER": "Descreva como e onde este cenário será utilizado",
                 "ERROR": "Descrição do cenário é obrigatória"
+              },
+              "TRIGGER_KEYWORDS": {
+                "LABEL": "Quando usar este cenário (gatilhos)",
+                "PLACEHOLDER": "USE QUANDO:\n- Cliente quer reservar\n- Cliente pergunta preço\n\nEXEMPLOS DE GATILHOS:\n- \"quero reservar sábado\"\n- \"quanto custa?\"\n\nNÃO USE QUANDO:\n- Cliente só quer ver fotos",
+                "HELP": "Opcional, mas recomendado. Use este campo para ensinar a IA QUANDO rotear para este cenário. Quanto mais claro e com exemplos, melhor a precisão do roteamento."
               },
               "INSTRUCTION": {
                 "LABEL": "Como lidar",
