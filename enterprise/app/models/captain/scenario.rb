@@ -72,6 +72,10 @@ class Captain::Scenario < ApplicationRecord
   # from a stronger model. Falls back to the global CAPTAIN_OPEN_AI_MODEL
   # (used by the orchestrator) when SCENARIO-specific override is unset.
   def agent_model
+    # Em modo Codex OAuth, ignora CAPTAIN_OPEN_AI_MODEL_SCENARIO (pode ter modelo
+    # legado como gpt-4o que o Codex rejeita) e usa o modelo padrão do provider.
+    return Captain::Llm::ProviderConfig.model if Captain::Llm::ProviderConfig.codex_oauth?
+
     scenario_model = InstallationConfig.find_by(name: 'CAPTAIN_OPEN_AI_MODEL_SCENARIO')&.value.presence
     scenario_model || super
   end

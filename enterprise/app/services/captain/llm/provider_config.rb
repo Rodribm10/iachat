@@ -18,6 +18,19 @@ class Captain::Llm::ProviderConfig
   DEFAULT_CODEX_PROXY_URL = 'http://localhost:3000/codex'.freeze
   DUMMY_API_KEY = 'codex-oauth'.freeze
 
+  # Modelo padrão pro Codex. gpt-5.2 é o mais recente reconhecido pelo RubyLLM
+  # (gpt-5.4 ainda não está no catalog do gem). Ambos são suportados pelo
+  # endpoint Codex da OpenAI via ChatGPT Plus.
+  DEFAULT_CODEX_MODEL = 'gpt-5.2'.freeze
+
+  # Modelo leve pra tasks de background (extração de memória, verificação de
+  # contradição, traduções internas). Quando usamos Codex, reutilizamos o
+  # mesmo modelo do chat — o endpoint não expõe gpt-4o-mini.
+  LIGHT_MODEL_DEFAULTS = {
+    'openai_api' => 'gpt-4o-mini',
+    'openai_codex_oauth' => DEFAULT_CODEX_MODEL
+  }.freeze
+
   class << self
     def provider
       cfg('CAPTAIN_LLM_PROVIDER').presence || 'openai_api'
@@ -49,13 +62,29 @@ class Captain::Llm::ProviderConfig
       settings[:model]
     end
 
+    # Modelo pra tasks leves (memory extraction, contradiction check, etc).
+    # Respeita a flag de provider: em Codex OAuth, usa o mesmo modelo do chat.
+    def light_model
+      LIGHT_MODEL_DEFAULTS[provider] || LIGHT_MODEL_DEFAULTS['openai_api']
+    end
+
+    # Settings sempre da OpenAI tradicional, independente do provider.
+    # Usado por recursos que o endpoint Codex NÃO expõe: /embeddings e Files API.
+    # Lança AuthError se não houver CAPTAIN_OPEN_AI_API_KEY configurada.
+    def legacy_openai_settings
+      {
+        api_key: cfg('CAPTAIN_OPEN_AI_API_KEY'),
+        api_base: (cfg('CAPTAIN_OPEN_AI_ENDPOINT').presence || DEFAULT_OPENAI_ENDPOINT).chomp('/')
+      }
+    end
+
     private
 
     def codex_settings
       {
         api_key: DUMMY_API_KEY,
         api_base: (cfg('CAPTAIN_CODEX_PROXY_URL').presence || DEFAULT_CODEX_PROXY_URL).chomp('/'),
-        model: cfg('CAPTAIN_OPEN_AI_MODEL').presence || default_codex_model
+        model: cfg('CAPTAIN_OPEN_AI_MODEL').presence || DEFAULT_CODEX_MODEL
       }
     end
 
@@ -65,10 +94,6 @@ class Captain::Llm::ProviderConfig
         api_base: (cfg('CAPTAIN_OPEN_AI_ENDPOINT').presence || DEFAULT_OPENAI_ENDPOINT).chomp('/'),
         model: cfg('CAPTAIN_OPEN_AI_MODEL').presence || DEFAULT_MODEL
       }
-    end
-
-    def default_codex_model
-      'gpt-5.4'
     end
 
     def cfg(name)

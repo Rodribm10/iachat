@@ -6,7 +6,10 @@ class Captain::ContactMemories::ContradictionCheckerService
   # Above CONFLICT_THRESHOLD: ignore — unrelated facts.
   DEDUP_THRESHOLD = 0.15
   CONFLICT_THRESHOLD = 0.6
-  CHECK_MODEL = 'gpt-4o-mini'.freeze
+
+  def self.check_model
+    Captain::Llm::ProviderConfig.light_model
+  end
 
   def initialize(memory:)
     @memory = memory
@@ -51,7 +54,7 @@ class Captain::ContactMemories::ContradictionCheckerService
   end
 
   def query_llm_for_contradiction(fact_a, fact_b)
-    response = RubyLLM.chat(model: CHECK_MODEL).with_temperature(0).ask(contradiction_prompt(fact_a, fact_b)).content.to_s
+    response = RubyLLM.chat(model: self.class.check_model).with_temperature(0).ask(contradiction_prompt(fact_a, fact_b)).content.to_s
     # Extract the first meaningful word. Expected "sim" or "nao" (or "não").
     first_word = response.strip.downcase.gsub(/[^a-zãáéíóúç]/, ' ').split.first.to_s
     # Normalize "não" → "nao" for ASCII comparison

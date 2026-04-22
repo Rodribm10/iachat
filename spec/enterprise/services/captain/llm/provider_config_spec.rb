@@ -37,8 +37,8 @@ RSpec.describe Captain::Llm::ProviderConfig do
         expect(settings[:api_base]).to eq('http://localhost:3000/codex')
       end
 
-      it 'falls back to default gpt-5.4 model when no custom model is set' do
-        expect(described_class.settings[:model]).to eq('gpt-5.4')
+      it 'falls back to DEFAULT_CODEX_MODEL when no custom model is set' do
+        expect(described_class.settings[:model]).to eq(described_class::DEFAULT_CODEX_MODEL)
       end
 
       it 'honors CAPTAIN_OPEN_AI_MODEL override even with Codex OAuth' do

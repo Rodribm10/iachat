@@ -1,3 +1,24 @@
+# == Schema Information
+#
+# Table name: captain_codex_credentials
+#
+#  id                 :bigint           not null, primary key
+#  access_token       :text             not null
+#  chatgpt_plan_type  :string
+#  email              :string
+#  expires_at         :datetime         not null
+#  last_refresh_at    :datetime
+#  refresh_token      :text             not null
+#  status             :string           default("active"), not null
+#  created_at         :datetime         not null
+#  updated_at         :datetime         not null
+#  chatgpt_account_id :string
+#
+# Indexes
+#
+#  index_captain_codex_credentials_on_expires_at  (expires_at)
+#  index_captain_codex_credentials_on_status      (status)
+#
 class Captain::CodexCredential < ApplicationRecord
   self.table_name = 'captain_codex_credentials'
 

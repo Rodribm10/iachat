@@ -1,5 +1,7 @@
 class Captain::Llm::TranslateQueryService < Captain::BaseTaskService
-  MODEL = 'gpt-4.1-nano'.freeze
+  def self.model
+    Captain::Llm::ProviderConfig.light_model
+  end
 
   pattr_initialize [:account!]
 
@@ -11,7 +13,7 @@ class Captain::Llm::TranslateQueryService < Captain::BaseTaskService
       { role: 'user', content: query }
     ]
 
-    response = make_api_call(model: MODEL, messages: messages)
+    response = make_api_call(model: self.class.model, messages: messages)
     return query if response[:error]
 
     response[:message].strip

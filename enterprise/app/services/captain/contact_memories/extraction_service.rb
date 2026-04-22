@@ -2,9 +2,12 @@
 class Captain::ContactMemories::ExtractionService
   MAX_FACTS = 5
   MIN_CONFIDENCE = 0.5
-  EXTRACTION_MODEL = 'gpt-4o-mini'.freeze
   MAX_CHARS = 40_000 # matches Captain::Llm::ConversationInsightService convention
   SCOPE_PATTERN = /\A(global|unit:\d+)\z/
+
+  def self.extraction_model
+    Captain::Llm::ProviderConfig.light_model
+  end
 
   def initialize(conversation:)
     @conversation = conversation
@@ -28,7 +31,7 @@ class Captain::ContactMemories::ExtractionService
   # TODO(phase-6): add Integrations::LlmInstrumentation wrap for OTEL metrics
   # (extraction_count, extraction_cost, facts_per_call, llm_error_rate).
   def call_llm
-    RubyLLM.chat(model: EXTRACTION_MODEL)
+    RubyLLM.chat(model: self.class.extraction_model)
            .with_temperature(0)
            .with_params(response_format: { type: 'json_object' })
            .ask(build_prompt)

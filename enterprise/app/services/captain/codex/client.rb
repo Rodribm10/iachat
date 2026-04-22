@@ -11,6 +11,8 @@ require 'net/http'
 # os eventos SSE em um response final no mesmo formato do /responses síncrono.
 class Captain::Codex::Client
   API_BASE = 'https://chatgpt.com/backend-api/codex'.freeze
+  MAX_RETRIES = 2
+  RETRY_DELAYS = [0.5, 1.5].freeze # segundos, backoff crescente
 
   class Error < StandardError
     attr_reader :http_status
@@ -22,18 +24,48 @@ class Captain::Codex::Client
   end
 
   def responses(body)
+    attempt = 0
+    begin
+      attempt += 1
+      call_responses(body)
+    rescue Error => e
+      if retryable?(e) && attempt <= MAX_RETRIES
+        sleep_time = RETRY_DELAYS[attempt - 1] || RETRY_DELAYS.last
+        Rails.logger.warn("[Captain::Codex::Client] Retry #{attempt}/#{MAX_RETRIES} after #{sleep_time}s: #{e.message[0, 200]}")
+        sleep sleep_time
+        retry
+      end
+      raise
+    end
+  end
+
+  private
+
+  def call_responses(body)
     access_token = Captain::Codex::AuthService.valid_access_token
     state = { items: [], usage: nil, id: nil, model: nil, completed: false, error: nil }
 
     stream_post(access_token, body) { |event, data| handle_event(event, data, state) }
 
-    raise Error, "Stream failed: #{state[:error].inspect[0, 500]}" if state[:error]
+    raise transient_error("Stream failed: #{state[:error].inspect[0, 500]}") if state[:error]
     raise Error, 'Stream finished without response.completed' unless state[:completed]
 
     { 'id' => state[:id], 'model' => state[:model], 'output' => state[:items], 'usage' => state[:usage] }
   end
 
-  private
+  def transient_error(message)
+    Error.new(message, http_status: 503)
+  end
+
+  # Retry apenas em erros transitórios: server_error upstream ou HTTP 5xx.
+  # Não retenta erros de auth (401/403) ou de validação (400).
+  def retryable?(error)
+    return true if error.http_status && error.http_status >= 500
+    return true if error.message.include?('server_error')
+    return true if error.message.include?('Stream finished without response.completed')
+
+    false
+  end
 
   def handle_event(event, data, state)
     case event
