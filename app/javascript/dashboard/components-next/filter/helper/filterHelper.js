@@ -28,6 +28,12 @@ export const CONTACT_ATTRIBUTES = {
   REFERER: 'referer',
   BLOCKED: 'blocked',
   LABELS: 'labels',
+  // Retenção / recorrência (stats desnormalizados em contacts)
+  IS_RECURRING: 'is_recurring',
+  LAST_INTERACTION_AT: 'last_interaction_at',
+  DAYS_SINCE_LAST_INTERACTION: 'days_since_last_interaction',
+  INTERACTIONS_COUNT: 'interactions_count',
+  RESERVATIONS_PAID_COUNT: 'reservations_paid_count',
 };
 
 /**

@@ -533,7 +533,74 @@
       "INSIGHTS": "Insights IA",
       "OPERATIONAL": "Operacional",
       "EXECUTIVE": "Executivo",
-      "LANDING_PAGES": "Landing Pages"
+      "LANDING_PAGES": "Landing Pages",
+      "RETENTION": "Retenção"
+    },
+    "RETENTION": {
+      "PERIOD_LABEL": "Período",
+      "PERIOD_THIS_MONTH": "Este mês",
+      "PERIOD_LAST_30": "Últimos 30 dias",
+      "PERIOD_LAST_90": "Últimos 90 dias",
+      "PERIOD_CUSTOM": "Personalizado",
+      "APPLY": "Aplicar",
+      "NO_DATA": "Sem dados.",
+      "KPI": {
+        "ACTIVE": "Clientes ativos",
+        "ACTIVE_HINT": "última interação nos últimos 30 dias",
+        "RECURRING": "Recorrentes",
+        "RECURRING_HINT": "≥2 interações qualificadas em 90 dias",
+        "RETURN_30D": "Taxa de retorno 30d",
+        "RETURN_30D_HINT": "voltaram a interagir em 7 dias",
+        "PIX_CONVERSION": "Conversão Pix",
+        "PIX_CONVERSION_HINT": "{paid} pagos de {generated} gerados"
+      },
+      "FLOW": {
+        "TITLE": "Fluxo do período",
+        "NEW_IN_PERIOD": "novos no período",
+        "RETURNED_IN_PERIOD": "retornaram no período",
+        "TOTAL_TOUCHES": "interações totais",
+        "BASE_STATUS": "Situação atual da base",
+        "SLEEPING": "{count} adormecidos",
+        "SLEEPING_HINT": "30-90d sem contato",
+        "AT_RISK": "{count} em risco",
+        "AT_RISK_HINT": "90-180d sem contato",
+        "CHURNED": "{count} inativos",
+        "CHURNED_HINT": "180d+ sem contato"
+      },
+      "COHORT": {
+        "TITLE": "Matriz de cohort",
+        "SUBTITLE": "% de clientes de cada cohort que voltaram a interagir em M+N meses.",
+        "EXPORT_CSV": "Exportar CSV",
+        "EMPTY": "Ainda não há cohorts com dados.",
+        "COL_COHORT": "Cohort",
+        "COL_SIZE": "Tamanho",
+        "CELL_TITLE": "{count} contatos ativos ({rate}%)"
+      },
+      "BADGE": {
+        "STATUS_FIRST": "Primeiro contato",
+        "STATUS_INACTIVE": "Inativo",
+        "STATUS_AT_RISK": "Em risco",
+        "STATUS_SLEEPING": "Adormecido",
+        "STATUS_RECURRING": "Recorrente",
+        "STATUS_ACTIVE": "Ativo",
+        "LAST_INTERACTION": "última {days}",
+        "INTERACTIONS_LABEL": "interação | interações",
+        "INTERACTIONS_TITLE": "Interações qualificadas (≥2+2 mensagens)",
+        "ONE_SHOT_LABEL": "one-shot",
+        "ONE_SHOT_TITLE": "Consultas one-shot (≥1+1)",
+        "PIX_LABEL": "Pix pagos",
+        "PIX_TITLE": "Pix gerados / reservas pagas",
+        "DAYS_TODAY": "hoje",
+        "DAYS_YESTERDAY": "ontem",
+        "DAYS_RECENT": "há {days} dias",
+        "DAYS_ONE_MONTH": "há cerca de 1 mês",
+        "DAYS_MONTHS": "há {months} meses",
+        "DAYS_YEARS": "há {years} anos"
+      },
+      "ERRORS": {
+        "SUMMARY": "Falha ao carregar KPIs de retenção",
+        "COHORT": "Falha ao carregar cohort"
+      }
     },
     "EXECUTIVE": {
       "LOADING": "Carregando digest executivo...",

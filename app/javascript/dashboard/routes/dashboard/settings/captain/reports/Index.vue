@@ -8,6 +8,7 @@ import SettingsLayout from '../../SettingsLayout.vue';
 import BaseSettingsHeader from '../../components/BaseSettingsHeader.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
 import CaptainReportsAPI from 'dashboard/api/captain/reports';
+import RetentionTab from './retention/RetentionTab.vue';
 
 const { t } = useI18n();
 const store = useStore();
@@ -31,6 +32,7 @@ const tabs = [
   { key: 'operational' },
   { key: 'executive' },
   { key: 'landing_pages' },
+  { key: 'retention' },
 ];
 
 const lpStats = ref(null);
@@ -426,6 +428,7 @@ const tabLabel = key => {
     operational: t('CAPTAIN_REPORTS.TABS.OPERATIONAL'),
     executive: t('CAPTAIN_REPORTS.TABS.EXECUTIVE'),
     landing_pages: 'Landing Pages',
+    retention: 'Retenção',
   };
   return map[key] || key;
 };
@@ -2724,6 +2727,11 @@ const maxHandoffCount = computed(() =>
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- Tab: Retenção -->
+        <div v-else-if="activeTab === 'retention'" class="p-4">
+          <RetentionTab />
         </div>
       </div>
     </template>

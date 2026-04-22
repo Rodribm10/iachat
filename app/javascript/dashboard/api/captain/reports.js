@@ -33,6 +33,14 @@ class CaptainReportsAPI extends ApiClient {
   deliverExecutive(params = {}) {
     return axios.post(`${this.url}/executive/deliver`, params);
   }
+
+  getRetention(params = {}) {
+    return axios.get(`${this.url}/retention`, { params });
+  }
+
+  getRetentionCohort(params = {}) {
+    return axios.get(`${this.url}/retention/cohort`, { params });
+  }
 }
 
 export default new CaptainReportsAPI();

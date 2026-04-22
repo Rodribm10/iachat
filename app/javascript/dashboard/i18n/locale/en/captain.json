@@ -531,7 +531,74 @@
       "INSIGHTS": "AI Insights",
       "OPERATIONAL": "Operational",
       "EXECUTIVE": "Executive",
-      "LANDING_PAGES": "Landing Pages"
+      "LANDING_PAGES": "Landing Pages",
+      "RETENTION": "Retention"
+    },
+    "RETENTION": {
+      "PERIOD_LABEL": "Period",
+      "PERIOD_THIS_MONTH": "This month",
+      "PERIOD_LAST_30": "Last 30 days",
+      "PERIOD_LAST_90": "Last 90 days",
+      "PERIOD_CUSTOM": "Custom",
+      "APPLY": "Apply",
+      "NO_DATA": "No data.",
+      "KPI": {
+        "ACTIVE": "Active customers",
+        "ACTIVE_HINT": "last interaction within 30 days",
+        "RECURRING": "Recurring",
+        "RECURRING_HINT": "≥2 qualified interactions in 90 days",
+        "RETURN_30D": "30-day return rate",
+        "RETURN_30D_HINT": "returned to interact within 7 days",
+        "PIX_CONVERSION": "Pix conversion",
+        "PIX_CONVERSION_HINT": "{paid} paid out of {generated} generated"
+      },
+      "FLOW": {
+        "TITLE": "Period flow",
+        "NEW_IN_PERIOD": "new in period",
+        "RETURNED_IN_PERIOD": "returned in period",
+        "TOTAL_TOUCHES": "total interactions",
+        "BASE_STATUS": "Current base status",
+        "SLEEPING": "{count} sleeping",
+        "SLEEPING_HINT": "30-90d without contact",
+        "AT_RISK": "{count} at risk",
+        "AT_RISK_HINT": "90-180d without contact",
+        "CHURNED": "{count} inactive",
+        "CHURNED_HINT": "180d+ without contact"
+      },
+      "COHORT": {
+        "TITLE": "Cohort matrix",
+        "SUBTITLE": "% of each cohort's customers who returned to interact in M+N months.",
+        "EXPORT_CSV": "Export CSV",
+        "EMPTY": "No cohort data yet.",
+        "COL_COHORT": "Cohort",
+        "COL_SIZE": "Size",
+        "CELL_TITLE": "{count} active contacts ({rate}%)"
+      },
+      "BADGE": {
+        "STATUS_FIRST": "First contact",
+        "STATUS_INACTIVE": "Inactive",
+        "STATUS_AT_RISK": "At risk",
+        "STATUS_SLEEPING": "Sleeping",
+        "STATUS_RECURRING": "Recurring",
+        "STATUS_ACTIVE": "Active",
+        "LAST_INTERACTION": "last {days}",
+        "INTERACTIONS_LABEL": "interaction | interactions",
+        "INTERACTIONS_TITLE": "Qualified interactions (≥2+2 messages)",
+        "ONE_SHOT_LABEL": "one-shot",
+        "ONE_SHOT_TITLE": "One-shot consultations (≥1+1)",
+        "PIX_LABEL": "Pix paid",
+        "PIX_TITLE": "Pix generated / reservations paid",
+        "DAYS_TODAY": "today",
+        "DAYS_YESTERDAY": "yesterday",
+        "DAYS_RECENT": "{days} days ago",
+        "DAYS_ONE_MONTH": "about 1 month ago",
+        "DAYS_MONTHS": "{months} months ago",
+        "DAYS_YEARS": "{years} years ago"
+      },
+      "ERRORS": {
+        "SUMMARY": "Failed to load retention KPIs",
+        "COHORT": "Failed to load cohort"
+      }
     },
     "EXECUTIVE": {
       "LOADING": "Loading executive digest...",

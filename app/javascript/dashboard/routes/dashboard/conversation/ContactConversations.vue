@@ -1,11 +1,13 @@
 <script>
 import ConversationCard from 'dashboard/components/widgets/conversation/ConversationCard.vue';
+import RetentionSummaryBadge from 'dashboard/components/widgets/conversation/RetentionSummaryBadge.vue';
 import { mapGetters } from 'vuex';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
 export default {
   components: {
     ConversationCard,
+    RetentionSummaryBadge,
     Spinner,
   },
   props: {
@@ -47,8 +49,9 @@ export default {
 </script>
 
 <template>
-  <div v-if="!uiFlags.isFetching" class="">
-    <div v-if="!previousConversations.length" class="no-label-message px-4 p-3">
+  <div v-if="!uiFlags.isFetching" class="px-2">
+    <RetentionSummaryBadge :contact-id="contactId" />
+    <div v-if="!previousConversations.length" class="no-label-message p-3">
       <span>
         {{ $t('CONTACT_PANEL.CONVERSATIONS.NO_RECORDS_FOUND') }}
       </span>
