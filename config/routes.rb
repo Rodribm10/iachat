@@ -749,4 +749,13 @@ Rails.application.routes.draw do
   # ----------------------------------------------------------------------
   # Routes for testing
   resources :widget_tests, only: [:index] unless Rails.env.production?
+
+  # ----------------------------------------------------------------------
+  # Captain Codex proxy: traduz Chat Completions (cliente) ↔ Responses (Codex).
+  # Uso interno apenas — o Nginx não deve expor /codex/* publicamente.
+  namespace :codex do
+    namespace :v1 do
+      post 'chat/completions', to: '/api/internal/codex_proxy#chat_completions'
+    end
+  end
 end

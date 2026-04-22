@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_22_105901) do
+ActiveRecord::Schema[7.1].define(version: 2026_04_22_145733) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -351,6 +351,21 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_105901) do
     t.jsonb "pricing_page_config", default: {}, null: false
     t.jsonb "suite_keywords"
     t.index ["account_id"], name: "index_captain_brands_on_account_id"
+  end
+
+  create_table "captain_codex_credentials", force: :cascade do |t|
+    t.text "access_token", null: false
+    t.text "refresh_token", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "last_refresh_at"
+    t.string "chatgpt_account_id"
+    t.string "chatgpt_plan_type"
+    t.string "email"
+    t.string "status", default: "active", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["expires_at"], name: "index_captain_codex_credentials_on_expires_at"
+    t.index ["status"], name: "index_captain_codex_credentials_on_status"
   end
 
   create_table "captain_configurations", force: :cascade do |t|
@@ -1158,7 +1173,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_105901) do
     t.string "evolution_api_token_iv"
     t.jsonb "provider_connection", default: {}
     t.index ["phone_number"], name: "index_channel_whatsapp_on_phone_number", unique: true
-    t.index ["provider_connection"], name: "index_channel_whatsapp_provider_connection", where: "((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying])::text[]))", using: :gin
+    t.index ["provider_connection"], name: "index_channel_whatsapp_provider_connection", where: "((provider)::text = ANY (ARRAY[('baileys'::character varying)::text, ('zapi'::character varying)::text]))", using: :gin
   end
 
   create_table "companies", force: :cascade do |t|

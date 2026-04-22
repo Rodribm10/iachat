@@ -89,6 +89,7 @@ Metrics/BlockLength:
     - spec/**/*
     - '**/routes.rb'
     - 'config/environments/*'
+    - 'lib/tasks/**/*.rake'
     - db/schema.rb
 
 Metrics/ModuleLength:

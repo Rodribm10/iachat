@@ -13,6 +13,14 @@ trigger_scheduled_items_job:
   class: 'TriggerScheduledItemsJob'
   queue: scheduled_jobs
 
+# Refresh proativo dos tokens OAuth do ChatGPT Plus (Captain Codex).
+# Roda a cada 30min e renova access_tokens que estão a <5min de expirar.
+# Garante que não tenha cold start causado por token vencido em horário de pico.
+captain_codex_refresh_tokens_job:
+  cron: '*/30 * * * *'
+  class: 'Captain::Codex::RefreshTokensJob'
+  queue: scheduled_jobs
+
 # Fallback pra draws da roleta revelados cujo callback do front falhou.
 # Executa a cada 5 minutos.
 captain_roleta_notify_revealed_scheduler_job:
