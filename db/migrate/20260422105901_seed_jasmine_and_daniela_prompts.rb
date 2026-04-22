@@ -1,53 +1,80 @@
-# Atualiza os prompts da Jasmine (orchestrator) e da Daniela (cenário reservas)
-# com os conteúdos validados em staging (feat/retention-metrics + feat/captain-semantic-memory).
+# Sincroniza os prompts da Jasmine (orchestrator) e dos cenários
+# (Daniela, Maria, Disponibilidade) com os arquivos versionados em
+# db/seed_prompts/.
 #
-# Os arquivos de origem vivem em db/seed_prompts/ — eles são a fonte de verdade
-# versionada desses prompts. Essa migration apenas sincroniza o banco com o
-# conteúdo dos arquivos no momento do deploy.
+# Os arquivos de origem são a fonte de verdade. Esta migration apenas
+# copia o conteúdo pros registros correspondentes. Roda toda vez que o
+# timestamp da migration avança OU quando você chama manualmente via:
+#   rails runner "Captain::PromptSync.run!"
 #
-# Idempotente: se os conteúdos já batem, não faz nada. Se divergirem, sobrescreve.
-# Se preferir preservar um prompt custom em produção, não rode essa migration
-# (marcar como skipped) ou ajuste os arquivos antes.
+# Convenções:
+# - assistants/<slug>.md        → Captain::Assistant#orchestrator_prompt
+# - scenarios/<slug>__<tit>.md  → Captain::Scenario#instruction (matched
+#                                 by assistant name + scenario title)
+#
+# Mapeamentos em ASSISTANT_MAP / SCENARIO_TITLE_MAP.
+# Idempotente: se o conteúdo já bate, pula (não atualiza updated_at).
 class SeedJasmineAndDanielaPrompts < ActiveRecord::Migration[7.1]
+  ASSISTANT_MAP = {
+    'jasmine_qnn01' => 'Jasmine( Qnn01)',
+    'jasmine_primeal' => 'Jasmine(PrimeAL)',
+    'jasmine_primevl' => 'Jasmine(PrimeVL)',
+    'jasmine_express' => 'Jasmine (Express)'
+  }.freeze
+
+  SCENARIO_TITLE_MAP = {
+    'daniela_reservas' => 'Daniela_Reservas',
+    'disponibilidade_suites' => 'Disponibilidade de suites',
+    'maria_fotos' => 'maria_fotos'
+  }.freeze
+
   def up
     return unless defined?(Captain::Assistant) && defined?(Captain::Scenario)
 
-    update_jasmine
-    update_daniela
+    sync_assistants
+    sync_scenarios
   end
 
   def down
-    # No-op: prompts não têm "versão anterior" canônica. Rollback manual se necessário.
+    # No-op: rollback manual se necessário.
   end
 
   private
 
-  def update_jasmine
-    path = Rails.root.join('db/seed_prompts/jasmine_orchestrator.md')
-    return unless File.exist?(path)
+  def sync_assistants
+    Dir.glob(Rails.root.join('db/seed_prompts/assistants/*.md')).each do |path|
+      slug = File.basename(path, '.md')
+      assistant_name = ASSISTANT_MAP[slug]
+      next if assistant_name.blank?
 
-    content = File.read(path)
-    Captain::Assistant.where(name: 'Jasmine').find_each do |assistant|
-      next if assistant.orchestrator_prompt == content
+      content = File.read(path)
+      Captain::Assistant.where(name: assistant_name).find_each do |assistant|
+        next if assistant.orchestrator_prompt == content
 
-      assistant.update_columns(orchestrator_prompt: content, updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
-      say_with_time "Updated Jasmine prompt on assistant ##{assistant.id}" do
-        assistant.id
+        assistant.update_columns(orchestrator_prompt: content, updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+        say "Synced orchestrator prompt → #{assistant_name} (id=#{assistant.id}, #{content.size} chars)"
       end
     end
   end
 
-  def update_daniela
-    path = Rails.root.join('db/seed_prompts/daniela_reservas.md')
-    return unless File.exist?(path)
+  def sync_scenarios
+    Dir.glob(Rails.root.join('db/seed_prompts/scenarios/*.md')).each do |path|
+      filename = File.basename(path, '.md')
+      assistant_slug, scenario_slug = filename.split('__', 2)
 
-    content = File.read(path)
-    Captain::Scenario.where(title: 'Daniela_Reservas').find_each do |scenario|
-      next if scenario.instruction == content
+      assistant_name = ASSISTANT_MAP[assistant_slug]
+      scenario_title = SCENARIO_TITLE_MAP[scenario_slug]
+      next if assistant_name.blank? || scenario_title.blank?
 
-      scenario.update_columns(instruction: content, updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
-      say_with_time "Updated Daniela prompt on scenario ##{scenario.id}" do
-        scenario.id
+      assistant_ids = Captain::Assistant.where(name: assistant_name).pluck(:id)
+      next if assistant_ids.empty?
+
+      content = File.read(path)
+      Captain::Scenario.where(assistant_id: assistant_ids, title: scenario_title).find_each do |scenario|
+        next if scenario.instruction == content
+
+        scenario.update_columns(instruction: content, updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
+        say "Synced scenario → #{assistant_name} / #{scenario_title} (id=#{scenario.id}, #{content.size} chars)"
       end
     end
   end
