@@ -130,6 +130,20 @@ RSpec.describe Captain::Codex::Translator do
 
       expect(result.keys).not_to include(:temperature, :top_p, :frequency_penalty)
     end
+
+    it 'always includes instructions (empty placeholder when no system message)' do
+      chat = {
+        'model' => 'gpt-5.4',
+        'messages' => [{ 'role' => 'user', 'content' => 'Oi' }]
+      }
+
+      result = described_class.chat_to_responses(chat)
+
+      # Codex exige o campo instructions mesmo sem system message.
+      expect(result).to have_key(:instructions)
+      expect(result[:instructions]).not_to be_nil
+      expect(result[:instructions]).not_to eq('')
+    end
   end
 
   describe '.responses_to_chat' do

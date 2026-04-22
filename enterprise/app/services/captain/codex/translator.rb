@@ -15,10 +15,12 @@ class Captain::Codex::Translator
     body = {
       model: chat_body['model'] || chat_body[:model],
       input: input,
+      # Codex exige o campo instructions sempre. Se não vier system message,
+      # usamos uma string com um espaço pra satisfazer o endpoint sem influenciar o comportamento.
+      instructions: instructions.presence || ' ',
       store: false,
       stream: true # Codex exige streaming sempre — o Client agrega.
     }
-    body[:instructions] = instructions if instructions
     body[:max_output_tokens] = chat_body['max_tokens'] if chat_body['max_tokens']
 
     tools = chat_body['tools'] || chat_body[:tools]
