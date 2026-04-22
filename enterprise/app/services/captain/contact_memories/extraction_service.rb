@@ -58,18 +58,24 @@ class Captain::ContactMemories::ExtractionService
       - Registro de estadia PASSADA: "fiquei na Alexa em 03/02", "nos hospedamos no fim de semana".
       - Cliente disse "já estou no hotel", "cheguei", "fazendo check-in agora".
 
-      ### ATENÇÃO — Pix GERADO ≠ Pix PAGO (diferença crítica)
+      ### ATENÇÃO — Pix GERADO ≠ Pix PAGO (diferença crítica, mas registrável)
 
-      Quando o bot gera um Pix e o cliente **só agradece ou silencia**, isso **NÃO é reserva consumada**. Pix gerado é um convite pra pagar — a reserva só vira real quando o pagamento cai.
+      Quando o bot gera um Pix e o cliente **só agradece ou silencia**, isso **NÃO é reserva consumada**. Pix gerado é um convite pra pagar — a reserva só vira real quando o pagamento cai. MAS a solicitação em si é um fato útil de registrar, porque é base pra follow-up.
 
-      | Situação na conversa | É `padrao_comportamental "Reservou X"`? |
+      | Situação na conversa | `padrao_comportamental` aceitável |
       |---|---|
-      | Bot gerou Pix + cliente disse "obrigado" / nada | ❌ NÃO (nem "solicitou reserva" vale — evite o tipo `padrao_comportamental` inteiro) |
-      | Bot gerou Pix + cliente disse "paguei" / "fiz o Pix" | ✅ SIM, pode registrar "Reservou X em DD/MM/AAAA" |
-      | Bot gerou Pix + aparece msg automática "Pagamento confirmado" | ✅ SIM |
-      | Cliente só pediu valor sem pedir pra reservar | ❌ NÃO |
+      | Bot gerou Pix + cliente disse "obrigado" / silêncio | ✅ "Solicitou Pix para <suíte> <permanência> em DD/MM/AAAA, aguardando pagamento" |
+      | Bot gerou Pix + cliente disse "paguei" / "fiz o Pix" | ✅ "Reservou <suíte> <permanência> em DD/MM/AAAA" |
+      | Bot gerou Pix + msg automática "Pagamento confirmado" | ✅ "Reservou <suíte> <permanência> em DD/MM/AAAA" |
+      | Cliente só pediu valor sem pedir pra reservar | ❌ NÃO (apenas consulta de preço) |
+      | Cliente disse "entro em contato amanhã pra reservar" | ❌ NÃO (intenção futura vazia) |
 
-      Regra prática: se você não consegue apontar uma frase LITERAL de pagamento confirmado (do cliente ou do sistema), **não extraia `padrao_comportamental` de reserva**. Melhor memória ausente do que memória mentirosa dizendo que o cliente reservou quando só gerou Pix.
+      Regra de ouro:
+      - Se CONFIRMOU pagamento → `"Reservou X para Y em DD/MM/AAAA"` (afirma a reserva como concreta).
+      - Se SÓ pediu Pix → `"Solicitou Pix para X <permanência> em DD/MM/AAAA, aguardando pagamento"` (registra a solicitação sem afirmar que fechou). A frase **precisa conter "aguardando pagamento"** ou equivalente, pra deixar claro que é pré-reserva.
+      - Se não teve Pix e nem reserva explícita → não extraia nada sobre reserva.
+
+      Isso vale pra `padrao_comportamental` somente. Preferência, data comemorativa, restrição etc seguem as regras próprias de cada tipo.
 
       ### Sinais de INTENÇÃO FUTURA (NÃO MEMORIZE — retorne nada):
       - "Entro em contato amanhã para reservar"
@@ -136,15 +142,15 @@ class Captain::ContactMemories::ExtractionService
          SIM: "Sempre chego tarde, entre 23h e meia-noite" (declarou hábito)
          SIM: "Costumo ficar só o pernoite" (declarou hábito)
          SIM: "Reservou Alexa para pernoite em 23/05/2026" — APENAS se há confirmação LITERAL de pagamento (cliente disse "paguei"/"Pix pago" OU mensagem automática "Pagamento confirmado"). Pix meramente gerado não conta.
+         SIM: "Solicitou Pix para Hidromassagem pernoite em 25/04/2026, aguardando pagamento" — quando o bot gerou Pix mas o cliente ainda não confirmou pagamento. É útil pra follow-up e pra entender interesses.
          SIM: "Escolheu 4hrs na visita de 14/03/2026" — se efetivamente escolheu e fechou
          NÃO: "Costuma ficar 2 horas" (SEM DATA e SEM declaração — banido)
          NÃO: "Prefere permanência de 4 horas" (banido — isso seria preferencia, que exige declaração explícita)
          NÃO: "Vai chegar às 22h hoje" (intenção da conversa atual, não histórico)
-         NÃO: "Reservou X" quando o cliente só disse "entro em contato amanhã para reservar" ou "quero reservar" (intenção futura — violação da REGRA DE OURO).
-         NÃO: "Reservou X" quando o bot apenas cotou preço e o cliente não fechou explicitamente.
-         NÃO: "Reservou X em DD/MM" quando o bot GEROU Pix mas o cliente só agradeceu / ficou em silêncio / não há confirmação de pagamento na conversa. Pix gerado sem pagamento = pré-reserva, NÃO é ação consumada, NÃO vira memória.
-         NÃO: "Solicitou reserva de X" / "Pediu Pix para X" — evite registrar a fase de intenção/pré-reserva como `padrao_comportamental`. Se a reserva foi paga, registra "Reservou X"; se não foi, não registra nada sobre essa tentativa.
-         REGRA CRÍTICA: se você vai registrar uma escolha pontual, (a) a ação DEVE ter sido consumada com pagamento confirmado na conversa, e (b) SEMPRE inclua a data no content. Memória sem data vira ruído; memória sem consumação vira mentira.
+         NÃO: "Reservou X" quando o cliente só disse "entro em contato amanhã para reservar" ou "quero reservar" sem Pix gerado (intenção futura vazia).
+         NÃO: "Reservou X" quando o bot apenas cotou preço e o cliente não pediu reserva.
+         NÃO: "Reservou X em DD/MM" quando o bot GEROU Pix mas NÃO há confirmação de pagamento — use a variante "Solicitou Pix para X ..., aguardando pagamento" nesse caso.
+         REGRA CRÍTICA: se você vai registrar uma escolha pontual, (a) especifique se é reserva confirmada (pagamento caiu) ou solicitação em aberto (Pix gerado sem pagamento), e (b) SEMPRE inclua a data no content. "Aguardando pagamento" é obrigatório quando não houve confirmação.
 
       5. **reclamacao** — queixa EXPLÍCITA sobre algo que desagradou/frustrou/causou problema, com sentimento negativo claro.
          SIM: "O ar-condicionado estava barulhento demais, não dormi direito"
@@ -183,7 +189,7 @@ class Captain::ContactMemories::ExtractionService
       1. **Evidência OBRIGATÓRIA**: cada fato precisa de um trecho LITERAL da conversa. Se não tem trecho claro, não extraia.
       2. **Perguntas/dúvidas NÃO são reclamação nem memória**: se o cliente fez uma pergunta ("tem X?", "aceita Y?"), isso é informação que ele queria, não fato sobre ele.
       3. **Cortesia genérica NÃO é feedback**: "obrigado", "tá bom", "ok" NÃO viram feedback_positivo.
-      4. **Aplicar a REGRA DE OURO de ação-consumada vs intenção-futura**: "informou CPF" nunca é memória (é cadastro). "Escolheu X" ou "Reservou X em tal data" SÓ vira `padrao_comportamental` se o pagamento do Pix foi CONFIRMADO na conversa (cliente disse "paguei" ou apareceu msg automática "Pagamento confirmado"). Pix gerado sem confirmação de pagamento = pré-reserva, NÃO é ação consumada, NÃO vira memória. Discussão/intenção sem pagamento = NÃO EXTRAIA.
+      4. **Aplicar a REGRA DE OURO de ação-consumada vs intenção-futura**: "informou CPF" nunca é memória (é cadastro). "Reservou X em tal data" SÓ se houve confirmação de pagamento; se o bot só gerou Pix sem pagamento, use o formato "Solicitou Pix para X em DD/MM/AAAA, aguardando pagamento". Cotação de preço pura ou "depois eu decido" = NÃO EXTRAIA. Sempre diferencie ação confirmada (Reservou) de solicitação em aberto (Solicitou Pix...aguardando pagamento).
       5. **Ações do atendente NÃO são memória do cliente**: se o bot "incentivou X" ou "ofereceu Y", isso descreve o atendente, não o cliente. Ignore.
       6. **Máximo 5 fatos por conversa**. Se há dúvida entre extrair ou não, DESCARTE. Qualidade > quantidade.
       7. **Se a conversa não tem NADA realmente memorável**, retorne `{"facts": []}`. Isso é o comportamento normal e esperado da maioria das conversas transacionais.
