@@ -240,6 +240,7 @@ AllCops:
     - 'reference/**/*'
     - '.aios-core/**/*'
     - '.claude/**/*'
+    - 'scripts/captain_codex_poc/**/*'
 
 FactoryBot/SyntaxMethods:
   Enabled: false
