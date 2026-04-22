@@ -113,6 +113,9 @@ Rails.application.routes.draw do
                 post :generate, on: :collection
               end
               resource :funnel, only: [:show], controller: :funnel
+              resource :retention, only: [:show], controller: :retention do
+                get :cohort
+              end
             end
             # Roleta da Sorte - tela de resgate na recepção + relatório semanal
             resource :roleta, only: [], controller: 'roleta' do
