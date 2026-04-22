@@ -4,6 +4,15 @@
 #
 # Opera em cima de hashes — sem I/O. I/O fica no Client.
 class Captain::Codex::Translator
+  # Permite forçar um modelo diferente no proxy via CAPTAIN_CODEX_MODEL_OVERRIDE.
+  # Útil pra usar modelos que o RubyLLM ainda não reconhece no catalog
+  # (ex: gpt-5.4, gpt-5.3-codex) — o Captain continua mandando gpt-5.2
+  # (validado pelo RubyLLM) e o proxy substitui antes de chegar no Codex.
+  def self.override_model(requested)
+    override = InstallationConfig.find_by(name: 'CAPTAIN_CODEX_MODEL_OVERRIDE')&.value.presence
+    override || requested
+  end
+
   # --- Request: chat completions → responses ---
 
   # chat_body: hash no formato OpenAI Chat Completions.
@@ -13,7 +22,7 @@ class Captain::Codex::Translator
     instructions, input = split_system(messages)
 
     body = {
-      model: chat_body['model'] || chat_body[:model],
+      model: override_model(chat_body['model'] || chat_body[:model]),
       input: input,
       # Codex exige o campo instructions sempre. Se não vier system message,
       # usamos uma string com um espaço pra satisfazer o endpoint sem influenciar o comportamento.
