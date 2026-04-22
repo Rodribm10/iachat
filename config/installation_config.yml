@@ -182,6 +182,16 @@
 # End of Microsoft Email Channel Config
 
 # MARK: Captain Config
+- name: CAPTAIN_LLM_PROVIDER
+  display_title: 'Captain LLM Provider'
+  description: 'Qual provider o Captain usa: openai_api (padrão, API key tradicional) ou openai_codex_oauth (assinatura ChatGPT Plus via proxy interno).'
+  value: 'openai_api'
+  locked: false
+- name: CAPTAIN_CODEX_PROXY_URL
+  display_title: 'Captain Codex Proxy URL'
+  description: 'URL base do proxy Codex interno quando CAPTAIN_LLM_PROVIDER=openai_codex_oauth. Default: http://localhost:3000/codex'
+  value: 'http://localhost:3000/codex'
+  locked: false
 - name: CAPTAIN_OPEN_AI_API_KEY
   display_title: 'OpenAI API Key'
   description: 'The API key used to authenticate requests to OpenAI services for Captain AI.'
