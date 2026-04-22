@@ -42,6 +42,8 @@ class Captain::PixCharge < ApplicationRecord
   validates :unit_id, presence: true
 
   after_create_commit :post_internal_pix_sent_note
+  after_create_commit :enqueue_retention_recalc
+  after_update_commit :enqueue_retention_recalc_on_status_change
 
   def expires_at
     return nil unless created_at
@@ -80,6 +82,22 @@ class Captain::PixCharge < ApplicationRecord
     ).perform
   rescue StandardError => e
     Rails.logger.warn("[Captain::PixCharge] failed to post sent note: #{e.class} - #{e.message}")
+  end
+
+  # Recalcula stats de retenção do contato sempre que um Pix novo aparece
+  # (incrementa pix_generated_count) ou muda de status pra paid/expired/failed
+  # (afeta reservations_paid_count).
+  def enqueue_retention_recalc
+    contact_id = reservation&.contact_id
+    return if contact_id.blank?
+
+    Captain::Retention::RecalculateContactStatsJob.perform_later(contact_id)
+  end
+
+  def enqueue_retention_recalc_on_status_change
+    return unless saved_change_to_status?
+
+    enqueue_retention_recalc
   end
 
   # Retorna o valor original da cobrança a partir do payload da Inter

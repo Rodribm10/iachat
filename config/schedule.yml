@@ -28,6 +28,14 @@ captain_retention_churn_outreach_scheduler_job:
   class: 'Captain::Retention::ChurnOutreachSchedulerJob'
   queue: scheduled_jobs
 
+# Recalcula stats de retenção (interações, Pix, reservas, recorrência) de
+# todos os contatos ativos nos últimos 120 dias. Roda diariamente às 3am BRT
+# (6am UTC) — fora do horário comercial pra não competir com atendimento.
+captain_retention_recalculate_all_contact_stats_job:
+  cron: '0 6 * * *'
+  class: 'Captain::Retention::RecalculateAllContactStatsJob'
+  queue: scheduled_jobs
+
 # executed every minute.
 trigger_scheduled_messages_job:
   cron: '* * * * *'
