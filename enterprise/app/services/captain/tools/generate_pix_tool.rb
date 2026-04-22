@@ -426,12 +426,15 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
     mark_conversation_as_awaiting_payment(reservation)
     Rails.logger.info "[GeneratePixTool] Reserva #{reservation.id} → pending_payment"
 
-    final_prefix = prefix || 'Cobrança Pix gerada com sucesso.'
-    response = build_pix_response(charge, reservation, amount: charge_amount, prefix: final_prefix)
+    response = build_pix_response(charge, reservation, amount: charge_amount, prefix: prefix)
 
     # Envia o link como mensagem direta pro cliente. Isso garante que o URL chegue
     # no WhatsApp mesmo que a LLM parafraseie com placeholder tipo "[Link do Pix]".
-    dispatch_direct_link_message(response[:payment_link], 'Link do Pix:')
+    # A mensagem do link é a ÚNICA com URL — a resposta da LLM não deve conter link.
+    dispatch_direct_link_message(
+      response[:payment_link],
+      "Pix do sinal (R$ #{format('%.2f', charge_amount)}) — sua reserva só fica garantida depois que o pagamento cair:"
+    )
 
     response
   rescue StandardError => e
@@ -772,22 +775,12 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
   end
 
   def build_pix_response(charge, reservation, amount:, prefix: nil)
-    intro = prefix.present? ? "#{prefix}\n\n" : ''
-
     base_url = InstallationConfig.find_by(name: 'FRONTEND_URL')&.value.presence ||
                ENV.fetch('FRONTEND_URL', 'http://localhost:3000')
     base_url = base_url.gsub('0.0.0.0', '127.0.0.1') if base_url.include?('0.0.0.0')
 
     token = charge.to_sgid(expires_in: 2.hours, purpose: :pix_payment).to_s
     link  = Rails.application.routes.url_helpers.short_payment_link_url(token, host: base_url)
-
-    instructions = "Para facilitar, gerei um link de pagamento rápido com botão COPIAR.\n" \
-                   "1. Clique no link abaixo\n" \
-                   "2. Aperte 'COPIAR CÓDIGO PIX'\n" \
-                   "3. Cole no app do seu banco e pague.\n\n" \
-                   "Link Seguro: #{link}\n\n" \
-                   '(IMPORTANTE PARA A I.A.: Envie este link EXATAMENTE como está acima. NÃO use formatação Markdown [texto](url). ' \
-                   'O WhatsApp não reconhece. Envie APENAS a URL pura, solta no texto.)'
 
     final_code = charge.pix_copia_e_cola.to_s.strip
     if final_code.start_with?('/spi/')
@@ -797,9 +790,16 @@ class Captain::Tools::GeneratePixTool < Captain::Tools::BaseTool
 
     final_code = normalize_text(final_code)
 
+    # formatted_message vai pra LLM como tool output — deve ser CURTO, sem URL
+    # e sem código Pix, porque dispatch_direct_link_message já envia o link em
+    # mensagem separada. Se incluirmos link aqui, a LLM parafraseia/cola de
+    # novo e o cliente recebe 2 mensagens com a mesma URL.
+    # prefix opcional pra casos como "Pix ainda válido" / "Gerando novo Pix".
+    summary = prefix.presence || 'Pix do sinal gerado e enviado em mensagem separada.'
+
     normalize_payload(
       {
-        formatted_message: "#{intro}#{instructions}",
+        formatted_message: summary,
         raw_payload: final_code,
         payment_link: link,
         amount: amount.to_f,
