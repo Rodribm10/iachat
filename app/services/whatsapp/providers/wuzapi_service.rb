@@ -175,7 +175,7 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
     return content unless message.inbox.message_signature_enabled?
 
     name = sender_name_for(message)
-    name.present? ? "*[ #{name} ]*\n#{content}" : content
+    name.present? ? "*#{name}*\n#{content}" : content
   end
 
   def reply_params(message)

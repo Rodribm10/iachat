@@ -275,8 +275,6 @@ Rails.application.routes.draw do
             post :sync_templates, on: :member
             get :health, on: :member
             post :on_whatsapp, on: :member
-            resources :notification_templates, only: [:index, :create, :update, :destroy],
-                                               module: 'captain'
             if ChatwootApp.enterprise?
               resource :conference, only: %i[create destroy], controller: 'conference' do
                 get :token, on: :member

@@ -66,7 +66,6 @@ import captainLifecycleDeliveries from './captain/lifecycleDeliveries';
 import captainUnits from './modules/captainUnits';
 import captainGalleryItems from './modules/captainGalleryItems';
 import captainReports from './modules/captainReports';
-import captainNotificationTemplates from './captain/notificationTemplates';
 
 const plugins = [];
 
@@ -138,7 +137,6 @@ export default createStore({
     captainUnits,
     captainGalleryItems,
     captainReports,
-    captainNotificationTemplates,
   },
   plugins,
 });
