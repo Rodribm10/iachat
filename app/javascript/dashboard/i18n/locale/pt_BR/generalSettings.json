@@ -104,6 +104,14 @@
           "ERROR": "Falha ao atualizar configuração de transcrição de áudio"
         }
       },
+      "AGGRESSIVE_ALERT": {
+        "TITLE": "Alerta agressivo de conversa (master switch)",
+        "NOTE": "Quando ligado, atendentes recebem banner + som + notificação do SO quando uma conversa é reaberta e a cada 5/15/28 min sem resposta. Cada agente ainda pode desligar pra si no próprio perfil — este toggle é o mestre da conta. Desligar aqui = ninguém recebe.",
+        "API": {
+          "SUCCESS": "Alerta agressivo atualizado",
+          "ERROR": "Falha ao atualizar o alerta agressivo"
+        }
+      },
       "AUTO_RESOLVE_DURATION": {
         "LABEL": "Tempo de inatividade para resolução",
         "HELP": "Tempo de inatividade após o qual a conversa deve ser encerrada automaticamente",

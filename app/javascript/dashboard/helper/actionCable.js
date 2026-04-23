@@ -2,6 +2,7 @@ import AuthAPI from '../api/auth';
 import BaseActionCableConnector from '../../shared/helpers/BaseActionCableConnector';
 import DashboardAudioNotificationHelper from './AudioAlerts/DashboardAudioNotificationHelper';
 import aggressiveAlert from './aggressiveAlert';
+import inactivityAlertTracker from './inactivityAlertTracker';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { emitter } from 'shared/helpers/mitt';
 import { useImpersonation } from 'dashboard/composables/useImpersonation';
@@ -108,6 +109,69 @@ class ActionCableConnector extends BaseActionCableConnector {
       lastActivityAt,
       conversationId,
     });
+    this.feedInactivityTracker(data);
+  };
+
+  // Alimenta o tracker de inatividade:
+  // - Cliente (Contact) mandou mensagem em conversa open → começa a contar
+  // - Agente (User/AgentBot/Captain) mandou mensagem → limpa (agente respondeu)
+  // - Status deixou de ser open → trata como "resolvido", limpa
+  feedInactivityTracker = data => {
+    if (!this.isAggressiveAlertEnabled()) return;
+    const {
+      conversation_id: conversationId,
+      message_type: messageType,
+      sender_type: senderType,
+      conversation,
+    } = data;
+
+    // message_type: 0=incoming, 1=outgoing, 2=activity, 3=template
+    // Activity = evento do sistema (status mudou, etc). Ignora.
+    if (messageType === 2 || messageType === 'activity') return;
+
+    // Incoming (cliente) e conversa aberta → começa/renova tracker
+    const isIncoming = messageType === 0 || messageType === 'incoming';
+    const conversationStatus = conversation && conversation.status;
+    if (isIncoming && conversationStatus === 'open') {
+      const contactName =
+        conversation && conversation.meta && conversation.meta.sender
+          ? conversation.meta.sender.name
+          : '';
+      const inbox = this.app.$store.getters['inboxes/getInbox']
+        ? this.app.$store.getters['inboxes/getInbox'](conversation.inbox_id)
+        : null;
+      const inboxName = inbox && inbox.name ? inbox.name : '';
+      inactivityAlertTracker.onClientMessage({
+        conversationId,
+        contactName,
+        inboxName,
+      });
+      return;
+    }
+
+    // Qualquer mensagem do agente/bot → limpa tracker
+    if (senderType === 'User' || senderType === 'AgentBot') {
+      inactivityAlertTracker.onAgentReplyOrResolved(conversationId);
+    }
+  };
+
+  // Lê account.settings.aggressive_alert_enabled + user.ui_settings
+  isAggressiveAlertEnabled = () => {
+    const store = this.app.$store;
+    const account = store.getters.getCurrentAccount;
+    const user = store.getters.getCurrentUser;
+
+    // Default true se settings não vieram ainda (não bloqueia no boot).
+    const accountEnabled =
+      !account ||
+      !account.settings ||
+      account.settings.aggressive_alert_enabled !== false;
+    const userEnabled =
+      !user ||
+      !user.ui_settings ||
+      user.ui_settings.aggressive_alert_enabled !== false;
+
+    return accountEnabled && userEnabled;
   };
 
   // eslint-disable-next-line class-methods-use-this
@@ -115,21 +179,21 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   onStatusChange = data => {
     this.maybeTriggerAggressiveAlert(data);
+    // Se saiu de 'open' (resolvida/snoozada/pending), limpa qualquer alerta
+    // pendente pra essa conversa.
+    if (data && data.id && data.status && data.status !== 'open') {
+      inactivityAlertTracker.onAgentReplyOrResolved(data.id);
+    }
     this.app.$store.dispatch('updateConversation', data);
     this.fetchConversationStats();
   };
 
-  // Dispara banner + som + push do SO toda vez que conversa transita
-  // pra 'open'. Broadcast `conversation.status_changed` só chega em
-  // mudança real de status, então confiar no evento é suficiente.
-  //
-  // Não usar store.getters.getConversationById(id).status pra detectar
-  // transição: quando o próprio usuário reabre, o dispatch HTTP local
-  // (toggleStatus→CHANGE_CONVERSATION_STATUS) já mutou o store antes do
-  // broadcast chegar → previousStatus === 'open' bloqueava o alerta.
-  // Conversas novas entram via onConversationCreated, não por status_changed.
+  // Dispara banner RED toda vez que a conversa transita pra 'open'.
+  // Broadcast `conversation.status_changed` só chega em mudança real,
+  // então confiar no evento é suficiente.
   maybeTriggerAggressiveAlert = data => {
     if (!data || data.status !== 'open') return;
+    if (!this.isAggressiveAlertEnabled()) return;
     const store = this.app.$store;
     const contactName =
       data.meta && data.meta.sender ? data.meta.sender.name : '';
@@ -140,9 +204,10 @@ class ActionCableConnector extends BaseActionCableConnector {
 
     aggressiveAlert.trigger({
       conversationId: data.id,
+      level: 'red',
+      kind: 'reopened',
       contactName,
       inboxName,
-      previousStatus: '',
     });
   };
 

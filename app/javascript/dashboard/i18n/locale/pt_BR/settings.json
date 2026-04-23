@@ -35,6 +35,12 @@
           }
         }
       },
+      "AGGRESSIVE_ALERT": {
+        "SECTION_TITLE": "Alerta agressivo de conversa",
+        "SECTION_NOTE": "Ativa banner, som e notificação do SO quando uma conversa é reaberta e a cada 5/15/28 minutos sem resposta. Só some quando VOCÊ responder. Desativa se quiser turno silencioso — mas a casa cai se esquecer.",
+        "TITLE": "Receber alertas agressivos",
+        "NOTE": "Se ligado, você recebe banner + som + notificação quando uma conversa é reaberta ou fica X minutos sem resposta. Só desliga se souber o que está fazendo."
+      },
       "INTERFACE_SECTION": {
         "TITLE": "Interface",
         "NOTE": "Personalize a aparência do seu painel do Chatwoot.",

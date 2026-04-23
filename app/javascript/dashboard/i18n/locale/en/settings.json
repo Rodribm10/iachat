@@ -35,6 +35,12 @@
           }
         }
       },
+      "AGGRESSIVE_ALERT": {
+        "SECTION_TITLE": "Aggressive conversation alert",
+        "SECTION_NOTE": "Triggers a banner, sound and OS notification when a conversation is reopened and every 5/15/28 minutes without reply. Only clears when YOU reply. Turn off for a silent shift — but own the risk.",
+        "TITLE": "Receive aggressive alerts",
+        "NOTE": "When on, you get a banner + sound + notification when a conversation reopens or goes X minutes without reply. Turn off at your own risk."
+      },
       "INTERFACE_SECTION": {
         "TITLE": "Interface",
         "NOTE": "Customize the look and feel of your Chatwoot dashboard.",

@@ -90,6 +90,7 @@ class Account < ApplicationRecord
   store_accessor :settings, :audio_transcriptions, :auto_resolve_label
   store_accessor :settings, :captain_models, :captain_features
   store_accessor :settings, :keep_pending_on_bot_failure
+  store_accessor :settings, :aggressive_alert_enabled
 
   has_many :account_users, dependent: :destroy_async
   has_many :agent_bot_inboxes, dependent: :destroy_async

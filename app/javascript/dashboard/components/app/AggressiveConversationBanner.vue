@@ -9,6 +9,7 @@ export default {
   data() {
     return {
       alerts: [],
+      maxLevel: null,
     };
   },
   computed: {
@@ -16,38 +17,74 @@ export default {
     hasAlerts() {
       return this.alerts.length > 0;
     },
-    bannerLabel() {
-      if (this.alerts.length === 1) {
+    bannerClass() {
+      return [
+        'aggressive-banner',
+        this.maxLevel ? `aggressive-banner--${this.maxLevel}` : '',
+      ];
+    },
+    bannerHeadline() {
+      const count = this.alerts.length;
+      if (count === 1) {
+        const a = this.alerts[0];
+        if (a.kind === 'reopened') {
+          return this.$t(
+            'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_REOPENED',
+            'Conversa reaberta — responda agora'
+          );
+        }
+        // inactivity — mostra tempo
+        if (a.minutes >= 28) {
+          return this.$t(
+            'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_28',
+            { minutes: a.minutes },
+            `🚨 ${a.minutes} MIN SEM RESPOSTA — conversa fecha em breve`
+          );
+        }
+        if (a.minutes >= 15) {
+          return this.$t(
+            'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_15',
+            { minutes: a.minutes },
+            `⚠️ ${a.minutes} MIN SEM RESPOSTA`
+          );
+        }
         return this.$t(
-          'AGGRESSIVE_CONVERSATION_BANNER.SINGLE',
-          'Conversa aguardando resposta!'
+          'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_5',
+          { minutes: a.minutes },
+          `⏰ ${a.minutes} min sem resposta`
         );
       }
       return this.$t(
-        'AGGRESSIVE_CONVERSATION_BANNER.MULTIPLE',
-        { count: this.alerts.length },
-        `${this.alerts.length} conversas aguardando resposta!`
+        'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_MULTIPLE',
+        { count },
+        `🚨 ${count} conversas aguardando resposta`
+      );
+    },
+    explanation() {
+      return this.$t(
+        'AGGRESSIVE_CONVERSATION_BANNER.EXPLANATION',
+        'Este alerta só some quando você RESPONDER a conversa. Clicar no × esconde temporariamente.'
       );
     },
   },
   mounted() {
-    emitter.on(BUS_EVENTS.AGGRESSIVE_ALERT_TRIGGER, this.handleTrigger);
-    emitter.on(BUS_EVENTS.AGGRESSIVE_ALERT_DISMISS, this.handleDismiss);
+    emitter.on(BUS_EVENTS.AGGRESSIVE_ALERT_TRIGGER, this.refreshAlerts);
+    emitter.on(BUS_EVENTS.AGGRESSIVE_ALERT_DISMISS, this.refreshAlerts);
     // Rehidrata se alertas foram disparados antes do componente montar
-    this.alerts = aggressiveAlert.getActiveConversations();
+    this.refreshAlerts();
   },
   beforeUnmount() {
-    emitter.off(BUS_EVENTS.AGGRESSIVE_ALERT_TRIGGER, this.handleTrigger);
-    emitter.off(BUS_EVENTS.AGGRESSIVE_ALERT_DISMISS, this.handleDismiss);
+    emitter.off(BUS_EVENTS.AGGRESSIVE_ALERT_TRIGGER, this.refreshAlerts);
+    emitter.off(BUS_EVENTS.AGGRESSIVE_ALERT_DISMISS, this.refreshAlerts);
   },
   methods: {
-    handleTrigger() {
+    refreshAlerts() {
       this.alerts = aggressiveAlert.getActiveConversations();
-    },
-    handleDismiss() {
-      this.alerts = aggressiveAlert.getActiveConversations();
+      this.maxLevel = aggressiveAlert.getMaxLevel();
     },
     openConversation(alert) {
+      // Clica no item → abre conversa E esconde o alerta dela (mas se
+      // não responder, volta a aparecer no próximo threshold).
       aggressiveAlert.dismiss(alert.id);
       if (!this.currentAccountId) return;
       this.$router.push({
@@ -58,40 +95,42 @@ export default {
     dismissOne(alert) {
       aggressiveAlert.dismiss(alert.id);
     },
-    dismissAll() {
-      aggressiveAlert.dismissAll();
+    alertItemClass(alert) {
+      return [
+        'aggressive-banner__item',
+        `aggressive-banner__item--${alert.level}`,
+      ];
+    },
+    alertContextLabel(alert) {
+      if (alert.kind === 'reopened') {
+        return this.$t(
+          'AGGRESSIVE_CONVERSATION_BANNER.KIND_REOPENED',
+          'reabriu'
+        );
+      }
+      return this.$t(
+        'AGGRESSIVE_CONVERSATION_BANNER.KIND_WAITING',
+        { minutes: alert.minutes || '?' },
+        `${alert.minutes || '?'} min sem resposta`
+      );
     },
   },
 };
 </script>
 
 <template>
-  <div
-    v-if="hasAlerts"
-    class="aggressive-banner"
-    role="alert"
-    aria-live="assertive"
-  >
-    <div class="aggressive-banner__main">
-      <span class="aggressive-banner__icon">{{
-        $t('AGGRESSIVE_CONVERSATION_BANNER.ALERT_ICON', '🚨')
-      }}</span>
-      <span class="aggressive-banner__title">{{ bannerLabel }}</span>
-      <button
-        type="button"
-        class="aggressive-banner__dismiss-all"
-        @click="dismissAll"
-      >
-        {{
-          $t('AGGRESSIVE_CONVERSATION_BANNER.DISMISS_ALL', 'Dispensar todas')
-        }}
-      </button>
+  <div v-if="hasAlerts" :class="bannerClass" role="alert" aria-live="assertive">
+    <div class="aggressive-banner__headline">
+      {{ bannerHeadline }}
+    </div>
+    <div class="aggressive-banner__explanation">
+      {{ explanation }}
     </div>
     <ul class="aggressive-banner__list">
       <li
         v-for="alert in alerts"
         :key="alert.id"
-        class="aggressive-banner__item"
+        :class="alertItemClass(alert)"
       >
         <button
           type="button"
@@ -104,25 +143,25 @@ export default {
           <span v-if="alert.inboxName" class="aggressive-banner__inbox">
             · {{ alert.inboxName }}
           </span>
-          <span v-if="alert.previousStatus" class="aggressive-banner__previous">
-            ·
-            {{
-              $t(
-                `AGGRESSIVE_CONVERSATION_BANNER.FROM_${alert.previousStatus.toUpperCase()}`,
-                alert.previousStatus
-              )
-            }}
+          <span class="aggressive-banner__context">
+            · {{ alertContextLabel(alert) }}
           </span>
         </button>
         <button
           type="button"
           class="aggressive-banner__close"
           :aria-label="
-            $t('AGGRESSIVE_CONVERSATION_BANNER.DISMISS_ONE', 'Dispensar')
+            $t('AGGRESSIVE_CONVERSATION_BANNER.HIDE_ONE', 'Esconder')
+          "
+          :title="
+            $t(
+              'AGGRESSIVE_CONVERSATION_BANNER.HIDE_ONE_TITLE',
+              'Esconde temporariamente — volta se não responder'
+            )
           "
           @click="dismissOne(alert)"
         >
-          {{ $t('AGGRESSIVE_CONVERSATION_BANNER.CLOSE_ICON', '×') }}
+          {{ $t('AGGRESSIVE_CONVERSATION_BANNER.HIDE_ICON', '×') }}
         </button>
       </li>
     </ul>
@@ -130,10 +169,28 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@keyframes aggressive-pulse {
+@keyframes aggressive-pulse-yellow {
   0%,
   100% {
-    background-color: #b91c1c;
+    background-color: #eab308;
+  }
+  50% {
+    background-color: #fbbf24;
+  }
+}
+@keyframes aggressive-pulse-orange {
+  0%,
+  100% {
+    background-color: #c2410c;
+  }
+  50% {
+    background-color: #f97316;
+  }
+}
+@keyframes aggressive-pulse-red {
+  0%,
+  100% {
+    background-color: #991b1b;
   }
   50% {
     background-color: #ef4444;
@@ -145,45 +202,38 @@ export default {
   top: 0;
   z-index: 9999;
   width: 100%;
-  background-color: #b91c1c;
   color: #ffffff;
-  padding: 12px 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  animation: aggressive-pulse 1.2s ease-in-out infinite;
-  font-weight: 600;
+  padding: 14px 20px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  font-weight: 700;
 }
 
-.aggressive-banner__main {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+.aggressive-banner--yellow {
+  background-color: #eab308;
+  color: #1f2937;
+}
+.aggressive-banner--orange {
+  background-color: #c2410c;
+  animation: aggressive-pulse-orange 1.4s ease-in-out infinite;
+}
+.aggressive-banner--red {
+  background-color: #991b1b;
+  animation: aggressive-pulse-red 0.9s ease-in-out infinite;
 }
 
-.aggressive-banner__icon {
-  font-size: 24px;
-  line-height: 1;
+.aggressive-banner__headline {
+  font-size: 22px;
+  line-height: 1.2;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
-.aggressive-banner__title {
-  font-size: 16px;
-  flex: 1;
-}
-
-.aggressive-banner__dismiss-all {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 4px;
-  padding: 6px 12px;
-  cursor: pointer;
+.aggressive-banner__explanation {
   font-size: 13px;
   font-weight: 500;
-  transition: background 0.15s ease;
-}
-
-.aggressive-banner__dismiss-all:hover {
-  background: rgba(255, 255, 255, 0.35);
+  opacity: 0.92;
+  margin-bottom: 10px;
 }
 
 .aggressive-banner__list {
@@ -198,51 +248,52 @@ export default {
 .aggressive-banner__item {
   display: flex;
   align-items: center;
-  background: rgba(0, 0, 0, 0.25);
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
   overflow: hidden;
+  font-size: 14px;
+}
+
+.aggressive-banner__item--yellow {
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .aggressive-banner__open {
   background: transparent;
-  color: #ffffff;
+  color: inherit;
   border: none;
-  padding: 6px 12px;
+  padding: 8px 12px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   text-align: left;
   display: flex;
   align-items: center;
   gap: 4px;
 }
-
 .aggressive-banner__open:hover {
   background: rgba(255, 255, 255, 0.15);
 }
 
 .aggressive-banner__contact {
-  font-weight: 700;
+  font-weight: 800;
 }
-
 .aggressive-banner__inbox,
-.aggressive-banner__previous {
-  opacity: 0.85;
-  font-weight: 400;
+.aggressive-banner__context {
+  opacity: 0.9;
+  font-weight: 500;
 }
 
 .aggressive-banner__close {
   background: transparent;
-  color: #ffffff;
+  color: inherit;
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 6px 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 8px 12px;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
-  font-weight: 700;
+  font-weight: 800;
 }
-
 .aggressive-banner__close:hover {
   background: rgba(255, 255, 255, 0.2);
 }

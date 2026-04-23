@@ -20,6 +20,7 @@ import AudioNotifications from './AudioNotifications.vue';
 import FormSection from 'dashboard/components/FormSection.vue';
 import AccessToken from './AccessToken.vue';
 import MfaSettingsCard from './MfaSettingsCard.vue';
+import AggressiveAlertProfileSetting from './AggressiveAlertProfileSetting.vue';
 import Policy from 'dashboard/components/policy.vue';
 import {
   ROLES,
@@ -41,6 +42,7 @@ export default {
     AudioNotifications,
     AccessToken,
     MfaSettingsCard,
+    AggressiveAlertProfileSetting,
   },
   setup() {
     const { isEditorHotKeyEnabled, updateUISettings } = useUISettings();
@@ -242,6 +244,12 @@ export default {
         @update-user="updateProfile"
       />
     </div>
+    <FormSection
+      :title="$t('PROFILE_SETTINGS.FORM.AGGRESSIVE_ALERT.SECTION_TITLE')"
+      :description="$t('PROFILE_SETTINGS.FORM.AGGRESSIVE_ALERT.SECTION_NOTE')"
+    >
+      <AggressiveAlertProfileSetting />
+    </FormSection>
     <FormSection
       :title="$t('PROFILE_SETTINGS.FORM.INTERFACE_SECTION.TITLE')"
       :description="

@@ -1,13 +1,15 @@
 {
   "AGGRESSIVE_CONVERSATION_BANNER": {
-    "SINGLE": "Conversation waiting for a response!",
-    "MULTIPLE": "{count} conversations waiting for a response!",
-    "DISMISS_ALL": "Dismiss all",
-    "DISMISS_ONE": "Dismiss",
-    "CLOSE_ICON": "×",
-    "ALERT_ICON": "🚨",
-    "FROM_PENDING": "from pending",
-    "FROM_SNOOZED": "reopened (snoozed)",
-    "FROM_RESOLVED": "reopened (resolved)"
+    "HEADLINE_REOPENED": "🚨 Conversation reopened — reply now",
+    "HEADLINE_5": "⏰ {minutes} min without reply",
+    "HEADLINE_15": "⚠️ {minutes} MIN WITHOUT REPLY — respond!",
+    "HEADLINE_28": "🚨 {minutes} MIN WITHOUT REPLY — conversation will auto-close!",
+    "HEADLINE_MULTIPLE": "🚨 {count} conversations awaiting reply",
+    "EXPLANATION": "This alert only clears when you REPLY to the conversation. Clicking × hides temporarily — it comes back if you do not reply.",
+    "KIND_REOPENED": "just reopened",
+    "KIND_WAITING": "{minutes} min without reply",
+    "HIDE_ONE": "Hide",
+    "HIDE_ONE_TITLE": "Hide temporarily — comes back if you do not reply",
+    "HIDE_ICON": "×"
   }
 }

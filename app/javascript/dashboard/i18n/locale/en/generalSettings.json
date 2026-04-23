@@ -104,6 +104,14 @@
           "ERROR": "Failed to update audio transcription setting"
         }
       },
+      "AGGRESSIVE_ALERT": {
+        "TITLE": "Aggressive conversation alert (master switch)",
+        "NOTE": "When on, agents receive a banner + sound + OS notification when a conversation is reopened and at 5/15/28 min without reply. Each agent can still turn it off in their profile — this is the account-wide master. Off here = nobody receives.",
+        "API": {
+          "SUCCESS": "Aggressive alert setting updated",
+          "ERROR": "Failed to update aggressive alert setting"
+        }
+      },
       "AUTO_RESOLVE_DURATION": {
         "LABEL": "Inactivity duration for resolution",
         "HELP": "Duration after a conversation should auto resolve if there is no activity",
