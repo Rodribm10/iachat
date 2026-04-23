@@ -9,15 +9,16 @@ Disponibilidade, etc) vive em arquivos `.md` aqui. O DB é só espelho.
 db/seed_prompts/
 ├── README.md                  ← você está aqui
 │
-├── _prod_snapshot/            ← snapshot dos prompts ATUAIS de produção
-│   │                            (extraído de iachat_production em 2026-04-22)
+├── _producao_atual/           ← prompts rodando em produção HOJE (com defeitos)
+│   │                            extraído de iachat_production em 2026-04-22
 │   ├── assistants/  (4 Jasmines: qnn01, primeal, primevl, express)
 │   └── scenarios/   (12 cenários, 3 por assistente)
 │
-├── _staging_current/          ← prompts ATIVOS no staging (iachat-v2)
-│   │                            que o Rodrigo e Claude revisaram juntos
-│   ├── assistants/  (jasmine.md — versão melhorada com saudação nominal)
-│   └── scenarios/   (daniela_reservas v3 com pré-reserva, etc)
+├── _modelos/                  ← versões REVISADAS que vão virar a nova produção
+│   │                            (o que Rodrigo e Claude testaram no staging,
+│   │                             SEMPRE prefixado por unidade: jasmine_<slug>__)
+│   ├── assistants/  (ex: jasmine_primeal.md — só PrimeAL validado até agora)
+│   └── scenarios/   (ex: jasmine_primeal__daniela_reservas.md)
 │
 └── target/                    ← APLICADO no DB pela migration de seed
     ├── assistants/
@@ -26,8 +27,8 @@ db/seed_prompts/
 
 ## Regra simples
 
-- **`_prod_snapshot/`** = só referência histórica. Não é aplicado.
-- **`_staging_current/`** = só referência do que testamos. Não é aplicado.
+- **`_producao_atual/`** = só referência do que tá em prod hoje. Não é aplicado.
+- **`_modelos/`** = só referência dos modelos revisados. Não é aplicado.
 - **`target/`** = source of truth. **A migration sincroniza isso no DB**.
 
 Arquivos vazios em `target/` = a migration **não toca** aquele prompt.
@@ -38,9 +39,9 @@ sem mexer na Jasmine de cada unidade).
 
 Pra cada prompt:
 
-1. Olhar `_prod_snapshot/X.md` (o que tá em prod hoje)
-2. Olhar `_staging_current/X.md` (se existir — versão melhorada)
-3. Decidir o conteúdo final: pode ser igual ao staging, igual ao prod
+1. Olhar `_producao_atual/X.md` (o que tá em prod hoje)
+2. Olhar `_modelos/X.md` (se existir — versão revisada)
+3. Decidir o conteúdo final: pode ser igual ao modelo, igual ao prod
    ou novo. Salvar em `target/X.md`.
 4. Quando todos os prompts revisados estiverem em `target/`, mergear
    pra main e deployar — a migration aplica em prod.
@@ -64,14 +65,26 @@ Os nomes batem com `name`/`title` no banco:
 | `outras_unidades`         | `outras_unidades`           |
 | `reclamacoes_ouvidoria`   | `Reclamacoes_Ouvidoria`     |
 
-Cenários se aplicam a TODAS as unidades cujo arquivo bate. Pra
-customizar por unidade, prefixe com `<assistant_slug>__`:
+## Convenção em `_modelos/` — SEMPRE prefixado por unidade
 
-- `target/scenarios/daniela_reservas.md` → aplica em todas as 4
-- `target/scenarios/jasmine_primeal__daniela_reservas.md` → só PrimeAL
-  (sobrescreve o genérico se ambos existirem)
+Cada arquivo em `_modelos/` representa UMA unidade específica, nunca genérico:
+
+- `_modelos/assistants/jasmine_primeal.md` → Jasmine do PrimeAL
+- `_modelos/assistants/jasmine_qnn01.md` → Jasmine do Qnn01 (quando criado)
+- `_modelos/scenarios/jasmine_primeal__daniela_reservas.md` → Daniela do PrimeAL
+- `_modelos/scenarios/jasmine_qnn01__daniela_reservas.md` → Daniela do Qnn01
+
+A migration aplica qualquer arquivo sem prefixo em `target/scenarios/` como
+genérico (todas as unidades); com prefixo `<assistant_slug>__` aplica só
+naquela unidade, sobrescrevendo o genérico se os dois existirem.
 
 ## Estado atual da revisão
 
 Em revisão. `target/` está vazio. Nada será aplicado em prod até
 preenchermos os arquivos lá.
+
+**Unidades com modelo validado:**
+- [x] PrimeAL (testado em staging 2026-04-23)
+- [ ] Qnn01
+- [ ] PrimeVL
+- [ ] Express
