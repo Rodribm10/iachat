@@ -1,0 +1,13 @@
+{
+  "AGGRESSIVE_CONVERSATION_BANNER": {
+    "SINGLE": "Conversation waiting for a response!",
+    "MULTIPLE": "{count} conversations waiting for a response!",
+    "DISMISS_ALL": "Dismiss all",
+    "DISMISS_ONE": "Dismiss",
+    "CLOSE_ICON": "×",
+    "ALERT_ICON": "🚨",
+    "FROM_PENDING": "from pending",
+    "FROM_SNOOZED": "reopened (snoozed)",
+    "FROM_RESOLVED": "reopened (resolved)"
+  }
+}

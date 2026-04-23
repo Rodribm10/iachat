@@ -1,6 +1,7 @@
 import AuthAPI from '../api/auth';
 import BaseActionCableConnector from '../../shared/helpers/BaseActionCableConnector';
 import DashboardAudioNotificationHelper from './AudioAlerts/DashboardAudioNotificationHelper';
+import aggressiveAlert from './aggressiveAlert';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import { emitter } from 'shared/helpers/mitt';
 import { useImpersonation } from 'dashboard/composables/useImpersonation';
@@ -113,8 +114,35 @@ class ActionCableConnector extends BaseActionCableConnector {
   onReload = () => window.location.reload();
 
   onStatusChange = data => {
+    this.maybeTriggerAggressiveAlert(data);
     this.app.$store.dispatch('updateConversation', data);
     this.fetchConversationStats();
+  };
+
+  // Dispara banner + som + push do SO quando conversa transiciona para 'open'
+  // vindo de outro status (pending/snoozed/resolved). Se já está open, ignora.
+  maybeTriggerAggressiveAlert = data => {
+    if (!data || data.status !== 'open') return;
+    const store = this.app.$store;
+    const existing = store.getters.getConversationById(data.id);
+    const previousStatus = existing ? existing.status : null;
+    // Só alerta se a conversa já existia no store com outro status.
+    // (Conversa nova em 'open' vai por onConversationCreated; não é reabertura.)
+    if (!previousStatus || previousStatus === 'open') return;
+
+    const contactName =
+      data.meta && data.meta.sender ? data.meta.sender.name : '';
+    const inbox = store.getters['inboxes/getInbox']
+      ? store.getters['inboxes/getInbox'](data.inbox_id)
+      : null;
+    const inboxName = inbox && inbox.name ? inbox.name : '';
+
+    aggressiveAlert.trigger({
+      conversationId: data.id,
+      contactName,
+      inboxName,
+      previousStatus,
+    });
   };
 
   onConversationUpdated = data => {

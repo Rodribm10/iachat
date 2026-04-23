@@ -5,6 +5,7 @@ import NetworkNotification from './components/NetworkNotification.vue';
 import UpdateBanner from './components/app/UpdateBanner.vue';
 import PaymentPendingBanner from './components/app/PaymentPendingBanner.vue';
 import PendingEmailVerificationBanner from './components/app/PendingEmailVerificationBanner.vue';
+import AggressiveConversationBanner from './components/app/AggressiveConversationBanner.vue';
 import vueActionCable from './helper/actionCable';
 import { useRouter } from 'vue-router';
 import { useStore } from 'dashboard/composables/store';
@@ -30,6 +31,7 @@ export default {
     PaymentPendingBanner,
     WootSnackbarBox,
     PendingEmailVerificationBanner,
+    AggressiveConversationBanner,
   },
   setup() {
     const router = useRouter();
@@ -134,6 +136,7 @@ export default {
     class="flex flex-col w-full h-screen min-h-0 bg-n-background"
     :dir="isRTL ? 'rtl' : 'ltr'"
   >
+    <AggressiveConversationBanner />
     <UpdateBanner :latest-chatwoot-version="latestChatwootVersion" />
     <template v-if="currentAccountId">
       <PendingEmailVerificationBanner v-if="hideOnOnboardingView" />

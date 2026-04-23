@@ -1,0 +1,13 @@
+{
+  "AGGRESSIVE_CONVERSATION_BANNER": {
+    "SINGLE": "Conversa aguardando resposta!",
+    "MULTIPLE": "{count} conversas aguardando resposta!",
+    "DISMISS_ALL": "Dispensar todas",
+    "DISMISS_ONE": "Dispensar",
+    "CLOSE_ICON": "×",
+    "ALERT_ICON": "🚨",
+    "FROM_PENDING": "saiu de pendente",
+    "FROM_SNOOZED": "reaberta (estava adiada)",
+    "FROM_RESOLVED": "reaberta (estava resolvida)"
+  }
+}
