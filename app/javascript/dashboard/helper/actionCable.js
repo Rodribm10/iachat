@@ -119,17 +119,18 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.fetchConversationStats();
   };
 
-  // Dispara banner + som + push do SO quando conversa transiciona para 'open'
-  // vindo de outro status (pending/snoozed/resolved). Se já está open, ignora.
+  // Dispara banner + som + push do SO toda vez que conversa transita
+  // pra 'open'. Broadcast `conversation.status_changed` só chega em
+  // mudança real de status, então confiar no evento é suficiente.
+  //
+  // Não usar store.getters.getConversationById(id).status pra detectar
+  // transição: quando o próprio usuário reabre, o dispatch HTTP local
+  // (toggleStatus→CHANGE_CONVERSATION_STATUS) já mutou o store antes do
+  // broadcast chegar → previousStatus === 'open' bloqueava o alerta.
+  // Conversas novas entram via onConversationCreated, não por status_changed.
   maybeTriggerAggressiveAlert = data => {
     if (!data || data.status !== 'open') return;
     const store = this.app.$store;
-    const existing = store.getters.getConversationById(data.id);
-    const previousStatus = existing ? existing.status : null;
-    // Só alerta se a conversa já existia no store com outro status.
-    // (Conversa nova em 'open' vai por onConversationCreated; não é reabertura.)
-    if (!previousStatus || previousStatus === 'open') return;
-
     const contactName =
       data.meta && data.meta.sender ? data.meta.sender.name : '';
     const inbox = store.getters['inboxes/getInbox']
@@ -141,7 +142,7 @@ class ActionCableConnector extends BaseActionCableConnector {
       conversationId: data.id,
       contactName,
       inboxName,
-      previousStatus,
+      previousStatus: '',
     });
   };
 
