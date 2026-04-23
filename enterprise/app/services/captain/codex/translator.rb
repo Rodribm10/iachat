@@ -18,9 +18,14 @@ class Captain::Codex::Translator
   # chat_body: hash no formato OpenAI Chat Completions.
   # Retorna hash pro POST /responses.
   def self.chat_to_responses(chat_body)
-    messages = chat_body['messages'] || chat_body[:messages] || []
-    instructions, input = split_system(messages)
+    instructions, input = split_system(chat_body['messages'] || chat_body[:messages] || [])
+    body = base_body(chat_body, instructions, input)
+    apply_tools!(body, chat_body)
+    apply_response_format!(body, chat_body['response_format'] || chat_body[:response_format])
+    body
+  end
 
+  def self.base_body(chat_body, instructions, input)
     body = {
       model: override_model(chat_body['model'] || chat_body[:model]),
       input: input,
@@ -31,14 +36,41 @@ class Captain::Codex::Translator
       stream: true # Codex exige streaming sempre — o Client agrega.
     }
     body[:max_output_tokens] = chat_body['max_tokens'] if chat_body['max_tokens']
-
-    tools = chat_body['tools'] || chat_body[:tools]
-    if tools.present?
-      body[:tools] = tools.map { |t| translate_tool(t) }
-      body[:tool_choice] = translate_tool_choice(chat_body['tool_choice'] || chat_body[:tool_choice])
-    end
-
     body
+  end
+
+  def self.apply_tools!(body, chat_body)
+    tools = chat_body['tools'] || chat_body[:tools]
+    return if tools.blank?
+
+    body[:tools] = tools.map { |t| translate_tool(t) }
+    body[:tool_choice] = translate_tool_choice(chat_body['tool_choice'] || chat_body[:tool_choice])
+  end
+
+  def self.apply_response_format!(body, response_format)
+    text_format = translate_response_format(response_format)
+    body[:text] = { format: text_format } if text_format
+  end
+
+  # Chat Completions: { type: 'json_schema', json_schema: { name, schema, strict } }
+  # Responses API:    { type: 'json_schema', name, schema, strict } (sem wrapper json_schema)
+  # Também aceita { type: 'json_object' } (sem schema).
+  def self.translate_response_format(format)
+    return nil if format.blank?
+
+    format = format.stringify_keys
+    case format['type']
+    when 'json_schema'
+      js = (format['json_schema'] || {}).stringify_keys
+      {
+        type: 'json_schema',
+        name: js['name'] || 'response',
+        schema: js['schema'] || {},
+        strict: js.fetch('strict', true)
+      }
+    when 'json_object'
+      { type: 'json_object' }
+    end
   end
 
   # Separa a(s) mensagem(ns) system do resto.
