@@ -3,6 +3,7 @@ import { mapGetters } from 'vuex';
 import { emitter } from 'shared/helpers/mitt';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 import aggressiveAlert from 'dashboard/helper/aggressiveAlert';
+import inactivityAlertTracker from 'dashboard/helper/inactivityAlertTracker';
 
 export default {
   name: 'AggressiveConversationBanner',
@@ -13,7 +14,10 @@ export default {
     };
   },
   computed: {
-    ...mapGetters({ currentAccountId: 'getCurrentAccountId' }),
+    ...mapGetters({
+      currentAccountId: 'getCurrentAccountId',
+      allConversations: 'getAllConversations',
+    }),
     hasAlerts() {
       return this.alerts.length > 0;
     },
@@ -65,6 +69,18 @@ export default {
         'AGGRESSIVE_CONVERSATION_BANNER.EXPLANATION',
         'Este alerta só some quando você RESPONDER a conversa. Clicar no × esconde temporariamente.'
       );
+    },
+  },
+  watch: {
+    // Rehidrata o tracker de inatividade toda vez que a lista de conversas
+    // muda (inclusive no boot). Dessa forma, conversas que já estão em
+    // 'open' com o cliente esperando resposta entram no tracker mesmo
+    // quando o usuário só abriu a aba sem receber mensagem ao vivo.
+    allConversations: {
+      handler(conversations) {
+        inactivityAlertTracker.hydrateFromConversations(conversations);
+      },
+      immediate: true,
     },
   },
   mounted() {
