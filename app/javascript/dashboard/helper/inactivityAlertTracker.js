@@ -12,12 +12,33 @@ const THRESHOLDS = [
 // não perder threshold (a menor janela entre thresholds é 5min = 300s).
 const CHECK_INTERVAL_MS = 20_000;
 
+// Logs opt-in. Ativar no DevTools: window.__AGGRESSIVE_DEBUG__ = true
+// Serve pra investigar porque o banner de inatividade não dispara numa
+// conversa específica sem ter que tornar logs permanentes em prod.
+const debug = (...args) => {
+  if (
+    typeof window !== 'undefined' &&
+    // eslint-disable-next-line no-underscore-dangle
+    window.__AGGRESSIVE_DEBUG__
+  ) {
+    // eslint-disable-next-line no-console
+    console.info('[aggressive-alert]', ...args);
+  }
+};
+
 function findLastNonActivityMessage(conv) {
-  if (!conv.messages || !conv.messages.length) return null;
-  const nonActivity = conv.messages.filter(
-    m => m && m.message_type !== 2 && m.message_type !== 'activity'
-  );
-  return nonActivity[nonActivity.length - 1] || null;
+  // 1) Preferir o campo dedicado do payload da listagem — o serializer
+  // já filtra atividades (`non_activity_messages`) antes de setar aqui.
+  if (conv.last_non_activity_message) return conv.last_non_activity_message;
+  // 2) Fallback pro array `messages` (só tem a última mensagem, e pode ser
+  // uma activity — filtra pra garantir).
+  if (conv.messages && conv.messages.length) {
+    const nonActivity = conv.messages.filter(
+      m => m && m.message_type !== 2 && m.message_type !== 'activity'
+    );
+    if (nonActivity.length) return nonActivity[nonActivity.length - 1];
+  }
+  return null;
 }
 
 // Chatwoot usa Unix timestamp (segundos) na maior parte dos endpoints e
@@ -66,6 +87,7 @@ class InactivityAlertTracker {
       contactName: contactName || '—',
       inboxName: inboxName || '',
     });
+    debug('onClientMessage', { conversationId, contactName, inboxName });
     this.start();
   }
 
@@ -83,19 +105,34 @@ class InactivityAlertTracker {
   }
 
   tick() {
-    if (!this.enabledGetter()) return;
+    if (!this.enabledGetter()) {
+      debug('tick skip: disabled');
+      return;
+    }
     if (this.conversations.size === 0) {
+      debug('tick: empty map, stopping interval');
       this.stop();
       return;
     }
     const now = Date.now();
+    debug('tick', { size: this.conversations.size });
     Array.from(this.conversations.entries()).forEach(
       ([conversationId, entry]) => {
         const elapsedMin = (now - entry.lastClientAt) / 60000;
+        debug('tick entry', {
+          conversationId,
+          elapsedMin: elapsedMin.toFixed(2),
+          fired: Array.from(entry.firedMinutes),
+        });
         THRESHOLDS.forEach(t => {
           if (elapsedMin < t.minutes) return;
           if (entry.firedMinutes.has(t.minutes)) return;
           entry.firedMinutes.add(t.minutes);
+          debug('THRESHOLD HIT', {
+            conversationId,
+            minutes: t.minutes,
+            level: t.level,
+          });
           aggressiveAlert.trigger({
             conversationId,
             level: t.level,
@@ -119,14 +156,32 @@ class InactivityAlertTracker {
    * (mantém o estado dos firedMinutes — evita re-trigger em re-hidratação).
    */
   hydrateFromConversations(conversations) {
-    if (!this.enabledGetter()) return;
-    if (!Array.isArray(conversations) || conversations.length === 0) return;
+    if (!this.enabledGetter()) {
+      debug('hydrate skip: disabled');
+      return;
+    }
+    if (!Array.isArray(conversations) || conversations.length === 0) {
+      debug('hydrate skip: empty list');
+      return;
+    }
+    debug('hydrate start', { total: conversations.length });
 
     let hydrated = 0;
+    let skippedNotOpen = 0;
+    let skippedNoMsg = 0;
+    let skippedAgentLast = 0;
+    let skippedNoTs = 0;
     conversations.forEach(conv => {
-      if (!conv || conv.status !== 'open') return;
+      if (!conv || conv.status !== 'open') {
+        skippedNotOpen += 1;
+        return;
+      }
       const lastMsg = findLastNonActivityMessage(conv);
-      if (!lastMsg) return;
+      if (!lastMsg) {
+        skippedNoMsg += 1;
+        debug('hydrate skip (no last msg)', { id: conv.id });
+        return;
+      }
 
       const isClient =
         lastMsg.sender_type === 'Contact' ||
@@ -137,11 +192,19 @@ class InactivityAlertTracker {
         if (this.conversations.has(conv.id)) {
           this.conversations.delete(conv.id);
         }
+        skippedAgentLast += 1;
         return;
       }
 
       const lastClientAt = parseCreatedAt(lastMsg.created_at);
-      if (!lastClientAt) return;
+      if (!lastClientAt) {
+        skippedNoTs += 1;
+        debug('hydrate skip (bad ts)', {
+          id: conv.id,
+          raw: lastMsg.created_at,
+        });
+        return;
+      }
 
       const existing = this.conversations.get(conv.id);
       if (existing && existing.lastClientAt >= lastClientAt) return;
@@ -157,6 +220,15 @@ class InactivityAlertTracker {
         inboxName,
       });
       hydrated += 1;
+    });
+
+    debug('hydrate done', {
+      hydrated,
+      skippedNotOpen,
+      skippedNoMsg,
+      skippedAgentLast,
+      skippedNoTs,
+      mapSize: this.conversations.size,
     });
 
     if (hydrated > 0) {
