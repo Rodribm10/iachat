@@ -23,7 +23,7 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
   end
 
   def update
-    user_attrs = agent_params.slice(:name).compact
+    user_attrs = agent_params.slice(:name).to_h.compact.symbolize_keys
     user_attrs[:ui_settings] = merged_ui_settings if agent_params[:ui_settings].present?
     @agent.update!(user_attrs) if user_attrs.any?
     @agent.current_account_user.update!(agent_params.slice(*account_user_attributes).compact)
