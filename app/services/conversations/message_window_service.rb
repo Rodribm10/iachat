@@ -14,7 +14,7 @@ class Conversations::MessageWindowService
 
   private
 
-  def messaging_window # rubocop:disable Metrics/CyclomaticComplexity
+  def messaging_window
     case @conversation.inbox.channel_type
     when 'Channel::Api'
       api_messaging_window
@@ -25,7 +25,10 @@ class Conversations::MessageWindowService
     when 'Channel::Tiktok'
       tiktok_messaging_window
     when 'Channel::Whatsapp'
-      return if %w[baileys zapi].include?(@conversation.inbox.channel.provider)
+      # Providers via WhatsApp Web (baileys, zapi, wuzapi, evolution) não
+      # estão sujeitos à janela de 24h da Meta Cloud API — Web permite
+      # mensagem livre a qualquer momento.
+      return if %w[baileys zapi wuzapi evolution].include?(@conversation.inbox.channel.provider)
 
       MESSAGING_WINDOW_24_HOURS
     when 'Channel::TwilioSms'
