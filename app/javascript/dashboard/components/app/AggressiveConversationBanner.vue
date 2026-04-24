@@ -17,7 +17,18 @@ export default {
     ...mapGetters({
       currentAccountId: 'getCurrentAccountId',
       allConversations: 'getAllConversations',
+      currentUser: 'getCurrentUser',
     }),
+    allowedInboxIds() {
+      // null → sem filtro (todas); array → só essas.
+      const raw =
+        this.currentUser &&
+        this.currentUser.ui_settings &&
+        this.currentUser.ui_settings.aggressive_alert_inbox_ids;
+      if (raw == null) return null;
+      if (!Array.isArray(raw)) return null;
+      return raw.map(id => Number(id));
+    },
     hasAlerts() {
       return this.alerts.length > 0;
     },
@@ -78,7 +89,14 @@ export default {
     // quando o usuário só abriu a aba sem receber mensagem ao vivo.
     allConversations: {
       handler(conversations) {
-        inactivityAlertTracker.hydrateFromConversations(conversations);
+        const allowed = this.allowedInboxIds;
+        const filtered =
+          allowed === null
+            ? conversations
+            : (conversations || []).filter(c =>
+                allowed.includes(Number(c && c.inbox_id))
+              );
+        inactivityAlertTracker.hydrateFromConversations(filtered);
       },
       immediate: true,
     },

@@ -94,6 +94,13 @@
         "ADMIN_SUCCESS_MESSAGE": "An email with reset password instructions has been sent to the agent",
         "SUCCESS_MESSAGE": "Agent password reset successfully",
         "ERROR_MESSAGE": "Could not connect to Woot Server, Please try again later"
+      },
+      "AGGRESSIVE_ALERT": {
+        "LABEL": "Aggressive alert — inboxes",
+        "DESCRIPTION": "Choose which inboxes will trigger the reopened/inactivity banner for this agent.",
+        "ALL_INBOXES": "All inboxes",
+        "PICK_INBOXES": "Select inboxes",
+        "NONE_WARNING": "No inbox selected — this agent will not see the aggressive alert."
       }
     },
     "SEARCH": {

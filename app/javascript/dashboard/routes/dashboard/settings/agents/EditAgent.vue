@@ -6,6 +6,7 @@ import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
 import Button from 'dashboard/components-next/button/Button.vue';
+import Multiselect from 'vue-multiselect';
 import Auth from '../../../../api/auth';
 import wootConstants from 'dashboard/constants/globals';
 
@@ -38,6 +39,10 @@ const props = defineProps({
     type: Number,
     default: null,
   },
+  uiSettings: {
+    type: Object,
+    default: () => ({}),
+  },
 });
 
 const emit = defineEmits(['close']);
@@ -51,6 +56,27 @@ const agentName = ref(props.name);
 const agentAvailability = ref(props.availability);
 const selectedRoleId = ref(props.customRoleId || props.type);
 const agentCredentials = ref({ email: props.email });
+
+// --- Alerta agressivo por inbox -------------------------------------------
+// ui_settings.aggressive_alert_inbox_ids:
+//   null/undefined → todas (default, legado)
+//   []             → nenhuma (silenciou tudo)
+//   [1, 2, 3]      → só essas
+const initialInboxIds = props.uiSettings?.aggressive_alert_inbox_ids;
+const alertAllInboxes = ref(
+  initialInboxIds === null ||
+    initialInboxIds === undefined ||
+    !Array.isArray(initialInboxIds)
+);
+
+const inboxes = useMapGetter('inboxes/getInboxes');
+const selectedAlertInboxes = ref(
+  Array.isArray(initialInboxIds) && inboxes.value
+    ? inboxes.value.filter(i =>
+        initialInboxIds.map(id => Number(id)).includes(Number(i.id))
+      )
+    : []
+);
 
 const rules = {
   agentName: { required, minLength: minLength(1) },
@@ -135,6 +161,12 @@ const editAgent = async () => {
       payload.custom_role_id = null;
     }
 
+    payload.ui_settings = {
+      aggressive_alert_inbox_ids: alertAllInboxes.value
+        ? null
+        : selectedAlertInboxes.value.map(i => Number(i.id)),
+    };
+
     await store.dispatch('agents/update', payload);
     useAlert(t('AGENT_MGMT.EDIT.API.SUCCESS_MESSAGE'));
     emit('close');
@@ -202,6 +234,47 @@ const resetPassword = async () => {
             {{ $t('AGENT_MGMT.EDIT.FORM.AGENT_AVAILABILITY.ERROR') }}
           </span>
         </label>
+      </div>
+
+      <div class="w-full">
+        <div class="mt-2 border-t pt-3 border-n-weak">
+          <span class="block font-medium mb-1">
+            {{ $t('AGENT_MGMT.EDIT.AGGRESSIVE_ALERT.LABEL') }}
+          </span>
+          <p class="text-xs text-n-slate-11 mb-2">
+            {{ $t('AGENT_MGMT.EDIT.AGGRESSIVE_ALERT.DESCRIPTION') }}
+          </p>
+
+          <label class="flex items-center gap-2 mb-2">
+            <input v-model="alertAllInboxes" type="checkbox" class="!m-0" />
+            <span>
+              {{ $t('AGENT_MGMT.EDIT.AGGRESSIVE_ALERT.ALL_INBOXES') }}
+            </span>
+          </label>
+
+          <div v-if="!alertAllInboxes">
+            <Multiselect
+              v-model="selectedAlertInboxes"
+              :options="inboxes || []"
+              track-by="id"
+              label="name"
+              multiple
+              :close-on-select="false"
+              :clear-on-select="false"
+              hide-selected
+              :placeholder="$t('AGENT_MGMT.EDIT.AGGRESSIVE_ALERT.PICK_INBOXES')"
+              selected-label
+              :select-label="$t('FORMS.MULTISELECT.ENTER_TO_SELECT')"
+              :deselect-label="$t('FORMS.MULTISELECT.ENTER_TO_REMOVE')"
+            />
+            <p
+              v-if="selectedAlertInboxes.length === 0"
+              class="text-xs text-n-slate-11 mt-1"
+            >
+              {{ $t('AGENT_MGMT.EDIT.AGGRESSIVE_ALERT.NONE_WARNING') }}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div class="flex flex-row justify-start w-full gap-2 px-0 py-2">

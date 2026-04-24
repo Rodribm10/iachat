@@ -94,6 +94,13 @@
         "ADMIN_SUCCESS_MESSAGE": "Um e-mail com instruções de redefinição de senha foi enviado para o agente",
         "SUCCESS_MESSAGE": "Senha do agente redefinida com sucesso",
         "ERROR_MESSAGE": "Não foi possível conectar ao servidor Woot, por favor tente novamente mais tarde"
+      },
+      "AGGRESSIVE_ALERT": {
+        "LABEL": "Alerta agressivo — caixas de entrada",
+        "DESCRIPTION": "Escolha em quais caixas de entrada este agente verá o banner de conversa reaberta e de inatividade.",
+        "ALL_INBOXES": "Em todas as caixas de entrada",
+        "PICK_INBOXES": "Selecione as caixas de entrada",
+        "NONE_WARNING": "Nenhuma caixa selecionada — este agente não verá o alerta agressivo."
       }
     },
     "SEARCH": {

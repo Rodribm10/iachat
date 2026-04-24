@@ -23,7 +23,9 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
   end
 
   def update
-    @agent.update!(agent_params.slice(:name).compact)
+    user_attrs = agent_params.slice(:name).compact
+    user_attrs[:ui_settings] = merged_ui_settings if agent_params[:ui_settings].present?
+    @agent.update!(user_attrs) if user_attrs.any?
     @agent.current_account_user.update!(agent_params.slice(*account_user_attributes).compact)
   end
 
@@ -72,11 +74,17 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
   end
 
   def allowed_agent_params
-    [:name, :email, :role, :availability, :auto_offline]
+    [:name, :email, :role, :availability, :auto_offline, { ui_settings: [:aggressive_alert_inbox_ids_mode, { aggressive_alert_inbox_ids: [] }] }]
   end
 
   def agent_params
     params.require(:agent).permit(allowed_agent_params)
+  end
+
+  def merged_ui_settings
+    existing = @agent.ui_settings || {}
+    incoming = agent_params[:ui_settings].to_h.deep_stringify_keys
+    existing.merge(incoming)
   end
 
   def new_agent_params

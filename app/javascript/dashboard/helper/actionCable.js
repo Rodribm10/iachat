@@ -133,12 +133,14 @@ class ActionCableConnector extends BaseActionCableConnector {
     const isIncoming = messageType === 0 || messageType === 'incoming';
     const conversationStatus = conversation && conversation.status;
     if (isIncoming && conversationStatus === 'open') {
+      const inboxId = conversation && conversation.inbox_id;
+      if (!this.isInboxAllowedForUser(inboxId)) return;
       const contactName =
         conversation && conversation.meta && conversation.meta.sender
           ? conversation.meta.sender.name
           : '';
       const inbox = this.app.$store.getters['inboxes/getInbox']
-        ? this.app.$store.getters['inboxes/getInbox'](conversation.inbox_id)
+        ? this.app.$store.getters['inboxes/getInbox'](inboxId)
         : null;
       const inboxName = inbox && inbox.name ? inbox.name : '';
       inactivityAlertTracker.onClientMessage({
@@ -174,6 +176,22 @@ class ActionCableConnector extends BaseActionCableConnector {
     return accountEnabled && userEnabled;
   };
 
+  // Filtra alertas por inbox conforme a preferência do user.
+  // ui_settings.aggressive_alert_inbox_ids:
+  //   - null/undefined → todas as inboxes (default, legado)
+  //   - [] (vazio) → nenhuma inbox (silenciou tudo)
+  //   - [1, 2, 3] → só essas inboxes
+  isInboxAllowedForUser = inboxId => {
+    if (inboxId == null) return true;
+    const user = this.app.$store.getters.getCurrentUser;
+    const allowed =
+      user && user.ui_settings && user.ui_settings.aggressive_alert_inbox_ids;
+    if (allowed == null) return true;
+    if (!Array.isArray(allowed)) return true;
+    // Inbox ids podem vir como number no evento e string no ui_settings.
+    return allowed.some(id => Number(id) === Number(inboxId));
+  };
+
   // eslint-disable-next-line class-methods-use-this
   onReload = () => window.location.reload();
 
@@ -194,6 +212,7 @@ class ActionCableConnector extends BaseActionCableConnector {
   maybeTriggerAggressiveAlert = data => {
     if (!data || data.status !== 'open') return;
     if (!this.isAggressiveAlertEnabled()) return;
+    if (!this.isInboxAllowedForUser(data.inbox_id)) return;
     const store = this.app.$store;
     const contactName =
       data.meta && data.meta.sender ? data.meta.sender.name : '';
