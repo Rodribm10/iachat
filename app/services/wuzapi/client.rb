@@ -57,12 +57,14 @@ class Wuzapi::Client # rubocop:disable Metrics/ClassLength
 
   def send_file(user_token, phone_number, base64_data, filename)
     payload = { 'Phone' => phone_number, 'Body' => base64_data, 'Filename' => filename }
+    # Wuzapi usa `/chat/send/document` pra PDFs/arquivos. As versões antigas
+    # tinham `/chat/send/file` — mantém como fallback pra compat.
     request(
       :post,
-      '/chat/send/file',
+      '/chat/send/document',
       payload,
       user_auth_headers(user_token),
-      fallback_paths: ['/send/file'],
+      fallback_paths: ['/send/document', '/chat/send/file', '/send/file'],
       allow_base_fallback: true
     )
   end
@@ -224,7 +226,9 @@ class Wuzapi::Client # rubocop:disable Metrics/ClassLength
 
     begin
       http.request(request_obj)
-    rescue SocketError, Errno::ECONNREFUSED, Errno::EHOSTUNREACH, Errno::ENETUNREACH, Net::OpenTimeout, Net::ReadTimeout => e
+    rescue SocketError, Errno::ECONNREFUSED, Errno::ECONNRESET, Errno::EHOSTUNREACH, Errno::ENETUNREACH, Net::OpenTimeout, Net::ReadTimeout => e
+      # ECONNRESET surge quando proxy intermediário corta antes do servidor
+      # responder — tratar como ConnectionError pra ativar fallback de path/base.
       raise ConnectionError, "Could not connect to Wuzapi: #{e.message}"
     end
   end
