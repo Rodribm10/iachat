@@ -269,8 +269,35 @@
     "NO_ENOUGH_DATA": "Não existem dados suficientes para gerar o relatório. Tente novamente mais tarde.",
     "DOWNLOAD_INBOX_REPORTS": "Baixar relatórios de entrada",
     "FILTER_DROPDOWN_LABEL": "Selecionar caixa de entrada",
-    "ALL_INBOXES": "All Inboxes",
-    "SEARCH_INBOX": "Search Inbox",
+    "ALL_INBOXES": "Todas as caixas",
+    "SEARCH_INBOX": "Buscar caixa",
+    "TABS": {
+      "OVERVIEW": "Visão Geral",
+      "LEADS": "Novas × Retorno"
+    },
+    "LEADS": {
+      "EMPTY": "Sem conversas no período.",
+      "TOTAL": "Total de conversas no período: {count}",
+      "METRICS": {
+        "NEW_LEADS": {
+          "LABEL": "Leads novos",
+          "INFO": "Conversas de contatos que nunca falaram em nenhuma caixa da rede antes."
+        },
+        "RETURNING": {
+          "LABEL": "Retorno",
+          "INFO": "Conversas de contatos cuja conversa anterior mais recente foi resolvida há mais de 24h."
+        },
+        "OTHERS": {
+          "LABEL": "Outras",
+          "INFO": "Conversas de contatos cuja conversa anterior ainda está aberta ou foi resolvida há menos de 24h."
+        }
+      },
+      "CHART": {
+        "NEW_LEADS": "Novas",
+        "RETURNING": "Retorno",
+        "OTHERS": "Outras"
+      }
+    },
     "METRICS": {
       "CONVERSATIONS": {
         "NAME": "Conversas",

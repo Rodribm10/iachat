@@ -67,6 +67,10 @@ const state = {
     agentConversationMetric: [],
     teamConversationMetric: [],
   },
+  inboxLeadsSummary: {
+    isFetching: false,
+    data: [],
+  },
 };
 
 const getters = {
@@ -102,6 +106,12 @@ const getters = {
   },
   getOverviewUIFlags($state) {
     return $state.overview.uiFlags;
+  },
+  getInboxLeadsSummary(_state) {
+    return _state.inboxLeadsSummary.data;
+  },
+  getInboxLeadsSummaryFetching(_state) {
+    return _state.inboxLeadsSummary.isFetching;
   },
 };
 
@@ -286,6 +296,20 @@ export const actions = {
         console.error(error);
       });
   },
+  fetchInboxLeadsSummary({ commit }, reportObj) {
+    commit(types.default.TOGGLE_INBOX_LEADS_SUMMARY_LOADING, true);
+    return Report.getInboxLeadsSummary(reportObj)
+      .then(response => {
+        commit(types.default.SET_INBOX_LEADS_SUMMARY, response.data || []);
+      })
+      .catch(error => {
+        console.error(error);
+        commit(types.default.SET_INBOX_LEADS_SUMMARY, []);
+      })
+      .finally(() => {
+        commit(types.default.TOGGLE_INBOX_LEADS_SUMMARY_LOADING, false);
+      });
+  },
   downloadAccountConversationHeatmap(_, reportObj) {
     Report.getConversationTrafficCSV({ daysBefore: reportObj.daysBefore })
       .then(response => {
@@ -356,6 +380,12 @@ const mutations = {
   },
   [types.default.TOGGLE_TEAM_CONVERSATION_METRIC_LOADING](_state, flag) {
     _state.overview.uiFlags.isFetchingTeamConversationMetric = flag;
+  },
+  [types.default.SET_INBOX_LEADS_SUMMARY](_state, data) {
+    _state.inboxLeadsSummary.data = data;
+  },
+  [types.default.TOGGLE_INBOX_LEADS_SUMMARY_LOADING](_state, flag) {
+    _state.inboxLeadsSummary.isFetching = flag;
   },
 };
 

@@ -87,6 +87,13 @@ class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
     render json: builder.build
   end
 
+  def inbox_leads_summary
+    return head :unprocessable_entity if params[:inbox_id].blank?
+
+    builder = V2::Reports::InboxLeadsSummaryBuilder.new(Current.account, inbox_leads_summary_params)
+    render json: builder.build
+  end
+
   private
 
   def generate_csv(filename, template)
@@ -183,6 +190,15 @@ class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
 
   def outgoing_messages_count_params
     {
+      group_by: params[:group_by],
+      since: params[:since],
+      until: params[:until]
+    }
+  end
+
+  def inbox_leads_summary_params
+    {
+      inbox_id: params[:inbox_id],
       group_by: params[:group_by],
       since: params[:since],
       until: params[:until]

@@ -108,6 +108,18 @@ class ReportsAPI extends ApiClient {
       },
     });
   }
+
+  getInboxLeadsSummary({ inboxId, from, to, groupBy } = {}) {
+    return axios.get(`${this.url}/inbox_leads_summary`, {
+      params: {
+        inbox_id: inboxId,
+        since: from,
+        until: to,
+        group_by: groupBy,
+        timezone_offset: getTimeOffset(),
+      },
+    });
+  }
 }
 
 export default new ReportsAPI();

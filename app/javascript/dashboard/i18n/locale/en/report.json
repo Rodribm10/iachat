@@ -281,6 +281,33 @@
     "FILTER_DROPDOWN_LABEL": "Select Inbox",
     "ALL_INBOXES": "All Inboxes",
     "SEARCH_INBOX": "Search Inbox",
+    "TABS": {
+      "OVERVIEW": "Overview",
+      "LEADS": "New × Returning"
+    },
+    "LEADS": {
+      "EMPTY": "No conversations in this period.",
+      "TOTAL": "Total conversations in the period: {count}",
+      "METRICS": {
+        "NEW_LEADS": {
+          "LABEL": "New leads",
+          "INFO": "Conversations from contacts who never spoke to any inbox of the network before."
+        },
+        "RETURNING": {
+          "LABEL": "Returning",
+          "INFO": "Conversations from contacts whose most recent prior conversation was resolved more than 24h ago."
+        },
+        "OTHERS": {
+          "LABEL": "Others",
+          "INFO": "Conversations from contacts whose prior conversation is still open or was resolved less than 24h ago."
+        }
+      },
+      "CHART": {
+        "NEW_LEADS": "New",
+        "RETURNING": "Returning",
+        "OTHERS": "Others"
+      }
+    },
     "FILTERS": {
       "INPUT_PLACEHOLDER": {
         "INBOXES": "Search inboxes"
