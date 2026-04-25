@@ -1,11 +1,17 @@
-# Tabela de Preços — Qnn01 (Ceilândia)
+# Tabela de Preços — Marca Hotel 1001 Noites (tradicional)
 
 **Marca:** Hotel 1001 Noites
-**Unidade:** QNN01 (Ceilândia)
+**Vale para:** TODAS as unidades 1001 Noites tradicionais (preços iguais por marca, per padrão `feedback_prompt_scope_by_brand`)
+**Unidades hoje cadastradas no Captain:** QNN01 (Ceilândia)
+**Unidades pendentes de cadastro:** Padova, Recanto das Emas, Samambaia ADE
 **Última atualização:** 2026-04-25
 **Fonte:** Tabela enviada pelo Rodrigo + correção operacional via WhatsApp (qui-dom uniforme, não "sex-sáb")
 
-> **Atenção:** a Qnn01 **não tem** Suíte Pole Dance (essa categoria existe em outras unidades 1001 Noites, mas não aqui).
+> **Importante — variação de categorias por unidade:** preços são iguais entre unidades da mesma marca, MAS algumas categorias existem em algumas unidades e não em outras. Exemplos:
+> - **Suíte Pole Dance:** existe em algumas unidades 1001 Noites (a confirmar quais via questionário do `top-team`); **NÃO existe na Qnn01**.
+> - **Outras categorias opcionais:** podem aparecer conforme as gerências respondem o questionário.
+>
+> **Quando uma unidade tem uma categoria, o preço é o desta tabela** — não se inventa preço por unidade.
 
 ---
 

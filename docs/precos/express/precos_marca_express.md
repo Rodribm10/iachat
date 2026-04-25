@@ -1,11 +1,13 @@
-# Tabela de Preços — Express Águas Lindas
+# Tabela de Preços — Marca Hotel 1001 Noites Express
 
 **Marca:** Hotel 1001 Noites Express
-**Unidade:** Express Águas Lindas
+**Vale para:** TODAS as unidades Express (preços iguais por marca, per padrão `feedback_prompt_scope_by_brand`)
+**Unidades hoje cadastradas no Captain:** Express Águas Lindas
+**Outras unidades Express:** (a confirmar — provavelmente Express é única hoje)
 **Última atualização:** 2026-04-25
 **Fonte:** Tabela enviada pelo Rodrigo
 
-> **Atenção:** o Express **não tem** Hidromassagem, Stilo, Alexa ou Pole Dance. Pra clientes que pedirem essas categorias, oferecer redirecionamento pra Prime ou outra unidade da marca 1001 Noites.
+> **Atenção:** o Express **não tem** Hidromassagem, Stilo, Alexa, Pole Dance ou Luxo. Pra clientes que pedirem essas categorias, oferecer redirecionamento pra Prime ou outra unidade da marca 1001 Noites tradicional.
 
 ---
 

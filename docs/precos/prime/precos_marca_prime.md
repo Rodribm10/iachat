@@ -1,7 +1,9 @@
 # Tabela de Preços — Marca Prime
 
 **Marca:** Hotel 1001 Noites Prime
-**Vale para:** Prime Águas Lindas (PrimeAL) e Prime Vila Lobos (PrimeVL) — preços idênticos por marca
+**Vale para:** TODAS as unidades Prime (preços iguais por marca, per padrão `feedback_prompt_scope_by_brand`)
+**Unidades hoje cadastradas no Captain:** Prime Águas Lindas (PrimeAL), Prime Vila Lobos (PrimeVL)
+**Unidades pendentes de cadastro:** Prime ADE
 **Última atualização:** 2026-04-25
 **Fonte:** Tabela oficial impressa fornecida pelo Rodrigo + confirmação da Daniela via WhatsApp
 
