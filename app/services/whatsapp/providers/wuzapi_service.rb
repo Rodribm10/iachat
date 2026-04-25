@@ -26,11 +26,14 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
     caption = content_with_signature || message.content
 
     base64_data = attachment.file.blob.open { |tmp| Base64.strict_encode64(tmp.read) }
-    data_uri = "data:#{mime_type};base64,#{base64_data}"
 
     if mime_type.start_with?('image/')
+      data_uri = "data:#{mime_type};base64,#{base64_data}"
       client.send_image(user_token, phone_number, data_uri, caption)
     else
+      # Wuzapi `/chat/send/document` exige prefixo `application/octet-stream`
+      # no data URI; o tipo real é inferido pelo FileName.
+      data_uri = "data:application/octet-stream;base64,#{base64_data}"
       client.send_file(user_token, phone_number, data_uri, attachment.file.filename.to_s)
     end
   end
