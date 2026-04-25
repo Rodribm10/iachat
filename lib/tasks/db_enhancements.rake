@@ -27,5 +27,7 @@ db_namespace = namespace :db do
     rescue ActiveRecord::NoDatabaseError
       db_namespace['setup'].invoke
     end
+
+    Rake::Task['captain:sync_prompts'].invoke if Rake::Task.task_defined?('captain:sync_prompts')
   end
 end
