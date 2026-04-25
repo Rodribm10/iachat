@@ -56,9 +56,16 @@ class Wuzapi::Client # rubocop:disable Metrics/ClassLength
   end
 
   def send_file(user_token, phone_number, base64_data, filename)
-    payload = { 'Phone' => phone_number, 'Body' => base64_data, 'Filename' => filename }
-    # Wuzapi usa `/chat/send/document` pra PDFs/arquivos. As versões antigas
-    # tinham `/chat/send/file` — mantém como fallback pra compat.
+    # Wuzapi (asternic) `/chat/send/document` espera o campo `Document`
+    # (data URI base64). `Body`/`Filename` ficam só pra fallback de versões
+    # mais antigas que aceitavam isso.
+    payload = {
+      'Phone' => phone_number,
+      'Document' => base64_data,
+      'FileName' => filename,
+      'Body' => base64_data,
+      'Filename' => filename
+    }
     request(
       :post,
       '/chat/send/document',
