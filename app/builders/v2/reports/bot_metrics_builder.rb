@@ -18,8 +18,15 @@ class V2::Reports::BotMetricsBuilder
 
   private
 
+  def filter_inbox_id
+    @filter_inbox_id ||= params[:inbox_id].presence&.to_i
+  end
+
   def bot_activated_inbox_ids
-    @bot_activated_inbox_ids ||= account.inboxes.filter(&:active_bot?).map(&:id)
+    @bot_activated_inbox_ids ||= begin
+      ids = account.inboxes.filter(&:active_bot?).map(&:id)
+      filter_inbox_id ? ids & [filter_inbox_id] : ids
+    end
   end
 
   def bot_conversations
@@ -30,14 +37,18 @@ class V2::Reports::BotMetricsBuilder
     @bot_messages ||= account.messages.outgoing.where(conversation_id: bot_conversations.ids).where(created_at: range)
   end
 
+  def base_reporting_events
+    scope = account.reporting_events.where(account_id: account.id, created_at: range)
+    scope = scope.where(inbox_id: filter_inbox_id) if filter_inbox_id
+    scope
+  end
+
   def bot_resolutions_count
-    account.reporting_events.joins(:conversation).select(:conversation_id).where(account_id: account.id, name: :conversation_bot_resolved,
-                                                                                 created_at: range).distinct.count
+    base_reporting_events.joins(:conversation).select(:conversation_id).where(name: :conversation_bot_resolved).distinct.count
   end
 
   def bot_handoffs_count
-    account.reporting_events.joins(:conversation).select(:conversation_id).where(account_id: account.id, name: :conversation_bot_handoff,
-                                                                                 created_at: range).distinct.count
+    base_reporting_events.joins(:conversation).select(:conversation_id).where(name: :conversation_bot_handoff).distinct.count
   end
 
   def bot_resolution_rate

@@ -38,6 +38,7 @@ namespace :reports do
     base_scope = base_scope.where(account_id: account_id) if account_id
 
     affected_conversation_ids = Message
+                                .unscope(:order)
                                 .where(message_type: :outgoing, sender_id: nil)
                                 .distinct
                                 .pluck(:conversation_id)

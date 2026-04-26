@@ -1,3 +1,4 @@
+# rubocop:disable Metrics/ClassLength
 class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
   include Api::V2::Accounts::ReportsHelper
   include Api::V2::Accounts::HeatmapHelper
@@ -58,7 +59,7 @@ class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
   end
 
   def bot_metrics
-    bot_metrics = V2::Reports::BotMetricsBuilder.new(Current.account, params).metrics
+    bot_metrics = V2::Reports::BotMetricsBuilder.new(Current.account, bot_metrics_params).metrics
     render json: bot_metrics
   end
 
@@ -196,6 +197,14 @@ class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
     }
   end
 
+  def bot_metrics_params
+    {
+      inbox_id: params[:inbox_id],
+      since: params[:since],
+      until: params[:until]
+    }
+  end
+
   def inbox_leads_summary_params
     {
       inbox_id: params[:inbox_id],
@@ -205,3 +214,4 @@ class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
     }
   end
 end
+# rubocop:enable Metrics/ClassLength

@@ -180,6 +180,8 @@ export const actions = {
       to: reportObj.to,
       groupBy: reportObj.groupBy,
       businessHours: reportObj.businessHours,
+      type: reportObj.type,
+      id: reportObj.id,
     })
       .then(botSummary => {
         commit(types.default.SET_BOT_SUMMARY, botSummary.data);

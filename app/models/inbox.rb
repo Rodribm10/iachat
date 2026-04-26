@@ -77,6 +77,7 @@ class Inbox < ApplicationRecord
   has_many :conversations, dependent: :destroy_async
   has_many :messages, dependent: :destroy_async
   has_many :scheduled_messages, dependent: :destroy_async
+  has_many :reporting_events, dependent: :nullify
 
   has_one :inbox_assignment_policy, dependent: :destroy
   has_one :assignment_policy, through: :inbox_assignment_policy

@@ -20,6 +20,7 @@ export default {
       from: 0,
       to: 0,
       groupBy: GROUP_BY_FILTER[1],
+      inboxId: null,
       reportKeys: {
         BOT_RESOLUTION_COUNT: 'bot_resolutions_count',
         BOT_HANDOFF_COUNT: 'bot_handoffs_count',
@@ -32,6 +33,7 @@ export default {
       return {
         from: this.from,
         to: this.to,
+        inboxId: this.inboxId,
       };
     },
   },
@@ -60,24 +62,35 @@ export default {
       });
     },
     getRequestPayload() {
-      const { from, to, groupBy, businessHours } = this;
-
-      return {
+      const { from, to, groupBy, businessHours, inboxId } = this;
+      const payload = {
         from,
         to,
         groupBy: groupBy?.period,
         businessHours,
       };
+      if (inboxId) {
+        payload.type = 'inbox';
+        payload.id = inboxId;
+      }
+      return payload;
     },
-    onFilterChange({ from, to, groupBy, businessHours }) {
+    onFilterChange({ from, to, groupBy, businessHours, inboxes }) {
       this.from = from;
       this.to = to;
       this.groupBy = groupBy;
       this.businessHours = businessHours;
+      this.inboxId = inboxes?.id || null;
       this.fetchAllData();
 
       useTrack(REPORTS_EVENTS.FILTER_REPORT, {
-        filterValue: { from, to, groupBy, businessHours },
+        filterValue: {
+          from,
+          to,
+          groupBy,
+          businessHours,
+          inboxId: this.inboxId,
+        },
         reportType: 'bots',
       });
     },
@@ -89,7 +102,7 @@ export default {
   <ReportHeader :header-title="$t('BOT_REPORTS.HEADER')" />
   <div class="flex flex-col gap-4">
     <ReportFilters
-      :show-entity-filter="false"
+      filter-type="inboxes"
       show-group-by
       :show-business-hours="false"
       @filter-change="onFilterChange"

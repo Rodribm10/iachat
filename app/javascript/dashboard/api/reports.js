@@ -91,18 +91,19 @@ class ReportsAPI extends ApiClient {
     });
   }
 
-  getBotMetrics({ from, to } = {}) {
+  getBotMetrics({ from, to, inboxId } = {}) {
     return axios.get(`${this.url}/bot_metrics`, {
-      params: { since: from, until: to },
+      params: { since: from, until: to, inbox_id: inboxId },
     });
   }
 
-  getBotSummary({ from, to, groupBy, businessHours } = {}) {
+  getBotSummary({ from, to, groupBy, businessHours, type, id } = {}) {
     return axios.get(`${this.url}/bot_summary`, {
       params: {
         since: from,
         until: to,
-        type: 'account',
+        type: type || 'account',
+        id,
         group_by: groupBy,
         business_hours: businessHours,
       },
