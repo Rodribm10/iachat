@@ -74,7 +74,7 @@ class Captain::Reports::RetentionCohortService
     end_month = Time.current.beginning_of_month
 
     sql = activity_sql(start_month, end_month)
-    rows = ActiveRecord::Base.connection.exec_query(sql, 'RetentionCohort', [@account.id])
+    rows = ActiveRecord::Base.connection.exec_query(sql, 'RetentionCohort')
 
     hash = Hash.new { |h, k| h[k] = {} }
 
@@ -89,37 +89,45 @@ class Captain::Reports::RetentionCohortService
 
   # rubocop:disable Metrics/MethodLength
   def activity_sql(start_month, end_month)
-    <<~SQL.squish
-      WITH contact_cohorts AS (
-        SELECT id AS contact_id,
-               DATE_TRUNC('month', first_interaction_at) AS cohort_month
-        FROM contacts
-        WHERE first_interaction_at IS NOT NULL
-          AND first_interaction_at >= '#{start_month.iso8601}'
-          AND account_id = $1
-      ),
-      contact_activity AS (
-        SELECT DISTINCT
-               conversations.contact_id,
-               DATE_TRUNC('month', messages.created_at) AS activity_month
-        FROM messages
-        INNER JOIN conversations ON conversations.id = messages.conversation_id
-        WHERE messages.sender_type = 'Contact'
-          AND messages.private = false
-          AND (messages.status IS NULL OR messages.status <> #{failed_status_value})
-          AND conversations.account_id = $1
-          AND messages.created_at >= '#{start_month.iso8601}'
-          AND messages.created_at <  '#{(end_month + 1.month).iso8601}'
-      )
-      SELECT c.cohort_month,
-             a.activity_month,
-             COUNT(DISTINCT c.contact_id) AS active_contacts
-      FROM contact_cohorts c
-      INNER JOIN contact_activity a ON a.contact_id = c.contact_id
-      WHERE a.activity_month >= c.cohort_month
-      GROUP BY c.cohort_month, a.activity_month
-      ORDER BY c.cohort_month, a.activity_month
-    SQL
+    ActiveRecord::Base.sanitize_sql_array([
+                                            <<~SQL.squish,
+                                              WITH contact_cohorts AS (
+                                                SELECT id AS contact_id,
+                                                       DATE_TRUNC('month', first_interaction_at) AS cohort_month
+                                                FROM contacts
+                                                WHERE first_interaction_at IS NOT NULL
+                                                  AND first_interaction_at >= ?
+                                                  AND account_id = ?
+                                              ),
+                                              contact_activity AS (
+                                                SELECT DISTINCT
+                                                       conversations.contact_id,
+                                                       DATE_TRUNC('month', messages.created_at) AS activity_month
+                                                FROM messages
+                                                INNER JOIN conversations ON conversations.id = messages.conversation_id
+                                                WHERE messages.sender_type = 'Contact'
+                                                  AND messages.private = false
+                                                  AND (messages.status IS NULL OR messages.status <> ?)
+                                                  AND conversations.account_id = ?
+                                                  AND messages.created_at >= ?
+                                                  AND messages.created_at < ?
+                                              )
+                                              SELECT c.cohort_month,
+                                                     a.activity_month,
+                                                     COUNT(DISTINCT c.contact_id) AS active_contacts
+                                              FROM contact_cohorts c
+                                              INNER JOIN contact_activity a ON a.contact_id = c.contact_id
+                                              WHERE a.activity_month >= c.cohort_month
+                                              GROUP BY c.cohort_month, a.activity_month
+                                              ORDER BY c.cohort_month, a.activity_month
+                                            SQL
+                                            start_month,
+                                            @account.id,
+                                            failed_status_value,
+                                            @account.id,
+                                            start_month,
+                                            end_month + 1.month
+                                          ])
   end
   # rubocop:enable Metrics/MethodLength
 

@@ -34,4 +34,8 @@ class Captain::AssistantPolicy < ApplicationPolicy
   def revenue?
     true
   end
+
+  def cohort?
+    true
+  end
 end
