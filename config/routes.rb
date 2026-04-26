@@ -516,6 +516,8 @@ Rails.application.routes.draw do
               get :first_response_time_distribution
               get :outgoing_messages_count
               get :inbox_leads_summary
+              get :conversion_funnel
+              get :inbox_benchmarking
             end
           end
           resource :year_in_review, only: [:show]

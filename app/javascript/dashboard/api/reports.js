@@ -121,6 +121,27 @@ class ReportsAPI extends ApiClient {
       },
     });
   }
+
+  getConversionFunnel({ inboxId, from, to } = {}) {
+    return axios.get(`${this.url}/conversion_funnel`, {
+      params: {
+        inbox_id: inboxId,
+        since: from,
+        until: to,
+        timezone_offset: getTimeOffset(),
+      },
+    });
+  }
+
+  getInboxBenchmarking({ from, to } = {}) {
+    return axios.get(`${this.url}/inbox_benchmarking`, {
+      params: {
+        since: from,
+        until: to,
+        timezone_offset: getTimeOffset(),
+      },
+    });
+  }
 }
 
 export default new ReportsAPI();

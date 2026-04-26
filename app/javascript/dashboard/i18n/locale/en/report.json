@@ -687,5 +687,47 @@
     "AVG_REPLY_TIME": "Avg. Customer Waiting Time",
     "RESOLUTION_COUNT": "Resolution Count",
     "CONVERSATIONS": "No. of conversations"
+  },
+  "DIRECTORY_DASHBOARD": {
+    "HEADER": "Directory Dashboard",
+    "BANNER": {
+      "TITLE": "Channel adoption — not the full picture.",
+      "BODY": "These numbers measure the digital channel only (Jasmine + reservations created via app). Conversations attended manually that closed at the reception are not yet captured (manual marking is in progress)."
+    },
+    "HEADLINE_NUMBERS": "Headline numbers",
+    "METRICS": {
+      "LEADS_TOTAL": {
+        "LABEL": "Leads (total)",
+        "TOOLTIP": "All conversations created in the period (new + returning)"
+      },
+      "LEADS_NEW": {
+        "LABEL": "New leads",
+        "TOOLTIP": "First-ever conversation of the contact in any inbox of the network"
+      },
+      "LEADS_RETURNING": {
+        "LABEL": "Returning leads",
+        "TOOLTIP": "Contact had at least one prior conversation"
+      },
+      "CONVERSION_RATE": {
+        "LABEL": "Lead → Paid reservation",
+        "TOOLTIP": "Paid reservations ÷ total leads × 100. Adoption proxy, not full operation."
+      }
+    },
+    "FUNNEL": {
+      "TITLE": "Funnel",
+      "STAGE_LEADS": "Leads",
+      "STAGE_RESERVATIONS": "Reservations created",
+      "STAGE_PAID": "Paid"
+    },
+    "BENCHMARK": {
+      "TITLE": "Inbox benchmarking by brand",
+      "BRAND_AVG": "brand avg.",
+      "COL_INBOX": "Inbox",
+      "COL_LEADS": "Leads",
+      "COL_CREATED": "Created",
+      "COL_PAID": "Paid",
+      "COL_RATE": "Conv. rate",
+      "COL_VS_BRAND": "vs brand"
+    }
   }
 }

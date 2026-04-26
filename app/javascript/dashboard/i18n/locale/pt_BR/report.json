@@ -619,5 +619,47 @@
     "AVG_REPLY_TIME": "Tempo Médio de Espera do Cliente",
     "RESOLUTION_COUNT": "Contagem de Resolução",
     "CONVERSATIONS": "Nº de Conversas"
+  },
+  "DIRECTORY_DASHBOARD": {
+    "HEADER": "Painel Diretoria",
+    "BANNER": {
+      "TITLE": "Adoção do canal digital — não é a operação completa.",
+      "BODY": "Esses números medem só o canal digital (Jasmine + reservas via app). Conversas atendidas manualmente que fecharam na recepção ainda não estão capturadas (marcação manual em construção)."
+    },
+    "HEADLINE_NUMBERS": "Números principais",
+    "METRICS": {
+      "LEADS_TOTAL": {
+        "LABEL": "Leads (total)",
+        "TOOLTIP": "Todas as conversas criadas no período (novos + retorno)"
+      },
+      "LEADS_NEW": {
+        "LABEL": "Leads novos",
+        "TOOLTIP": "Primeira conversa do contato em qualquer caixa da rede"
+      },
+      "LEADS_RETURNING": {
+        "LABEL": "Leads de retorno",
+        "TOOLTIP": "Contato com pelo menos uma conversa anterior"
+      },
+      "CONVERSION_RATE": {
+        "LABEL": "Lead → Reserva paga",
+        "TOOLTIP": "Reservas pagas ÷ total de leads × 100. Proxy de adoção, não retrato da operação."
+      }
+    },
+    "FUNNEL": {
+      "TITLE": "Funil",
+      "STAGE_LEADS": "Leads",
+      "STAGE_RESERVATIONS": "Reservas criadas",
+      "STAGE_PAID": "Pagas"
+    },
+    "BENCHMARK": {
+      "TITLE": "Comparativo entre unidades por marca",
+      "BRAND_AVG": "média da marca",
+      "COL_INBOX": "Caixa de Entrada",
+      "COL_LEADS": "Leads",
+      "COL_CREATED": "Criadas",
+      "COL_PAID": "Pagas",
+      "COL_RATE": "Taxa conv.",
+      "COL_VS_BRAND": "vs marca"
+    }
   }
 }

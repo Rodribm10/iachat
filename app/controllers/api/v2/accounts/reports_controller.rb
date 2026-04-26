@@ -95,6 +95,16 @@ class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
     render json: builder.build
   end
 
+  def conversion_funnel
+    builder = V2::Reports::ConversionFunnelBuilder.new(Current.account, conversion_funnel_params)
+    render json: builder.metrics
+  end
+
+  def inbox_benchmarking
+    builder = V2::Reports::InboxBenchmarkingBuilder.new(Current.account, inbox_benchmarking_params)
+    render json: builder.build
+  end
+
   private
 
   def generate_csv(filename, template)
@@ -209,6 +219,21 @@ class Api::V2::Accounts::ReportsController < Api::V1::Accounts::BaseController
     {
       inbox_id: params[:inbox_id],
       group_by: params[:group_by],
+      since: params[:since],
+      until: params[:until]
+    }
+  end
+
+  def conversion_funnel_params
+    {
+      inbox_id: params[:inbox_id],
+      since: params[:since],
+      until: params[:until]
+    }
+  end
+
+  def inbox_benchmarking_params
+    {
       since: params[:since],
       until: params[:until]
     }
