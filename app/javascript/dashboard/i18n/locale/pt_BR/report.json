@@ -36,11 +36,11 @@
         "DESC": "( Total )"
       },
       "BOT_RESOLUTION_COUNT": {
-        "NAME": "Contagem de Resolução",
+        "NAME": "Resolvidas pelo bot",
         "DESC": "( Total )"
       },
       "BOT_HANDOFF_COUNT": {
-        "NAME": "Contagem de transferências",
+        "NAME": "Transferidas para humano",
         "DESC": "( Total )"
       },
       "REPLY_TIME": {
@@ -466,20 +466,32 @@
     "HEADER": "Relatórios do Bot",
     "METRIC": {
       "TOTAL_CONVERSATIONS": {
-        "LABEL": "Nº de Conversas",
-        "TOOLTIP": "Número total de conversas tratadas pelo bot"
+        "LABEL": "Conversas",
+        "TOOLTIP": "Total de conversas atendidas pelo bot no período"
       },
       "TOTAL_RESPONSES": {
-        "LABEL": "Total de respostas",
-        "TOOLTIP": "Número total de respostas enviadas pelo bot"
+        "LABEL": "Mensagens enviadas",
+        "TOOLTIP": "Total de mensagens enviadas — inclui o bot E humanos (via Chatwoot ou eco do WhatsApp)"
       },
       "RESOLUTION_RATE": {
-        "LABEL": "Tempo de resolução",
-        "TOOLTIP": "Número total de conversas resolvidas pelo bot / número total de conversas manipuladas pelo bot * 100"
+        "LABEL": "Resolvidas pelo bot %",
+        "TOOLTIP": "Conversas que o bot resolveu sozinho (sem humano respondendo, via Chatwoot ou WhatsApp) ÷ total de conversas × 100"
       },
       "HANDOFF_RATE": {
-        "LABEL": "Taxa de entrega",
-        "TOOLTIP": "Número total de conversas entregues a agentes / número total de conversas mantidas pelo bot * 100"
+        "LABEL": "Transferidas pra humano %",
+        "TOOLTIP": "Conversas transferidas pra humano (auto pela Jasmine + tomada manual) ÷ total de conversas × 100. Junto com a taxa de resolução fecha a engrenagem (o resto está aberto, em snooze ou abandonado)."
+      },
+      "BOT_RESOLUTIONS": {
+        "LABEL": "Resolvidas pelo bot",
+        "TOOLTIP": "Contagem absoluta: conversas que o bot fechou sozinho, sem humano respondendo (via Chatwoot ou WhatsApp)"
+      },
+      "AUTO_HANDOFFS": {
+        "LABEL": "Transferência automática (Jasmine)",
+        "TOOLTIP": "Conversas em que a Jasmine chamou bot_handoff! explicitamente — geralmente loop de ferramenta, timeout, limite de turnos ou intent do LLM classificado como handoff"
+      },
+      "MANUAL_TAKEOVERS": {
+        "LABEL": "Tomada manual (agente)",
+        "TOOLTIP": "Conversas em que um humano respondeu (Chatwoot ou eco do WhatsApp) SEM a Jasmine ter chamado bot_handoff! antes — o agente assumiu silenciosamente"
       }
     }
   },

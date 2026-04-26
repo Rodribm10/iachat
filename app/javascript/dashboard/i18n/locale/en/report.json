@@ -36,11 +36,11 @@
         "DESC": "( Total )"
       },
       "BOT_RESOLUTION_COUNT": {
-        "NAME": "Resolution Count",
+        "NAME": "Resolved by bot",
         "DESC": "( Total )"
       },
       "BOT_HANDOFF_COUNT": {
-        "NAME": "Handoff Count",
+        "NAME": "Transferred to human",
         "DESC": "( Total )"
       },
       "REPLY_TIME": {
@@ -534,20 +534,32 @@
     "HEADER": "Bot Reports",
     "METRIC": {
       "TOTAL_CONVERSATIONS": {
-        "LABEL": "No. of Conversations",
-        "TOOLTIP": "Total number of conversations handled by the bot"
+        "LABEL": "Conversations",
+        "TOOLTIP": "Total number of conversations handled by the bot in the period"
       },
       "TOTAL_RESPONSES": {
-        "LABEL": "Total Responses",
-        "TOOLTIP": "Total number of responses sent by the bot"
+        "LABEL": "Outgoing messages",
+        "TOOLTIP": "Total number of outgoing messages — includes the bot AND humans (Chatwoot UI or WhatsApp echo)"
       },
       "RESOLUTION_RATE": {
-        "LABEL": "Resolution Rate",
-        "TOOLTIP": "Total number of conversations resolved by the bot / Total number of conversations handled by the bot * 100"
+        "LABEL": "Resolved by bot %",
+        "TOOLTIP": "Conversations the bot resolved alone (no human reply, via UI or WhatsApp) ÷ total conversations × 100"
       },
       "HANDOFF_RATE": {
-        "LABEL": "Handoff Rate",
-        "TOOLTIP": "Total number of conversations handed off to agents / Total number of conversations handled by the bot * 100"
+        "LABEL": "Transferred to human %",
+        "TOOLTIP": "Conversations transferred to human (auto by Jasmine + manual takeover) ÷ total conversations × 100. Together with the resolution rate, the gear closes the math (the rest are still open, snoozed, or abandoned)."
+      },
+      "BOT_RESOLUTIONS": {
+        "LABEL": "Resolved by bot",
+        "TOOLTIP": "Absolute count: conversations the bot closed alone, with no human reply (UI or WhatsApp)"
+      },
+      "AUTO_HANDOFFS": {
+        "LABEL": "Auto handoff (Jasmine)",
+        "TOOLTIP": "Conversations where Jasmine explicitly called bot_handoff! — typically tool loop, timeout, max turns reached or LLM intent classified as handoff"
+      },
+      "MANUAL_TAKEOVERS": {
+        "LABEL": "Manual takeover (agent)",
+        "TOOLTIP": "Conversations where a human replied (Chatwoot UI or WhatsApp echo) without Jasmine triggering bot_handoff! first — the agent took over silently"
       }
     }
   },

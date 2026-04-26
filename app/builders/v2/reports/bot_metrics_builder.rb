@@ -12,7 +12,10 @@ class V2::Reports::BotMetricsBuilder
       conversation_count: bot_conversations.count,
       message_count: bot_messages.count,
       resolution_rate: bot_resolution_rate.to_i,
-      handoff_rate: bot_handoff_rate.to_i
+      handoff_rate: total_handoff_rate.to_i,
+      bot_resolutions_count: bot_resolutions_count,
+      auto_handoffs_count: auto_handoffs_count,
+      manual_takeovers_count: manual_takeovers_count
     }
   end
 
@@ -44,11 +47,40 @@ class V2::Reports::BotMetricsBuilder
   end
 
   def bot_resolutions_count
-    base_reporting_events.joins(:conversation).select(:conversation_id).where(name: :conversation_bot_resolved).distinct.count
+    @bot_resolutions_count ||= base_reporting_events.joins(:conversation)
+                                                    .select(:conversation_id)
+                                                    .where(name: :conversation_bot_resolved)
+                                                    .distinct.count
   end
 
-  def bot_handoffs_count
-    base_reporting_events.joins(:conversation).select(:conversation_id).where(name: :conversation_bot_handoff).distinct.count
+  # Auto handoff = Jasmine called bot_handoff! explicitly (loop, timeout, max_turns, intent)
+  def auto_handoffs_count
+    @auto_handoffs_count ||= base_reporting_events.joins(:conversation)
+                                                  .select(:conversation_id)
+                                                  .where(name: :conversation_bot_handoff)
+                                                  .distinct.count
+  end
+
+  # Manual takeover = a human replied (via Chatwoot UI or WhatsApp echo) WITHOUT a bot_handoff
+  # event being emitted for the same conversation. The bot itself uses sender_type 'Captain::Assistant',
+  # so it's never counted here.
+  def manual_takeovers_count
+    @manual_takeovers_count ||= begin
+      conv_ids_with_human_reply = bot_conversations
+                                  .joins(:messages)
+                                  .where(messages: { message_type: :outgoing })
+                                  .where('messages.sender_type = ? OR messages.sender_type IS NULL', 'User')
+                                  .distinct
+                                  .pluck(:id)
+
+      conv_ids_with_auto_handoff = ReportingEvent.unscope(:order)
+                                                 .where(name: 'conversation_bot_handoff',
+                                                        conversation_id: conv_ids_with_human_reply)
+                                                 .distinct
+                                                 .pluck(:conversation_id)
+
+      (conv_ids_with_human_reply - conv_ids_with_auto_handoff).count
+    end
   end
 
   def bot_resolution_rate
@@ -57,9 +89,10 @@ class V2::Reports::BotMetricsBuilder
     bot_resolutions_count.to_f / bot_conversations.count * 100
   end
 
-  def bot_handoff_rate
+  # Total handoff = auto + manual (the gear that closes the math now)
+  def total_handoff_rate
     return 0 if bot_conversations.count.zero?
 
-    bot_handoffs_count.to_f / bot_conversations.count * 100
+    (auto_handoffs_count + manual_takeovers_count).to_f / bot_conversations.count * 100
   end
 end
