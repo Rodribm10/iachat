@@ -276,6 +276,8 @@
       "LEADS": "Novas × Retorno"
     },
     "LEADS": {
+      "TITLE": "Novas × Retorno",
+      "INBOX_LABEL": "Caixa de entrada:",
       "EMPTY": "Sem conversas no período.",
       "TOTAL": "Total de conversas no período: {count}",
       "METRICS": {

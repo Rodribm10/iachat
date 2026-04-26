@@ -286,6 +286,8 @@
       "LEADS": "New × Returning"
     },
     "LEADS": {
+      "TITLE": "New × Returning",
+      "INBOX_LABEL": "Inbox:",
       "EMPTY": "No conversations in this period.",
       "TOTAL": "Total conversations in the period: {count}",
       "METRICS": {

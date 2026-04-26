@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useFunctionGetter } from 'dashboard/composables/store';
 
@@ -8,7 +8,8 @@ import InboxLeadsReport from './components/InboxLeadsReport.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 
 const route = useRoute();
-const inbox = useFunctionGetter('inboxes/getInboxById', route.params.id);
+const inboxIdParam = computed(() => route.params.id);
+const inbox = useFunctionGetter('inboxes/getInboxById', inboxIdParam);
 
 const TABS = {
   OVERVIEW: 'overview',
@@ -63,6 +64,7 @@ const activeTab = ref(TABS.OVERVIEW);
         v-else-if="activeTab === TABS.LEADS"
         :key="`leads-${inbox.id}`"
         :inbox-id="inbox.id"
+        :inbox-name="inbox.name"
       />
     </div>
   </div>

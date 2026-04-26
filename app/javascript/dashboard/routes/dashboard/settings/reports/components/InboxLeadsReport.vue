@@ -13,6 +13,10 @@ const props = defineProps({
     type: [Number, String],
     required: true,
   },
+  inboxName: {
+    type: String,
+    default: '',
+  },
 });
 
 const store = useStore();
@@ -85,7 +89,7 @@ const chartOptions = {
 };
 
 const fetchData = () => {
-  if (!filters.value.from || !filters.value.to) return;
+  if (!filters.value.from || !filters.value.to || !props.inboxId) return;
   store.dispatch('fetchInboxLeadsSummary', {
     inboxId: props.inboxId,
     from: filters.value.from,
@@ -111,6 +115,18 @@ watch(
 
 <template>
   <div class="flex flex-col gap-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-base font-semibold text-n-slate-12 m-0">
+          {{ $t('INBOX_REPORTS.LEADS.TITLE') }}
+        </h2>
+        <p v-if="inboxName" class="text-sm text-n-slate-11 mt-1 mb-0">
+          <span>{{ $t('INBOX_REPORTS.LEADS.INBOX_LABEL') }}</span>
+          <span class="font-medium text-n-slate-12 ms-1">{{ inboxName }}</span>
+        </p>
+      </div>
+    </div>
+
     <ReportFilters
       filter-type="inboxes"
       :selected-item="{ id: Number(inboxId) }"
