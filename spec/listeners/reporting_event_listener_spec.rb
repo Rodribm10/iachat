@@ -62,6 +62,14 @@ describe ReportingEventListener do
         listener.conversation_resolved(event)
         expect(account.reporting_events.where(name: 'conversation_bot_resolved').count).to be 0
       end
+
+      it 'does not create a conversation_bot_resolved event if a human replied directly via the connected WhatsApp app' do
+        # outgoing message with sender_type=NULL = WhatsApp echo (IsFromMe=true) — human replied outside Chatwoot UI
+        create(:message, :bot_message, account: account, inbox: agent_bot_inbox, conversation: bot_resolved_conversation)
+        event = Events::Base.new('conversation.resolved', Time.zone.now, conversation: bot_resolved_conversation)
+        listener.conversation_resolved(event)
+        expect(account.reporting_events.where(name: 'conversation_bot_resolved').count).to be 0
+      end
     end
   end
 

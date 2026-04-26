@@ -133,11 +133,22 @@ class ReportingEventListener < BaseListener
 
   def create_bot_resolved_event(conversation, reporting_event)
     return unless conversation.inbox.active_bot?
-    # We don't want to create a bot_resolved event if there is user interaction on the conversation
-    return if conversation.messages.exists?(message_type: :outgoing, sender_type: 'User')
+    # We don't want to create a bot_resolved event if there is human interaction on the conversation.
+    # Human interaction = outgoing message either from a User (replied via Chatwoot UI) OR from a
+    # nil sender (replied directly via the connected WhatsApp app — webhook echo with IsFromMe=true,
+    # see app/services/whatsapp/incoming_message_wuzapi_service.rb#build_message).
+    # The bot itself uses sender_type 'Captain::Assistant' (or 'AgentBot'), so it stays excluded from this filter.
+    return if human_outgoing_messages?(conversation)
 
     bot_resolved_event = reporting_event.dup
     bot_resolved_event.name = 'conversation_bot_resolved'
     bot_resolved_event.save!
+  end
+
+  def human_outgoing_messages?(conversation)
+    conversation.messages
+                .where(message_type: :outgoing)
+                .where('sender_type = ? OR sender_type IS NULL', 'User')
+                .any?
   end
 end
