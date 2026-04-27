@@ -2,7 +2,7 @@
 import { reactive, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useVuelidate } from '@vuelidate/core';
-import { required, minLength } from '@vuelidate/validators';
+import { required, minLength, maxLength } from '@vuelidate/validators';
 import { useMapGetter } from 'dashboard/composables/store';
 
 import Input from 'dashboard/components-next/input/Input.vue';
@@ -39,11 +39,17 @@ const initialState = {
   assistant_id: '',
 };
 
+const QUESTION_MAX_LENGTH = 255;
+
 const state = reactive({ ...initialState });
 
 const validationRules = computed(() => {
   const rules = {
-    question: { required, minLength: minLength(1) },
+    question: {
+      required,
+      minLength: minLength(1),
+      maxLength: maxLength(QUESTION_MAX_LENGTH),
+    },
     answer: { required, minLength: minLength(1) },
   };
 
@@ -123,6 +129,7 @@ watch(
       :placeholder="t('CAPTAIN.RESPONSES.FORM.QUESTION.PLACEHOLDER')"
       :message="formErrors.question"
       :message-type="formErrors.question ? 'error' : 'info'"
+      :maxlength="QUESTION_MAX_LENGTH"
     />
     <Editor
       v-model="state.answer"

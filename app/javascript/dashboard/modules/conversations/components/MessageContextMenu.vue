@@ -18,6 +18,8 @@ import NextButton from 'dashboard/components-next/button/Button.vue';
 import Editor from 'dashboard/components-next/Editor/Editor.vue';
 import { useUISettings } from 'dashboard/composables/useUISettings';
 
+const FAQ_QUESTION_MAX_LENGTH = 255;
+
 export default {
   components: {
     AddCannedModal,
@@ -92,6 +94,11 @@ export default {
       return useSnakeCase(
         this.message.content_attributes ?? this.message.contentAttributes
       );
+    },
+    faqQuestion() {
+      return (this.plainTextContent || '')
+        .trim()
+        .slice(0, FAQ_QUESTION_MAX_LENGTH);
     },
   },
   methods: {
@@ -251,7 +258,7 @@ export default {
       ref="faqDialog"
       type="create"
       :selected-response="{
-        question: plainTextContent,
+        question: faqQuestion,
         assistant_id: copilotAssistant?.id,
       }"
       @close="hideFaqModal"

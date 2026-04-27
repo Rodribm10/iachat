@@ -30,7 +30,7 @@ class Captain::AssistantResponse < ApplicationRecord
   belongs_to :documentable, polymorphic: true, optional: true
   has_neighbors :embedding, normalize: true
 
-  validates :question, presence: true
+  validates :question, presence: true, length: { maximum: 255 }
   validates :answer, presence: true
 
   before_validation :ensure_account
