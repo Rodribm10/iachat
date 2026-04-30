@@ -35,7 +35,7 @@ class Captain::AssistantResponse < ApplicationRecord
 
   before_validation :ensure_account
   before_validation :ensure_status
-  after_commit :update_response_embedding
+  after_commit :update_response_embedding, on: %i[create update]
 
   scope :ordered, -> { order(created_at: :desc) }
   scope :by_account, ->(account_id) { where(account_id: account_id) }
