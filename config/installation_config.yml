@@ -184,7 +184,7 @@
 # MARK: Captain Config
 - name: CAPTAIN_LLM_PROVIDER
   display_title: 'Captain LLM Provider'
-  description: 'Qual provider o Captain usa: openai_api (padrão, API key tradicional) ou openai_codex_oauth (assinatura ChatGPT Plus via proxy interno).'
+  description: 'Qual provider o Captain usa: openai_api (padrão, API key tradicional), openai_codex_oauth (assinatura ChatGPT Plus via proxy interno) ou openai_hermes_gateway (Hermes Agent rodando como gateway HTTP local — ele faz o roteamento multi-modelo via OAuth).'
   value: 'openai_api'
   locked: false
 - name: CAPTAIN_CODEX_PROXY_URL
@@ -192,6 +192,21 @@
   description: 'URL base do proxy Codex interno quando CAPTAIN_LLM_PROVIDER=openai_codex_oauth. Default: http://localhost:3000/codex'
   value: 'http://localhost:3000/codex'
   locked: false
+- name: CAPTAIN_HERMES_GATEWAY_URL
+  display_title: 'Captain Hermes Gateway URL'
+  description: 'URL base do Hermes Gateway quando CAPTAIN_LLM_PROVIDER=openai_hermes_gateway. Default: http://host.docker.internal:9877 (Hermes rodando no host, container alcança via host.docker.internal).'
+  value: 'http://host.docker.internal:9877'
+  locked: false
+- name: CAPTAIN_HERMES_GATEWAY_MODEL
+  display_title: 'Captain Hermes Gateway Model'
+  description: 'Modelo a passar pro Hermes Gateway no formato <provider>/<model>. Default: anthropic/claude-opus-4-5. O Hermes faz o roteamento real e pode usar Codex/Anthropic/Gemini conforme config local em ~/.hermes/config.yaml.'
+  value: 'anthropic/claude-opus-4-5'
+  locked: false
+- name: CAPTAIN_HERMES_GATEWAY_API_KEY
+  display_title: 'Captain Hermes Gateway API Key (optional)'
+  description: 'API key opcional pro Hermes Gateway. Geralmente vazio (gateway local não exige auth). Se setado, vai no Authorization header das requisições do Captain pro Hermes.'
+  locked: false
+  type: secret
 - name: CAPTAIN_OPEN_AI_API_KEY
   display_title: 'OpenAI API Key'
   description: 'The API key used to authenticate requests to OpenAI services for Captain AI.'
