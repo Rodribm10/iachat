@@ -48,7 +48,7 @@ class Captain::Roleta::OfferService
   end
 
   def fetch_unidade_for_conversation(conversation)
-    unit = conversation&.inbox&.captain_inbox&.unit
+    unit = conversation&.inbox&.captain_inbox&.captain_unit
     return nil if unit.blank?
 
     supabase_get('unidades', { chatwoot_unit_id: "eq.#{unit.id}", select: '*', limit: 1 }).first

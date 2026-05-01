@@ -76,7 +76,7 @@ class Captain::Tools::GetReservaPrecoTool < Captain::Tools::BaseTool
   private
 
   def infer_unit
-    @conversation&.inbox&.captain_inbox&.unit
+    @conversation&.inbox&.captain_inbox&.captain_unit
   end
 
   def fetch_unidade(chatwoot_unit_id)

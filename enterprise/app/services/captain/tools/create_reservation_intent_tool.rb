@@ -256,7 +256,7 @@ class Captain::Tools::CreateReservationIntentTool < Captain::Tools::BaseTool
   end
 
   def infer_unit
-    @conversation&.inbox&.captain_inbox&.unit
+    @conversation&.inbox&.captain_inbox&.captain_unit
   end
 
   def update_sticky_state(suite:, price:, check_in_at:, check_out_at:)
