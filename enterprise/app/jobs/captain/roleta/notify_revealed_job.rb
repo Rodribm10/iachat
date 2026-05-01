@@ -81,6 +81,7 @@ class Captain::Roleta::NotifyRevealedJob < ApplicationJob
       req.headers['Content-Profile'] = supabase_schema
       req.headers['Content-Type'] = 'application/json'
       req.headers['Accept'] = 'application/json'
+      req.headers['Accept-Encoding'] = 'identity'
       req.body = body.to_json
     end
     return [] unless response.success?

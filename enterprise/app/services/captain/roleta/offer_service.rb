@@ -92,6 +92,7 @@ class Captain::Roleta::OfferService
       req.headers['Authorization'] = "Bearer #{supabase_key}"
       req.headers['Accept-Profile'] = supabase_schema
       req.headers['Accept'] = 'application/json'
+      req.headers['Accept-Encoding'] = 'identity'
     end
     return [] unless response.success?
 
@@ -108,6 +109,7 @@ class Captain::Roleta::OfferService
       req.headers['Content-Profile'] = supabase_schema
       req.headers['Content-Type'] = 'application/json'
       req.headers['Accept'] = 'application/json'
+      req.headers['Accept-Encoding'] = 'identity'
       req.body = body.to_json
     end
     return [] unless response.success?

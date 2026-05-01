@@ -39,6 +39,7 @@ class Captain::Roleta::NotifyRevealedSchedulerJob < ApplicationJob
       req.headers['Authorization'] = "Bearer #{supabase_key}"
       req.headers['Accept-Profile'] = supabase_schema
       req.headers['Accept'] = 'application/json'
+      req.headers['Accept-Encoding'] = 'identity'
     end
     return [] unless response.success?
 
