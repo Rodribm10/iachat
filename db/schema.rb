@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_04_22_145733) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_01_030000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -964,10 +964,14 @@ ActiveRecord::Schema[7.1].define(version: 2026_04_22_145733) do
     t.boolean "proactive_pix_polling_enabled", default: false, null: false
     t.bigint "concierge_inbox_id"
     t.jsonb "concierge_config", default: {}, null: false
+    t.uuid "supabase_unit_id"
+    t.bigint "supabase_tenant_id", default: 1
+    t.uuid "supabase_marca_id"
     t.index ["account_id"], name: "index_captain_units_on_account_id"
     t.index ["captain_brand_id"], name: "index_captain_units_on_captain_brand_id"
     t.index ["concierge_inbox_id"], name: "index_captain_units_on_concierge_inbox_id"
     t.index ["inbox_id"], name: "index_captain_units_on_inbox_id"
+    t.index ["supabase_unit_id"], name: "index_captain_units_on_supabase_unit_id", unique: true, where: "(supabase_unit_id IS NOT NULL)"
   end
 
   create_table "categories", force: :cascade do |t|

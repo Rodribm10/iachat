@@ -52,10 +52,11 @@ Os nomes batem com `name`/`title` no banco:
 
 | Slug do arquivo | Captain::Assistant#name |
 |---|---|
-| `jasmine_qnn01`   | `Jasmine( Qnn01)`   |
-| `jasmine_primeal` | `Jasmine(PrimeAL)`  |
-| `jasmine_primevl` | `Jasmine(PrimeVL)`  |
-| `jasmine_express` | `Jasmine (Express)` |
+| `jasmine_qnn01`        | `Jasmine( Qnn01)`     |
+| `jasmine_primeal`      | `Jasmine(PrimeAL)`    |
+| `jasmine_primevl`      | `Jasmine(PrimeVL)`    |
+| `jasmine_express`      | `Jasmine (Express)`   |
+| `jasmine_dolce_amore`  | `Jasmine(DolceAmore)` |
 
 | Slug do cenário         | Captain::Scenario#title     |
 |---|---|
@@ -88,3 +89,4 @@ preenchermos os arquivos lá.
 - [ ] Qnn01
 - [ ] PrimeVL
 - [ ] Express
+- [ ] Dolce Amore (criado 2026-04-27 — primeira unidade fora do 1001 Noites; marca distinta, motel-first em Natal/RN; não testado em staging ainda)

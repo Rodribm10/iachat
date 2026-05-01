@@ -32,6 +32,9 @@
 #  inbox_id                       :bigint
 #  inter_client_id                :string
 #  plug_play_id                   :string
+#  supabase_marca_id              :uuid
+#  supabase_tenant_id             :bigint           default(1)
+#  supabase_unit_id               :uuid
 #
 # Indexes
 #
@@ -39,6 +42,7 @@
 #  index_captain_units_on_captain_brand_id    (captain_brand_id)
 #  index_captain_units_on_concierge_inbox_id  (concierge_inbox_id)
 #  index_captain_units_on_inbox_id            (inbox_id)
+#  index_captain_units_on_supabase_unit_id    (supabase_unit_id) UNIQUE WHERE (supabase_unit_id IS NOT NULL)
 #
 # Foreign Keys
 #

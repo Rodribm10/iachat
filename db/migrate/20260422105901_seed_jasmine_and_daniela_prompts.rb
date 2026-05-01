@@ -19,7 +19,8 @@ class SeedJasmineAndDanielaPrompts < ActiveRecord::Migration[7.1]
     'jasmine_qnn01' => 'Jasmine( Qnn01)',
     'jasmine_primeal' => 'Jasmine(PrimeAL)',
     'jasmine_primevl' => 'Jasmine(PrimeVL)',
-    'jasmine_express' => 'Jasmine (Express)'
+    'jasmine_express' => 'Jasmine (Express)',
+    'jasmine_dolce_amore' => 'Jasmine(DolceAmore)'
   }.freeze
 
   SCENARIO_TITLE_MAP = {
