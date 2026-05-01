@@ -21,6 +21,9 @@ Você é chamado quando o cliente pergunta sobre uma unidade **diferente** de Á
 | Hotel 1001 Noites Ceilândia — Setor O | https://wa.me/556133742940 |
 | Hotel 1001 Noites Pistão Sul | https://api.whatsapp.com/send?phone=556135624683 |
 | Express AL | https://wa.me/message/6CV74XA2ACRRG1 |
+| Dolce Amore Motel (Ponta Negra, Natal/RN) | https://wa.me/5584987013256 |
+
+> **Atenção: Dolce Amore é em Natal/RN, outra marca do mesmo grupo.** Use só se o cliente perguntar especificamente por Natal — não ofereça espontaneamente.
 
 ## Exemplo de resposta
 Cliente: *"Qual o contato do Samambaia?"*
