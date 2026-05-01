@@ -79,11 +79,32 @@ class Webhooks::Captain::McpController < ApplicationController
   # Cliente MCP pode mandar contexto multi-tenant em params._captain_context.
   # Hermes inclui isso quando chama uma tool, pra Captain saber qual conversation
   # é (já que MCP em si é stateless entre client/server).
+  #
+  # Fallback: cada profile do Hermes está atrelado a uma unidade
+  # (Valentina → Dolce Amore, Jasmine → Prime AL, etc), então também aceitamos
+  # contexto via headers HTTP fixos no config.yaml do profile:
+  #   X-Captain-Account-Id, X-Captain-Assistant-Id, X-Captain-Inbox-Id.
+  # Body wins se houver conflito (override por chamada).
   def extract_context(request_body)
     params = request_body['params'] || {}
-    ctx = params['_captain_context'] || {}
-    return {} unless ctx.is_a?(Hash)
+    body_ctx = params['_captain_context'] || {}
+    body_ctx = {} unless body_ctx.is_a?(Hash)
 
-    ctx.symbolize_keys
+    extract_header_context.merge(body_ctx.symbolize_keys)
+  end
+
+  def extract_header_context
+    {
+      account_id: header_int('X-Captain-Account-Id'),
+      assistant_id: header_int('X-Captain-Assistant-Id'),
+      inbox_id: header_int('X-Captain-Inbox-Id')
+    }.compact
+  end
+
+  def header_int(name)
+    value = request.headers[name].to_s
+    return nil if value.blank?
+
+    value.to_i
   end
 end

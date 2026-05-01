@@ -10,9 +10,14 @@
 class Captain::Mcp::ToolRegistry
   TOOLS = [
     Captain::Mcp::Tools::AddLabelTool,
-    Captain::Mcp::Tools::FaqLookupTool
-    # Captain::Mcp::Tools::GeneratePixTool     — TODO depois MCP base validar
-    # Captain::Mcp::Tools::SendSuiteImagesTool — TODO depois MCP base validar
+    Captain::Mcp::Tools::FaqLookupTool,
+    Captain::Mcp::Tools::GeneratePixTool,
+    Captain::Mcp::Tools::UpdateContactTool,
+    Captain::Mcp::Tools::GetContactHistoryTool,
+    Captain::Mcp::Tools::CheckPixPaymentTool,
+    Captain::Mcp::Tools::SendSuiteImagesTool,
+    Captain::Mcp::Tools::RescheduleReservationTool,
+    Captain::Mcp::Tools::ReactToMessageTool
     # Captain::Mcp::Tools::HandoffTool         — fluxo via automation hoje, MCP futuro
   ].freeze
 
