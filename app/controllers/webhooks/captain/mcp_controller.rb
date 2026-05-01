@@ -8,9 +8,13 @@
 # Conexão pelo Hermes:
 #   hermes mcp add captain-tools --url http://CAPTAIN_HOST/webhooks/captain/mcp
 #
-# Auth: HMAC-SHA256 do body via header `X-Hub-Signature-256`, secret
-# compartilhado via env var `CAPTAIN_MCP_SECRET` (igual ao padrão de
-# `hermes_callback`). Quando vazio, validação é desabilitada (PoC/dev).
+# Auth: aceita 2 modos (qualquer um basta):
+#   - Bearer token (padrão MCP, recomendado): `Authorization: Bearer <CAPTAIN_MCP_SECRET>`
+#     É o que `hermes mcp add --auth header` usa nativamente.
+#   - HMAC-SHA256 do body: `X-Hub-Signature-256: sha256=<hex>`
+#     Para clientes que preferem assinar o body inteiro.
+# Secret compartilhado via env var `CAPTAIN_MCP_SECRET`. Quando vazio,
+# validação é desabilitada (PoC/dev).
 #
 # Multi-tenant: o cliente MCP pode mandar contexto (conversation_id,
 # inbox_id, account_id) num campo de extensão chamado `_captain_context`
@@ -50,13 +54,26 @@ class Webhooks::Captain::McpController < ApplicationController
     secret = ENV.fetch('CAPTAIN_MCP_SECRET', nil)
     return true if secret.blank?
 
+    return true if bearer_token_matches?(secret)
+    return true if hmac_signature_matches?(secret)
+
+    head :unauthorized
+  end
+
+  def bearer_token_matches?(secret)
+    auth_header = request.headers['Authorization'].to_s
+    return false unless auth_header.start_with?('Bearer ')
+
+    token = auth_header.delete_prefix('Bearer ').strip
+    ActiveSupport::SecurityUtils.secure_compare(token, secret)
+  end
+
+  def hmac_signature_matches?(secret)
     signature = request.headers['X-Hub-Signature-256'].to_s
-    return head :unauthorized if signature.blank?
+    return false if signature.blank?
 
     expected = "sha256=#{OpenSSL::HMAC.hexdigest('SHA256', secret, request.raw_post)}"
-    return head :unauthorized unless ActiveSupport::SecurityUtils.secure_compare(signature, expected)
-
-    true
+    ActiveSupport::SecurityUtils.secure_compare(signature, expected)
   end
 
   # Cliente MCP pode mandar contexto multi-tenant em params._captain_context.
