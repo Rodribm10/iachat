@@ -30,6 +30,18 @@ module Enterprise::MessageTemplates::HookExecutionService
   private
 
   def schedule_captain_response
+    return schedule_hermes_response if Captain::Hermes.enabled_for?(conversation.inbox)
+
+    schedule_internal_response
+  end
+
+  def schedule_hermes_response
+    # Inbox marcada via CAPTAIN_HERMES_INBOX_IDS roteia pro gateway do Hermes
+    # Agent em vez do orquestrador interno do Captain.
+    Captain::Hermes::OutgoingJob.perform_later(conversation.id, message.id)
+  end
+
+  def schedule_internal_response
     job_args = [conversation, conversation.inbox.captain_assistant, message]
     base_wait = conversation.inbox.typing_delay.to_i.seconds
 
