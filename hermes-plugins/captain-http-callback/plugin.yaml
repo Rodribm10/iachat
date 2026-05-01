@@ -1,0 +1,14 @@
+name: captain-http-callback
+kind: platform
+version: 0.1.0
+description: >
+  HTTP callback platform adapter for Hermes Agent.
+  POSTs the agent response back to a configurable URL (passed as
+  --deliver-chat-id when creating the webhook subscription).
+  Optional HMAC-SHA256 signing via env var CAPTAIN_HTTP_CALLBACK_SECRET.
+
+  Use case: integrate Hermes as the LLM/agent brain behind another
+  backend (e.g. Captain / Chatwoot) where the agent response must be
+  delivered synchronously to a known service endpoint, rather than to
+  a chat platform like Telegram or Slack.
+author: Captain (fazer.ai)
