@@ -30,11 +30,10 @@ RSpec.describe Captain::Reserva::ProvisionUnitInSupabaseService do
         .with(query: hash_including('nome' => "eq.#{brand.name}", 'tenant_id' => 'eq.1'))
         .to_return(status: 200, body: [{ id: marca_uuid }].to_json, headers: { 'Content-Type' => 'application/json' })
 
-      stub_request(:post, "#{supabase_url}/rest/v1/unidades")
-        .with(query: { 'on_conflict' => 'tenant_id,chatwoot_unit_id' })
+      stub_request(:post, "#{supabase_url}/rest/v1/rpc/provision_unidade")
         .to_return(
-          status: 201,
-          body: [{ id: unidade_uuid, tenant_id: 1, id_marca: marca_uuid }].to_json,
+          status: 200,
+          body: [{ out_id: unidade_uuid, out_tenant_id: 1, out_id_marca: marca_uuid }].to_json,
           headers: { 'Content-Type' => 'application/json' }
         )
     end
@@ -51,18 +50,16 @@ RSpec.describe Captain::Reserva::ProvisionUnitInSupabaseService do
       expect(unit.supabase_marca_id).to eq(marca_uuid)
     end
 
-    it 'envia categorias_visiveis e chatwoot_unit_id no payload' do
+    it 'envia parâmetros corretos pra RPC' do
       described_class.new(unit: unit).perform
 
-      expect(WebMock).to have_requested(:post, "#{supabase_url}/rest/v1/unidades").with(
-        query: { 'on_conflict' => 'tenant_id,chatwoot_unit_id' },
+      expect(WebMock).to have_requested(:post, "#{supabase_url}/rest/v1/rpc/provision_unidade").with(
         body: hash_including(
-          'nome' => unit.name,
-          'id_marca' => marca_uuid,
-          'tenant_id' => 1,
-          'chatwoot_unit_id' => unit.id,
-          'categorias_visiveis' => %w[Alexa Stilo Hidromassagem],
-          'ativa' => true
+          'p_nome' => unit.name,
+          'p_id_marca' => marca_uuid,
+          'p_tenant_id' => 1,
+          'p_chatwoot_unit_id' => unit.id,
+          'p_categorias_visiveis' => %w[Alexa Stilo Hidromassagem]
         )
       )
     end
@@ -86,10 +83,10 @@ RSpec.describe Captain::Reserva::ProvisionUnitInSupabaseService do
       expect(result[:error]).to match(/marca .* não encontrada/)
     end
 
-    it 'retorna erro e não grava IDs quando upsert falha' do
+    it 'retorna erro e não grava IDs quando RPC falha' do
       stub_request(:get, "#{supabase_url}/rest/v1/marcas")
         .to_return(status: 200, body: [{ id: marca_uuid }].to_json, headers: { 'Content-Type' => 'application/json' })
-      stub_request(:post, "#{supabase_url}/rest/v1/unidades")
+      stub_request(:post, "#{supabase_url}/rest/v1/rpc/provision_unidade")
         .to_return(status: 500, body: '{"message":"err"}')
 
       result = described_class.new(unit: unit).perform

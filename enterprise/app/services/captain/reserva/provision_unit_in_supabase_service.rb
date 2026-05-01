@@ -13,9 +13,6 @@
 class Captain::Reserva::ProvisionUnitInSupabaseService
   DEFAULT_SCHEMA = 'reserva_hotel'
   DEFAULT_TENANT_ID = 1
-  # Conta padrão usada quando a unidade ainda não tem id_conta_pagamento próprio.
-  # Cada marca pode editar isso direto no Supabase posteriormente.
-  DEFAULT_CONTA_PAGAMENTO_ID = 'e227a8b3-480a-46a8-987f-2cca6395760b'
 
   def initialize(unit:)
     @unit = unit
@@ -28,12 +25,12 @@ class Captain::Reserva::ProvisionUnitInSupabaseService
     marca_id = resolve_marca_id
     return error("marca '#{unit.brand.name}' não encontrada em reserva_hotel.marcas") if marca_id.blank?
 
-    row = upsert_unidade(build_payload(marca_id))
+    row = upsert_via_rpc(marca_id)
     return error('falha ao gravar unidade no Supabase') if row.blank?
 
     persist_supabase_ids(row)
-    Rails.logger.info("[Captain::Reserva::ProvisionUnit] unit=#{unit.id} (#{unit.name}) -> supabase_unit=#{row['id']}")
-    { success: true, supabase_unit_id: row['id'] }
+    Rails.logger.info("[Captain::Reserva::ProvisionUnit] unit=#{unit.id} (#{unit.name}) -> supabase_unit=#{row['out_id']}")
+    { success: true, supabase_unit_id: row['out_id'] }
   rescue StandardError => e
     Rails.logger.error("[Captain::Reserva::ProvisionUnit] unit=#{unit&.id} #{e.class}: #{e.message}")
     error(e.message)
@@ -68,45 +65,46 @@ class Captain::Reserva::ProvisionUnitInSupabaseService
   # disparar after_commit em loop (chamado pelo próprio after_commit).
   def persist_supabase_ids(row)
     unit.update_columns( # rubocop:disable Rails/SkipsModelValidations
-      supabase_unit_id: row['id'],
-      supabase_tenant_id: row['tenant_id'],
-      supabase_marca_id: row['id_marca']
+      supabase_unit_id: row['out_id'],
+      supabase_tenant_id: row['out_tenant_id'],
+      supabase_marca_id: row['out_id_marca']
     )
   end
 
-  def build_payload(marca_id)
-    {
-      nome: unit.name,
-      id_marca: marca_id,
-      id_conta_pagamento: unit.supabase_unit_id.present? ? nil : DEFAULT_CONTA_PAGAMENTO_ID,
-      tenant_id: tenant_id,
-      chatwoot_unit_id: unit.id,
-      categorias_visiveis: Array(unit.visible_suite_categories),
-      ativa: true
-    }.compact
-  end
-
-  def upsert_unidade(payload)
-    url = "#{supabase_url}/rest/v1/unidades?on_conflict=tenant_id,chatwoot_unit_id"
-    response = http.post(url) do |req|
-      apply_upsert_headers(req)
-      req.body = payload.to_json
+  # Chama a RPC reserva_hotel.provision_unidade (SECURITY DEFINER) que faz
+  # upsert idempotente em unidades bypassando RLS. Anon key tem GRANT EXECUTE.
+  def upsert_via_rpc(marca_id)
+    response = http.post("#{supabase_url}/rest/v1/rpc/provision_unidade") do |req|
+      apply_rpc_headers(req)
+      req.body = build_rpc_body(marca_id).to_json
     end
-    return nil unless response.success?
+    unless response.success?
+      Rails.logger.warn("[ProvisionUnit] RPC status=#{response.status} body=#{response.body}")
+      return nil
+    end
 
     Array(JSON.parse(response.body)).first
   rescue JSON::ParserError
     nil
   end
 
-  def apply_upsert_headers(req)
+  def build_rpc_body(marca_id)
+    {
+      p_nome: unit.name,
+      p_id_marca: marca_id,
+      p_tenant_id: tenant_id,
+      p_chatwoot_unit_id: unit.id,
+      p_categorias_visiveis: Array(unit.visible_suite_categories)
+    }
+  end
+
+  def apply_rpc_headers(req)
     req.headers['apikey'] = supabase_key
     req.headers['Authorization'] = "Bearer #{supabase_key}"
     req.headers['Content-Profile'] = supabase_schema
     req.headers['Content-Type'] = 'application/json'
     req.headers['Accept'] = 'application/json'
     req.headers['Accept-Encoding'] = 'identity'
-    req.headers['Prefer'] = 'resolution=merge-duplicates,return=representation'
   end
 
   def supabase_get(table, query)
