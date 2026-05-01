@@ -21,16 +21,13 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   before_action :fetch_inbox
 
   def process_payload
-    content = params[:content].to_s.strip
+    content = extract_content
     return head :bad_request if content.blank?
 
     conversation = recent_conversation_for(@inbox)
     return log_no_conversation_and_ack if conversation.blank?
 
-    Rails.logger.info(
-      "[Hermes::Callback] reply received for conv #{conversation.display_id} (#{content.length} chars)"
-    )
-
+    log_reply(conversation, content)
     create_outgoing_message(conversation, content)
     head :ok
   rescue StandardError => e
@@ -71,6 +68,26 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   def log_no_conversation_and_ack
     Rails.logger.warn "[Hermes::Callback] no recent conversation for inbox #{@inbox.id} — ignorando callback"
     head :ok
+  end
+
+  def extract_content
+    normalize_for_whatsapp(params[:content].to_s.strip)
+  end
+
+  # Converte markdown padrão (que LLMs default usam) pra formato WhatsApp:
+  #   **negrito** -> *negrito*
+  # WhatsApp usa single asterisk pra bold; double asterisk aparece literal
+  # pro cliente, parecendo bug. Defesa caso o SOUL.md não convença o LLM.
+  def normalize_for_whatsapp(content)
+    return content if content.blank?
+
+    content.gsub(/\*\*([^*\n]+?)\*\*/, '*\1*')
+  end
+
+  def log_reply(conversation, content)
+    Rails.logger.info(
+      "[Hermes::Callback] reply received for conv #{conversation.display_id} (#{content.length} chars)"
+    )
   end
 
   def create_outgoing_message(conversation, content)
