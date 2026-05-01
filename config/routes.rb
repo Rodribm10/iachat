@@ -638,6 +638,7 @@ Rails.application.routes.draw do
   post 'webhooks/shopify', to: 'webhooks/shopify#events'
   post 'webhooks/wuzapi/:inbox_id', to: 'webhooks/wuzapi#process_payload'
   post 'webhooks/captain/hermes_callback', to: 'webhooks/captain/hermes_callback#process_payload'
+  post 'webhooks/captain/mcp', to: 'webhooks/captain/mcp#process_payload'
 
   namespace :twitter do
     resource :callback, only: [:show]
