@@ -40,9 +40,20 @@ class Captain::Llm::EmbeddingService
     api_base = settings[:api_base].present? ? "#{settings[:api_base]}/v1" : nil
     embed_options = embed_extra_options
 
+    # Quando há config dedicada de embedding (CAPTAIN_EMBEDDING_API_KEY etc),
+    # forçamos provider :openai pra que o RubyLLM trate como OpenAI-compatible
+    # mesmo com modelos cujo nome auto-detectaria outro provider (ex:
+    # `gemini-embedding-001` apontado pro endpoint Gemini OpenAI-compat).
+    embed_options[:provider] = :openai if dedicated_embedding_config?
+    embed_options[:assume_model_exists] = true if dedicated_embedding_config?
+
     Llm::Config.with_api_key(settings[:api_key], api_base: api_base) do |ctx|
       ctx.embed(content, model: model, **embed_options).vectors
     end
+  end
+
+  def dedicated_embedding_config?
+    installation_config_value('CAPTAIN_EMBEDDING_API_KEY').present?
   end
 
   def embedding_settings
