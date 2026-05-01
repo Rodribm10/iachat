@@ -1,0 +1,28 @@
+name: captain-webhook
+kind: platform
+version: 0.1.0
+description: >
+  Drop-in replacement for the built-in `webhook` platform adapter that
+  supports stable session_chat_id via payload field.
+
+  The default Hermes WebhookAdapter creates a fresh session per POST
+  (session_chat_id = "webhook:<route>:<delivery_id>" — and delivery_id is
+  unique per request). For backend integrations like Captain ↔ Hermes
+  where multiple messages of the same conversation must share session
+  memory, the caller can include `conversation_id` (or `hermes_session_id`)
+  in the payload — this adapter constructs:
+
+      session_chat_id = "webhook:<route>:session:<conversation_id>"
+
+  keeping the Hermes session continuous across messages of the same
+  conversation. Idempotency (delivery_id) remains unchanged.
+
+  When the payload has neither `conversation_id` nor `hermes_session_id`,
+  behavior is identical to the built-in adapter (every msg is fresh
+  session). 100% backward-compatible.
+
+  Inheritance-only override: this plugin extends WebhookAdapter and only
+  overrides handle_message() to rewrite event.source.chat_id when the
+  payload carries a stable session id. All other behavior (HMAC, rate
+  limiting, idempotency, parsing, deliver) is inherited unchanged.
+author: Captain (fazer.ai)
