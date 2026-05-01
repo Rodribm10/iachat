@@ -70,6 +70,8 @@ class Captain::Unit < ApplicationRecord
   validates :name, presence: true
   validate :proactive_pix_polling_requires_inter_credentials
 
+  after_commit :enqueue_supabase_provisioning, on: :create
+
   def concierge_persona_name
     concierge_config_hash['persona_name'].presence || 'Sofia'
   end
@@ -132,5 +134,11 @@ class Captain::Unit < ApplicationRecord
     return fallback_path if File.exist?(fallback_path)
 
     path # Retorna original se nenhum caminho for encontrado
+  end
+
+  def enqueue_supabase_provisioning
+    Captain::Reserva::ProvisionUnitInSupabaseJob.perform_later(id)
+  rescue StandardError => e
+    Rails.logger.warn("[Captain::Unit##{id}] enqueue ProvisionUnitInSupabaseJob falhou: #{e.class} - #{e.message}")
   end
 end
