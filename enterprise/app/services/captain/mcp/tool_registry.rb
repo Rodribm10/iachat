@@ -17,7 +17,12 @@ class Captain::Mcp::ToolRegistry
     Captain::Mcp::Tools::CheckPixPaymentTool,
     Captain::Mcp::Tools::SendSuiteImagesTool,
     Captain::Mcp::Tools::RescheduleReservationTool,
-    Captain::Mcp::Tools::ReactToMessageTool
+    Captain::Mcp::Tools::ReactToMessageTool,
+    # Construtor (admin scope) — usadas pelo profile Hermes "construtor" pra criar novos agentes
+    Captain::Mcp::Tools::ListAssistantsTool,
+    Captain::Mcp::Tools::GetAssistantPricingTool,
+    Captain::Mcp::Tools::GetAssistantFaqsTool,
+    Captain::Mcp::Tools::SaveAgentSpecTool
     # Captain::Mcp::Tools::HandoffTool         — fluxo via automation hoje, MCP futuro
   ].freeze
 
