@@ -20,6 +20,7 @@ class Captain::Payments::ConfirmationService
     end
 
     enqueue_roulette_offer! unless was_already_paid
+    notify_hermes_proactively! unless was_already_paid
 
     Rails.logger.info "[PaymentConfirmation] Reserva #{@reservation.id} confirmada (#{source_label})"
   end
@@ -88,5 +89,15 @@ class Captain::Payments::ConfirmationService
     Captain::Payments::OfferRouletteJob.perform_later(reservation.id)
   rescue StandardError => e
     Rails.logger.warn("[PaymentConfirmation] falha ao enfileirar roleta reserva=#{reservation.id}: #{e.class} - #{e.message}")
+  end
+
+  # Notifica o Hermes Agent (se a inbox estiver no fluxo Hermes) pra mandar
+  # mensagem espontânea pro cliente. Coexiste com o fluxo Captain interno —
+  # se a inbox NÃO estiver no Hermes, o job ignora silenciosamente. Side
+  # effect: nunca bloqueia a confirmação.
+  def notify_hermes_proactively!
+    Captain::Hermes::NotifyPaymentConfirmedJob.perform_later(reservation.id)
+  rescue StandardError => e
+    Rails.logger.warn("[PaymentConfirmation] falha ao notificar Hermes reserva=#{reservation.id}: #{e.class} - #{e.message}")
   end
 end

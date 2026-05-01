@@ -28,7 +28,11 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     return log_no_conversation_and_ack if conversation.blank?
 
     log_reply(conversation, content)
-    create_outgoing_message(conversation, content)
+    if defined?(Captain::Hermes::DelayedReplyJob)
+      Captain::Hermes::DelayedReplyJob.perform_later(conversation.id, content)
+    else
+      create_outgoing_message(conversation, content)
+    end
     head :ok
   rescue StandardError => e
     Rails.logger.error "[Hermes::Callback] error: #{e.class}: #{e.message}"
