@@ -12,7 +12,9 @@ import ToggleSwitch from 'dashboard/components-next/switch/Switch.vue';
 import { GROUP_BY_FILTER } from '../constants';
 import { DATE_RANGE_TYPES } from 'dashboard/components/ui/DatePicker/helpers/DatePickerHelper';
 import {
+  generateFilterURLParams,
   generateReportURLParams,
+  parseFilterURLParams,
   parseReportURLParams,
 } from '../helpers/reportFilterHelper';
 
@@ -37,6 +39,10 @@ const props = defineProps({
     default: true,
   },
   showEntityFilter: {
+    type: Boolean,
+    default: true,
+  },
+  navigateOnEntityFilter: {
     type: Boolean,
     default: true,
   },
@@ -176,8 +182,11 @@ const updateURLParams = () => {
     groupBy: isGroupByPossible.value ? groupBy.value.id : null,
     range: selectedDateRange.value,
   });
+  const filterParams = props.showEntityFilter
+    ? generateFilterURLParams(appliedFilters.value)
+    : {};
 
-  router.replace({ query: { ...params } });
+  router.replace({ query: { ...params, ...filterParams } });
 };
 
 const emitChange = () => {
@@ -234,6 +243,10 @@ const addFilter = item => {
     labels: 'label_reports_show',
     agents: 'agent_reports_show',
   };
+
+  if (!props.navigateOnEntityFilter) {
+    return;
+  }
 
   const routeName = routeNameMap[props.filterType];
   if (routeName) {
@@ -308,6 +321,12 @@ const initializeFromURL = () => {
   if (props.showEntityFilter && route.params.id) {
     const filterKey = getFilterKey();
     appliedFilters.value[filterKey] = Number(route.params.id);
+  } else if (props.showEntityFilter) {
+    const filterKey = getFilterKey();
+    const filterParams = parseFilterURLParams(route.query);
+    if (filterParams[filterKey]) {
+      appliedFilters.value[filterKey] = filterParams[filterKey];
+    }
   }
 };
 

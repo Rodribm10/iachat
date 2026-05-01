@@ -37,10 +37,16 @@ export default {
       };
     },
   },
+  mounted() {
+    this.fetchInboxes();
+  },
   methods: {
     fetchAllData() {
       this.fetchBotSummary();
       this.fetchChartData();
+    },
+    fetchInboxes() {
+      this.$store.dispatch('inboxes/get');
     },
     fetchBotSummary() {
       try {
@@ -105,6 +111,7 @@ export default {
       filter-type="inboxes"
       show-group-by
       :show-business-hours="false"
+      :navigate-on-entity-filter="false"
       @filter-change="onFilterChange"
     />
 
