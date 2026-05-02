@@ -291,6 +291,15 @@ sed -i "s|Dolce Amore Motel|$BRAND_NAME — $UNIT_NAME|g" "$PROFILES_DIR/$SLUG/S
 sed -i "s|Valentina|$NAME|g" "$PROFILES_DIR/$SLUG/SOUL.md"
 sed -i "s|dolce-amore-reservas|$SKILL_NAME|g" "$PROFILES_DIR/$SLUG/SOUL.md"
 
+# Substitui exemplos hardcoded de categorias Dolce Amore (Mini Chalé 45 etc) pelas
+# 3 primeiras categorias da unidade nova. Sem isso, SOUL.md vaza Dolce Amore-isms
+# em descrições de tools mesmo após sed de identidade.
+EX_CATS_LIST=$(echo "$SPEC" | jq -r '[.categories[0:3] | .[] | "\"" + .key + "\""] | join(", ")')
+FIRST_CAT=$(echo "$SPEC" | jq -r '.categories[0].key // "categoria"')
+sed -i "s|\"Master\", \"Luxo\", \"Mini Chalé 45\"|$EX_CATS_LIST|g" "$PROFILES_DIR/$SLUG/SOUL.md"
+sed -i "s|Prefere Suíte Master|Prefere $FIRST_CAT|g" "$PROFILES_DIR/$SLUG/SOUL.md"
+sed -i "s|prefiro suíte master|prefiro $FIRST_CAT|g" "$PROFILES_DIR/$SLUG/SOUL.md"
+
 # Skill: usa o markdown gerado pelo expand_spec (tabela do banco + regras).
 echo "$SPEC" | jq -r '.skill_md' > "$PROFILES_DIR/$SLUG/skills/$SKILL_NAME/SKILL.md"
 
