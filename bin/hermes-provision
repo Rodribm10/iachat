@@ -216,14 +216,25 @@ DB_RESULT=$(docker exec "$CID" bundle exec rails runner "
     end
   end
 
-  asst = Captain::Assistant.find_or_initialize_by(account_id: account_id, name: spec['name'])
-  asst.description ||= 'Atendente Hermes ' + spec['name']
+  # CHAVE = hermes_profile_name (slug). Nome é cosmético e PODE colidir com
+  # captain_interno do mesmo nome — nesse caso auto-renomeamos com sufixo
+  # ' · Hermes' pra evitar sobrescrever.
+  asst = Captain::Assistant.find_or_initialize_by(account_id: account_id, hermes_profile_name: spec['slug'])
+
+  desired_name = spec['name'].to_s.strip
+  if asst.new_record?
+    collision = Captain::Assistant.where(account_id: account_id, name: desired_name).where.not(hermes_profile_name: spec['slug']).exists?
+    desired_name = desired_name + ' · Hermes' if collision && !desired_name.include?('Hermes')
+  end
+  asst.name = desired_name
+  asst.description ||= 'Atendente Hermes ' + desired_name
   asst.engine = 'hermes'
   asst.hermes_profile_name = spec['slug']
   asst.hermes_webhook_base_url = 'http://172.17.0.1:' + $PORT.to_s
   asst.hermes_subscription_secret = '$SECRET'
   asst.hermes_port = $PORT
   asst.parent_assistant_id = spec['parent_assistant_id']
+  asst.captain_unit_id = unit.id
 
   if spec['humanization']
     asst.config['response_delay'] = spec['humanization']
