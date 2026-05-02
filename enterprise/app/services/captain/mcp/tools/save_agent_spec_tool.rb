@@ -130,11 +130,16 @@ class Captain::Mcp::Tools::SaveAgentSpecTool < Captain::Mcp::Tools::BaseTool
   def lookup_brand(parent, brand_name)
     return nil if parent.nil?
 
-    if brand_name.present?
-      hit = Captain::Brand.where(account_id: parent.account_id).find { |b| brand_matches?(b.name, brand_name) }
-      return hit if hit
-    end
-    parent.captain_inboxes.first&.captain_unit&.brand
+    # Sempre prefere a brand do parent_unit (fonte de verdade — Construtor copiou
+    # daquele agente). Spec.brand passado é só hint, pode estar errado/abreviado.
+    parent_brand = parent.captain_unit&.brand || parent.captain_inboxes.first&.captain_unit&.brand
+    return parent_brand if parent_brand
+
+    return nil if brand_name.blank?
+
+    candidates = Captain::Brand.where(account_id: parent.account_id)
+    candidates.find { |b| b.name.casecmp?(brand_name) } ||
+      candidates.find { |b| brand_matches?(b.name, brand_name) }
   end
 
   def parent_unit_for(parent)

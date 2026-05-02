@@ -5,8 +5,10 @@
 # Captain::GalleryItem da inbox atual (com fallback pra acervo global) e
 # envia até `limit` imagens como mensagens outgoing na conversa.
 #
-# Search: aceita `suite_category` (ex: "Master", "Luxo") OU `suite_number`
-# (ex: "101"), mutuamente exclusivos. Match case-insensitive, fuzzy.
+# Search: aceita `suite_category` (nome da categoria configurada na unidade)
+# OU `suite_number` (ex: "101"), mutuamente exclusivos. Match case-insensitive,
+# fuzzy. NÃO incluir exemplos de categorias específicas aqui — vaza pro LLM
+# em outros agentes via tools/list.
 #
 # Pré-requisito: cadastro do Captain::GalleryItem via painel UI do
 # Chatwoot — Captain::Mcp não cria fotos, só consome o catálogo.
@@ -22,8 +24,8 @@ class Captain::Mcp::Tools::SendSuiteImagesTool < Captain::Mcp::Tools::BaseTool
     def description
       'Envia fotos da suíte pra conversa do cliente. Use quando ele pedir foto/imagem ' \
         '("manda uma foto", "tem como ver?"). Busca no catálogo da inbox atual (fallback ' \
-        'global). Passe `suite_category` (ex: "Master", "Luxo", "Mini Chalé 45") OU ' \
-        '`suite_number` (ex: "101") — não combine os dois.'
+        'global). Passe `suite_category` (nome da categoria conforme cadastro da unidade) ' \
+        'OU `suite_number` (ex: "101") — não combine os dois.'
     end
 
     def input_schema # rubocop:disable Metrics/MethodLength
@@ -36,7 +38,7 @@ class Captain::Mcp::Tools::SendSuiteImagesTool < Captain::Mcp::Tools::BaseTool
           },
           suite_category: {
             type: 'string',
-            description: 'Nome/tipo da suíte (ex: "Master", "Luxo", "Mini Chalé 45"). Use quando o cliente pede pelo NOME da categoria.'
+            description: 'Nome/tipo da suíte conforme cadastro da unidade. Use quando o cliente pede pelo NOME da categoria.'
           },
           suite_number: {
             type: 'string',
