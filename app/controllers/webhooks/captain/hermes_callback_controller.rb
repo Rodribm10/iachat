@@ -44,7 +44,15 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
 
   def fetch_inbox
     inbox_id = params[:inbox_id].presence || params.dig(:metadata, :inbox_id).presence
-    @inbox = Inbox.find_by(id: inbox_id)
+    if inbox_id.present?
+      @inbox = Inbox.find_by(id: inbox_id)
+    elsif (slug = params[:slug].presence)
+      # Resolve via slug (hermes_profile_name) — admin pode re-apontar a
+      # inbox pra qualquer agente Hermes sem mexer em URL de callback.
+      asst = Captain::Assistant.find_by(hermes_profile_name: slug, engine: 'hermes')
+      ci = asst&.captain_inboxes&.first
+      @inbox = ci&.inbox
+    end
     head :not_found if @inbox.blank?
   end
 
