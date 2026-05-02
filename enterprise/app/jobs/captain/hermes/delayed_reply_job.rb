@@ -39,9 +39,10 @@ class Captain::Hermes::DelayedReplyJob < ApplicationJob
 
     create_outgoing_message(conversation, content)
 
-    # WhatsApp cliente costuma sumir typing automático ao receber msg, mas
-    # mandamos typing_off explícito por segurança.
-    send_typing(conversation, 'typing_off') if delay.positive?
+    # NÃO mandamos typing_off explícito — WhatsApp cancela o indicador
+    # automaticamente quando a msg chega no celular. Mandar paused agora
+    # quebraria visualmente: typing some -> gap de 2-5s ate msg ser
+    # entregue via SendReplyJob -> msg chega. Deixa o WhatsApp gerenciar.
   end
 
   private
