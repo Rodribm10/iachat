@@ -88,6 +88,24 @@ const resetSession = async () => {
   }
 };
 
+const startSession = async () => {
+  if (sending.value) return;
+  sending.value = true;
+  try {
+    await hermesBuilderApi.start();
+    // Construtor vai responder com primeira pergunta via callback async
+    // — polling pega em ~2s
+  } catch (e) {
+    useAlert(
+      t('CAPTAIN_HERMES_BUILDER.SEND_FAILED', {
+        message: e.response?.data?.error || e.message || 'unknown',
+      })
+    );
+  } finally {
+    sending.value = false;
+  }
+};
+
 const formatTime = iso => {
   if (!iso) return '';
   const d = new Date(iso);
@@ -124,7 +142,10 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
 
       <section ref="scrollContainer" class="messages">
         <div v-if="!messages.length" class="empty-state">
-          {{ t('CAPTAIN_HERMES_BUILDER.EMPTY_STATE') }}
+          <p>{{ t('CAPTAIN_HERMES_BUILDER.EMPTY_STATE') }}</p>
+          <Button variant="primary" :disabled="sending" @click="startSession">
+            {{ t('CAPTAIN_HERMES_BUILDER.START') }}
+          </Button>
         </div>
         <div
           v-for="(msg, idx) in messages"
@@ -216,6 +237,14 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
   color: var(--color-text-light, #9ca3af);
   font-size: 14px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+
+  p {
+    margin: 0;
+  }
 }
 
 .msg {

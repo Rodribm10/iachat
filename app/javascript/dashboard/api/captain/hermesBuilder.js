@@ -14,6 +14,10 @@ class HermesBuilder extends ApiClient {
     return axios.post(this.url, { text });
   }
 
+  start() {
+    return axios.post(`${this.url}/start`);
+  }
+
   reset() {
     return axios.delete(`${this.url}/reset`);
   }

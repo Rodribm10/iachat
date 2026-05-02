@@ -900,11 +900,12 @@
     "HEADER_DESCRIPTION": "Converse com o Construtor pra criar um novo agente Hermes. Ele faz perguntas e ao final salva a especificação em JSON pra revisão.",
     "RESET": "Limpar conversa",
     "RESET_CONFIRM": "Limpar conversa atual com o Construtor?",
-    "EMPTY_STATE": "Mande \"olá\" pra começar. O Construtor vai te guiar.",
+    "EMPTY_STATE": "Pronto pra criar um novo agente Hermes? Clica em \"Iniciar criação\" e o Construtor te guia.",
     "PLACEHOLDER": "Escreva e Enter pra enviar (Shift+Enter pula linha)",
     "SEND": "Enviar",
     "SESSION_LABEL": "Sessão:",
     "SEND_FAILED": "Erro ao enviar: {message}",
-    "RESET_FAILED": "Falha ao limpar sessão."
+    "RESET_FAILED": "Falha ao limpar sessão.",
+    "START": "Iniciar criação"
   }
 }

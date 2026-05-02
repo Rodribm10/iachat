@@ -899,11 +899,12 @@
     "HEADER_DESCRIPTION": "Chat with the Builder to create a new Hermes agent. It asks questions and saves the spec as JSON for review at the end.",
     "RESET": "Clear conversation",
     "RESET_CONFIRM": "Clear current conversation with the Builder?",
-    "EMPTY_STATE": "Type \"hello\" to start. The Builder will guide you.",
+    "EMPTY_STATE": "Ready to create a new Hermes agent? Click \"Start creation\" and the Builder will guide you.",
     "PLACEHOLDER": "Type and press Enter to send (Shift+Enter for new line)",
     "SEND": "Send",
     "SESSION_LABEL": "Session:",
     "SEND_FAILED": "Send failed: {message}",
-    "RESET_FAILED": "Failed to clear session."
+    "RESET_FAILED": "Failed to clear session.",
+    "START": "Start creation"
   }
 }

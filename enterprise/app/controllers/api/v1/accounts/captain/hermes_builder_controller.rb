@@ -8,7 +8,7 @@
 #   5. UI faz GET /messages a cada 2s (polling) e renderiza
 #
 # Sessão é por account+user (1 admin → 1 sessão de builder por vez).
-class Enterprise::Api::V1::Accounts::Captain::HermesBuilderController < Api::V1::Accounts::BaseController
+class Api::V1::Accounts::Captain::HermesBuilderController < Api::V1::Accounts::BaseController
   before_action :authorize_admin
 
   def index
@@ -26,6 +26,21 @@ class Enterprise::Api::V1::Accounts::Captain::HermesBuilderController < Api::V1:
     render json: { ok: true, session_id: session_id }, status: :accepted
   rescue HermesBuilder::Dispatcher::DispatchError => e
     Rails.logger.error("[HermesBuilder#create] dispatch failed: #{e.message}")
+    render json: { error: "Falha ao contatar Construtor: #{e.message}" }, status: :bad_gateway
+  end
+
+  # Inicia sessão limpa enviando comando-gatilho oculto pro Construtor pra
+  # ele começar o fluxo socrático de criação. UI chama este endpoint
+  # quando admin clica "Iniciar" — sem ter que digitar primeira msg.
+  def start
+    HermesBuilder::Storage.clear(session_key)
+    HermesBuilder::Dispatcher.send_to_construtor(
+      session_id: session_id,
+      message: '__START__ Inicie o fluxo de criação de novo agente Hermes. Comece pela primeira pergunta do Bloco 1 (nome do agente).'
+    )
+    render json: { ok: true, session_id: session_id }, status: :accepted
+  rescue HermesBuilder::Dispatcher::DispatchError => e
+    Rails.logger.error("[HermesBuilder#start] dispatch failed: #{e.message}")
     render json: { error: "Falha ao contatar Construtor: #{e.message}" }, status: :bad_gateway
   end
 

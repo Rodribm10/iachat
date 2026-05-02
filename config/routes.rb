@@ -60,6 +60,7 @@ Rails.application.routes.draw do
           namespace :captain do
             resources :hermes_builder, only: [:index, :create] do
               collection do
+                post :start
                 delete :reset
               end
             end
