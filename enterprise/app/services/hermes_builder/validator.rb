@@ -170,6 +170,19 @@ class HermesBuilder::Validator
     EXPECTED_MCP_TOOLS.each do |t|
       add("MCP tool '#{t}' registrado", registered.include?(t) ? 'PASS' : 'FAIL', nil, category: 'mcp')
     end
+
+    check_own_faqs
+  end
+
+  # FAQs aprovadas vinculadas ao próprio assistant (não ao parent). Se zero,
+  # toda chamada faq_lookup vai cair no parent — vazou senha errada do
+  # Wi-Fi em 2026-05-02 porque parent.id=1 tinha FAQ "presencial" e a
+  # senha nova só estava cadastrada no próprio Hermes.id=10.
+  def check_own_faqs
+    count = ::Captain::AssistantResponse.where(assistant_id: @asst.id, status: :approved).count
+    add('FAQs próprias aprovadas > 0', count.positive? ? 'PASS' : 'WARN',
+        "#{count} FAQs (zero significa que faq_lookup busca dados do parent — risco de info desatualizada)",
+        category: 'mcp')
   end
 
   def mcp_tool_names

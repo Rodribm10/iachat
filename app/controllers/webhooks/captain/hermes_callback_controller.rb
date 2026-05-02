@@ -51,6 +51,15 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
   #    "endereço completo ou link?" → "apenas link ou link + endereço?").
   LOOP_SIMILARITY_THRESHOLD = 0.50
   LOOP_TOPIC_KEYWORD_OVERLAP = 3
+
+  # Camada 3 — Anti-repetição de linhas:
+  # LLM tende a "resumir" info de turns anteriores em toda nova resposta
+  # (ex: depois que mandou senha do Wi-Fi, repete em todo callback futuro).
+  # Strip de linhas onde >70% das palavras significativas já apareceram em
+  # outgoings recentes da mesma conv. Saudações/confirmações curtas
+  # (<5 chars) são preservadas.
+  REPEAT_OVERLAP_THRESHOLD = 0.70
+  REPEAT_LOOKBACK_OUTGOINGS = 3
   LOOP_STOPWORDS = %w[
     voce voces para por pra como mas isso esse essa estou esta este aqui ali
     eles elas tem ter tinha tendo era ser sou foi fui agora ainda ja muito mais
@@ -79,6 +88,10 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     # alucinação de memória. Bloqueia entrega + re-dispara forçando tool
     # call. NÃO entrega a msg pro cliente até o LLM consultar a fonte.
     return head :ok if gate_factual_no_tool!(conversation, content)
+
+    # Camada 3: strip de linhas repetidas de outgoings anteriores
+    # (LLM resumindo info de turns anteriores em cada nova resposta).
+    content = strip_repeated_lines(conversation, content)
 
     detect_handoff_or_loop(conversation, content)
     deliver_outgoing(conversation, content)
@@ -229,6 +242,48 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     current = conversation.label_list
     conversation.update_labels((current + %w[triagem_humana]).uniq)
     Rails.logger.info("[Hermes::Callback] conv #{conversation.display_id} → triagem_humana (#{reason})")
+  end
+
+  # Strip linhas onde a maioria das palavras significativas já foi
+  # enviada em outgoings recentes. Preserva saudações curtas (<5 chars)
+  # e tudo se a resposta ficaria vazia (melhor repetido do que mudo).
+  def strip_repeated_lines(conversation, content)
+    pool = recent_outgoings_pool(conversation)
+    return content if pool.blank?
+
+    lines = content.split("\n")
+    kept = lines.reject { |line| line_already_said?(line, pool) }
+    return content if kept.empty? || kept.size == lines.size
+
+    Rails.logger.info(
+      "[Hermes::Callback] strip de #{lines.size - kept.size} linha(s) repetida(s) em conv #{conversation.display_id}"
+    )
+    kept.join("\n").strip
+  end
+
+  def recent_outgoings_pool(conversation)
+    msgs = conversation.messages
+                       .where(message_type: :outgoing)
+                       .order(created_at: :desc)
+                       .limit(REPEAT_LOOKBACK_OUTGOINGS * 2)
+    texts = msgs.reject do |m|
+      attrs = m.content_attributes.to_h
+      attrs['is_reaction'] || attrs['external_source'] != 'hermes_callback'
+    end.first(REPEAT_LOOKBACK_OUTGOINGS).map(&:content)
+    return '' if texts.empty?
+
+    ActiveSupport::Inflector.transliterate(texts.join("\n").downcase)
+  end
+
+  def line_already_said?(line, pool)
+    stripped = line.strip
+    return false if stripped.length < 5
+
+    words = ActiveSupport::Inflector.transliterate(stripped.downcase).scan(/[a-z0-9]+/).reject { |w| w.length < 3 }
+    return false if words.empty?
+
+    matches = words.count { |w| pool.include?(w) }
+    matches.to_f / words.size >= REPEAT_OVERLAP_THRESHOLD
   end
 
   def fetch_inbox
