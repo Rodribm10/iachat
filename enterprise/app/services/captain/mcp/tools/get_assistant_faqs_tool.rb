@@ -36,7 +36,6 @@ class Captain::Mcp::Tools::GetAssistantFaqsTool < Captain::Mcp::Tools::BaseTool
     return error_response("Assistente #{args['assistant_id']} não encontrado.") if assistant.blank?
 
     faqs = assistant.responses
-                    .where(documentable_type: nil)
                     .where(status: 'approved')
                     .order(:id)
                     .limit(MAX_FAQS)
