@@ -9,19 +9,25 @@
 # Estrutura: TABLES[captain_unit_id] = {
 #   categories: {
 #     '<categoria_key>' => {
-#       prices: { '3h' => 85, 'pernoite_promo' => 110, ... },
-#       aliases: ['apto', 'standard', 'apartamento standard', ...]
+#       # Preço por período. Aceita 2 formatos:
+#       #   1) Valor único (motel sem variação por dia da semana):
+#       #        prices: { '3h' => 85.0, 'pernoite_promo' => 110.0 }
+#       #   2) Hash por bucket de dia da semana (hotel: qui-dom caro):
+#       #        prices: { '3h' => { 'mon_wed' => 50.0, 'thu_sun' => 65.0 } }
+#       #   Buckets aceitos: 'mon_wed' (seg-qua) e 'thu_sun' (qui-dom).
+#       prices: { '3h' => 85, ... },
+#       aliases: ['apto', 'standard', ...]
 #     }
 #   },
 #   extra_person_fee: 45,
 #   extra_person_rules: { '<categoria_key>' => starts_at_guest_n }
 # }
-#
-# Hoje só Dolce Amore (unit 4) está mapeado — Hermes só está ativo nele.
-# Conforme outras unidades migrarem pra Hermes, expandir aqui.
 # rubocop:disable Metrics/ModuleLength
 module Captain::Mcp::PricingTables
-  PERIOD_KEYS = %w[3h pernoite_promo pernoite_integral diaria].freeze
+  PERIOD_KEYS = %w[2h 3h 4h 5h pernoite_promo pernoite_integral diaria].freeze
+  # mon_wed cobre wday 1,2,3 (seg-qua); thu_sun cobre wday 4,5,6,0 (qui-dom).
+  DAY_BUCKETS = %w[mon_wed thu_sun].freeze
+  DEFAULT_TZ = 'America/Sao_Paulo'.freeze
 
   TABLES = {
     # Motel Dolce Amore — Ponta Negra, Natal/RN (captain_unit_id=4)
@@ -73,16 +79,74 @@ module Captain::Mcp::PricingTables
           aliases: ['chale master', 'chalé master', 'master 4 suites', 'chalé master 4 suítes', 'chale_master', '4 suites']
         }
       }
+    },
+    # Hotel 1001 Noites Express — Águas Lindas/GO (captain_unit_id=5)
+    # Preço varia por dia da semana (mon_wed = seg-qua / thu_sun = qui-dom).
+    # Diária e Família são flat (mesmo preço todos os dias).
+    5 => {
+      currency: 'BRL',
+      extra_person_fee: 0.0,
+      categories: {
+        'standard' => {
+          prices: {
+            '2h' => { 'mon_wed' => 40.0, 'thu_sun' => 50.0 },
+            '3h' => { 'mon_wed' => 50.0, 'thu_sun' => 65.0 },
+            '4h' => { 'mon_wed' => 60.0, 'thu_sun' => 80.0 },
+            'pernoite_promo' => { 'mon_wed' => 100.0, 'thu_sun' => 120.0 },
+            'diaria' => 150.0
+          },
+          extra_person_starts_at: 3,
+          aliases: ['standard', 'comum', 'básica', 'basica', 'apartamento standard']
+        },
+        'master' => {
+          prices: {
+            '2h' => { 'mon_wed' => 50.0, 'thu_sun' => 60.0 },
+            '3h' => { 'mon_wed' => 60.0, 'thu_sun' => 75.0 },
+            '4h' => { 'mon_wed' => 70.0 },
+            '5h' => { 'thu_sun' => 85.0 },
+            'pernoite_promo' => { 'mon_wed' => 120.0, 'thu_sun' => 140.0 },
+            'diaria' => 160.0
+          },
+          extra_person_starts_at: 3,
+          aliases: ['master', 'melhor', 'suite master', 'suíte master']
+        },
+        'singles' => {
+          prices: {
+            'pernoite_promo' => { 'mon_wed' => 80.0, 'thu_sun' => 110.0 },
+            'diaria' => 130.0
+          },
+          extra_person_starts_at: 99,
+          aliases: %w[singles single sozinho]
+        },
+        'familia' => {
+          prices: {
+            'pernoite_promo' => 160.0,
+            'diaria' => 190.0
+          },
+          extra_person_starts_at: 99,
+          aliases: %w[familia família familiar]
+        },
+        'singles_duplo' => {
+          prices: {
+            'pernoite_promo' => { 'mon_wed' => 180.0, 'thu_sun' => 220.0 },
+            'diaria' => 250.0
+          },
+          extra_person_starts_at: 99,
+          aliases: ['singles duplo', 'singles_duplo', 'casal', 'duplo']
+        }
+      }
     }
   }.freeze
 
   class << self
     # Retorna {amount:, breakdown:} ou erro {error:} pra uma cobrança.
     # period: '3h' | 'pernoite_promo' | 'pernoite_integral' | 'diaria'
-    # extra_guests: número TOTAL de hóspedes (não só os "extras" — a função
-    # calcula extras baseado em extra_person_starts_at).
-    # rubocop:disable Metrics/MethodLength
-    def calculate(unit_id:, suite_category:, period:, total_guests: 2)
+    # check_in_at: Time/String ISO8601. Determina o bucket de dia da semana
+    #              quando o preço varia (mon_wed/thu_sun). Default: agora.
+    # total_guests: número TOTAL de hóspedes — a função calcula extras
+    #               baseado em extra_person_starts_at.
+    # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
+    def calculate(unit_id:, suite_category:, period:, total_guests: 2, check_in_at: nil)
       table = TABLES[unit_id]
       return { error: "Unidade #{unit_id} não tem tabela de preços cadastrada." } if table.blank?
 
@@ -92,8 +156,12 @@ module Captain::Mcp::PricingTables
       period_key = normalize_period(period)
       return { error: "Período '#{period}' inválido. Use: #{PERIOD_KEYS.join(', ')}." } if period_key.blank?
 
-      base = cat_data[:prices][period_key]
-      return { error: "Preço de '#{period_key}' não definido para '#{cat_key}'." } if base.blank?
+      raw = cat_data[:prices][period_key]
+      return { error: "Preço de '#{period_key}' não definido para '#{cat_key}'." } if raw.blank?
+
+      day_bucket = resolve_day_bucket(check_in_at)
+      base, used_bucket = resolve_price(raw, day_bucket, period_key, cat_key)
+      return { error: base } if base.is_a?(String)
 
       starts_at = cat_data[:extra_person_starts_at] || 3
       extra_guests = [total_guests.to_i - (starts_at - 1), 0].max
@@ -106,6 +174,7 @@ module Captain::Mcp::PricingTables
           unit_id: unit_id,
           suite_category: cat_key,
           period: period_key,
+          day_bucket: used_bucket,
           base_price: base,
           total_guests: total_guests,
           extra_guests: extra_guests,
@@ -120,6 +189,35 @@ module Captain::Mcp::PricingTables
     end
 
     private
+
+    # Recebe Numeric (preço único) ou Hash{bucket=>preço}. Retorna [valor, bucket]
+    # ou [erro_string, nil] se o bucket pedido não tiver preço cadastrado.
+    def resolve_price(raw, day_bucket, period_key, cat_key)
+      return [raw.to_f, nil] if raw.is_a?(Numeric)
+
+      return ["Estrutura de preço inválida pra '#{cat_key}/#{period_key}'.", nil] unless raw.is_a?(Hash)
+
+      price = raw[day_bucket] || raw[day_bucket.to_s]
+      if price.blank?
+        avail = raw.keys.map(&:to_s).join(', ')
+        return ["'#{cat_key}/#{period_key}' não tem preço pro dia escolhido (#{day_bucket}). Disponível: #{avail}.", nil]
+      end
+
+      [price.to_f, day_bucket]
+    end
+
+    # mon_wed: wday 1,2,3 (seg, ter, qua)
+    # thu_sun: wday 4,5,6,0 (qui, sex, sáb, dom)
+    def resolve_day_bucket(check_in_at)
+      time =
+        case check_in_at
+        when nil then Time.current.in_time_zone(DEFAULT_TZ)
+        when Time, ActiveSupport::TimeWithZone, DateTime then check_in_at.in_time_zone(DEFAULT_TZ)
+        else Time.zone.parse(check_in_at.to_s)&.in_time_zone(DEFAULT_TZ) || Time.current.in_time_zone(DEFAULT_TZ)
+        end
+
+      [1, 2, 3].include?(time.wday) ? 'mon_wed' : 'thu_sun'
+    end
 
     def find_category(table, raw)
       needle = raw.to_s.downcase.strip.tr('_', ' ').squeeze(' ')
@@ -145,7 +243,7 @@ module Captain::Mcp::PricingTables
       when 'diária' then 'diaria'
       end
     end
-    # rubocop:enable Metrics/MethodLength
+    # rubocop:enable Metrics/MethodLength,Metrics/AbcSize
   end
 end
 # rubocop:enable Metrics/ModuleLength

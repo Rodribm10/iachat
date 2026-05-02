@@ -385,7 +385,11 @@
       "ASSISTANTS": "Assistants",
       "SWITCH_ASSISTANT": "Switch between assistants",
       "NEW_ASSISTANT": "Create Assistant",
-      "EMPTY_LIST": "No assistants found, please create one to get started"
+      "EMPTY_LIST": "No assistants found, please create one to get started",
+      "ENGINE_HERMES": "Hermes",
+      "ENGINE_HERMES_TOOLTIP": "Assistant operated by the Hermes Agent (external LLM)",
+      "ENGINE_INTERNO": "Internal",
+      "ENGINE_INTERNO_TOOLTIP": "Assistant operated by the internal Captain orchestrator"
     },
     "COPILOT": {
       "TITLE": "Copilot",

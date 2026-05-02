@@ -3,7 +3,10 @@ json.config resource.config
 json.created_at resource.created_at.to_i
 json.default_orchestrator_prompt Captain::PromptRenderer.read_template('assistant')
 json.description resource.description
+json.engine resource.engine
 json.guardrails resource.guardrails
+json.hermes_profile_name resource.hermes_profile_name
+json.hermes_webhook_base_url resource.hermes_webhook_base_url
 json.id resource.id
 json.name resource.name
 json.orchestrator_prompt resource.orchestrator_prompt

@@ -43,9 +43,17 @@ class Captain::Assistant < ApplicationRecord
 
   store_accessor :config, :temperature, :feature_faq, :feature_memory, :product_name
 
+  ENGINES = %w[captain_interno hermes].freeze
+
   validates :name, presence: true
   validates :description, presence: true
   validates :account_id, presence: true
+  validates :engine, inclusion: { in: ENGINES }
+  validates :hermes_profile_name, presence: true, if: :hermes?
+  validates :hermes_webhook_base_url, presence: true, if: :hermes?
+
+  scope :hermes, -> { where(engine: 'hermes') }
+  scope :captain_interno, -> { where(engine: 'captain_interno') }
 
   scope :ordered, -> { order(created_at: :desc) }
 
@@ -53,6 +61,14 @@ class Captain::Assistant < ApplicationRecord
 
   def available_name
     name
+  end
+
+  def hermes?
+    engine == 'hermes'
+  end
+
+  def captain_interno?
+    engine == 'captain_interno'
   end
 
   def available_agent_tools
