@@ -77,7 +77,7 @@ class Captain::Mcp::Tools::SaveAgentSpecTool < Captain::Mcp::Tools::BaseTool
 
   private
 
-  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+  # rubocop:disable Metrics/AbcSize
   def expand_spec(slug, spec)
     errors = []
     parent_id = spec.dig('persona_source', 'copied_from_assistant_id') ||
@@ -101,6 +101,12 @@ class Captain::Mcp::Tools::SaveAgentSpecTool < Captain::Mcp::Tools::BaseTool
     name = spec['name'].presence || slug.tr('_', ' ').split.map(&:capitalize).join(' ')
     serialized_categories = pricing_categories.map { |c| serialize_category(c) }
 
+    [build_expanded_hash(slug, name, parent, parent_id, parent_unit, brand, spec, serialized_categories), errors]
+  end
+  # rubocop:enable Metrics/AbcSize
+
+  # rubocop:disable Metrics/ParameterLists
+  def build_expanded_hash(slug, name, parent, parent_id, parent_unit, brand, spec, serialized_categories)
     {
       'slug' => slug,
       'name' => name,
@@ -119,7 +125,7 @@ class Captain::Mcp::Tools::SaveAgentSpecTool < Captain::Mcp::Tools::BaseTool
       'saved_by_tool' => 'mcp_save_agent_spec'
     }
   end
-  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
+  # rubocop:enable Metrics/ParameterLists
 
   def lookup_brand(parent, brand_name)
     return nil if parent.nil?
