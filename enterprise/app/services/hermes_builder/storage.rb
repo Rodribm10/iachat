@@ -29,4 +29,15 @@ module HermesBuilder::Storage
   def clear(session_key)
     Rails.cache.delete(session_key)
   end
+
+  # Última sessão ativa por account — usada pelo callback do Hermes pra
+  # roteamento (Hermes nao propaga chat_id no metadata da resposta).
+  # Aceitavel pra MVP com 1 admin por vez por conta.
+  def remember_last_session(account_id, session_key)
+    Rails.cache.write("hermes_builder:last_session:account:#{account_id}", session_key, expires_in: TTL)
+  end
+
+  def last_session_for(account_id)
+    Rails.cache.read("hermes_builder:last_session:account:#{account_id}")
+  end
 end

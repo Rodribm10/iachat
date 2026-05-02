@@ -21,6 +21,7 @@ class Api::V1::Accounts::Captain::HermesBuilderController < Api::V1::Accounts::B
     return render json: { error: 'Texto vazio' }, status: :bad_request if text.blank?
 
     HermesBuilder::Storage.append(session_key, role: 'user', content: text)
+    HermesBuilder::Storage.remember_last_session(Current.account.id, session_key)
     HermesBuilder::Dispatcher.send_to_construtor(session_id: session_id, message: text)
 
     render json: { ok: true, session_id: session_id }, status: :accepted
@@ -34,6 +35,7 @@ class Api::V1::Accounts::Captain::HermesBuilderController < Api::V1::Accounts::B
   # quando admin clica "Iniciar" — sem ter que digitar primeira msg.
   def start
     HermesBuilder::Storage.clear(session_key)
+    HermesBuilder::Storage.remember_last_session(Current.account.id, session_key)
     HermesBuilder::Dispatcher.send_to_construtor(
       session_id: session_id,
       message: '__START__ Inicie o fluxo de criação de novo agente Hermes. Comece pela primeira pergunta do Bloco 1 (nome do agente).'

@@ -30,35 +30,14 @@ class Webhooks::Captain::HermesBuilderCallbackController < ApplicationController
 
   private
 
-  # Estratégia: usar o session_id do metadata (Hermes propaga o chat_id).
-  # Fallback: account_id da query string + último user que mandou msg
-  # (raro, mas evita perder resposta).
+  # Hermes nao propaga chat_id no metadata da resposta de callback, entao
+  # usamos a ultima sessao ativa do account (gravada por
+  # HermesBuilder::Storage.remember_last_session no /start e /create).
+  # MVP-safe pra 1 admin por vez por conta.
   def resolve_session_key
-    chat_id = params[:metadata]&.[](:chat_id) || params.dig(:metadata, 'chat_id')
-    if chat_id.is_a?(String) && chat_id.include?('builder-')
-      # Formato: webhook:construtor-admin:session:builder-<account>-<user>
-      session_id = chat_id.split(':').last
-      return "hermes_builder:#{session_id}" if session_id.start_with?('builder-')
-    end
-
     account_id = params[:account_id]
     return nil if account_id.blank?
 
-    # Fallback: pega últimas 5 sessões do account, retorna a mais recente
-    # com mensagens. Aceitável pra MVP com 1 admin testando por vez.
-    recent_session_key_for(account_id)
-  end
-
-  def recent_session_key_for(account_id)
-    return nil unless Rails.cache.respond_to?(:redis)
-
-    pattern = "hermes_builder:builder-#{account_id}-*"
-    keys = Rails.cache.redis.with { |c| c.keys(pattern) }
-    return nil if keys.blank?
-
-    keys.first.sub(/^.*?(hermes_builder:.*)$/, '\1')
-  rescue StandardError => e
-    Rails.logger.warn("[HermesBuilder::Callback] recent_session_key fallback failed: #{e.class} - #{e.message}")
-    nil
+    HermesBuilder::Storage.last_session_for(account_id)
   end
 end
