@@ -65,13 +65,25 @@ module Captain::Hermes
     "#{webhook_base_url(inbox)}/webhooks/#{subscription_name_for(inbox)}"
   end
 
-  # Convenção de nome de subscription no Hermes: precisa bater com o que o
-  # admin criou via `hermes webhook subscribe captain-inbox-<id> ...`.
+  # Convenção de nome de subscription no Hermes:
+  # - Pra Hermes assistant criado pelo Construtor (tem hermes_profile_name):
+  #   usa "captain-inbox-<slug>" (única por agente, independente de qual
+  #   inbox o admin atrelou).
+  # - Pra agentes legados (Valentina, Nina) criados antes do Construtor:
+  #   fallback pro padrão velho "captain-inbox-<inbox.id>".
   def subscription_name_for(inbox)
-    "captain-inbox-#{inbox.id}"
+    assistant = assistant_for(inbox)
+    if assistant&.hermes_profile_name.present?
+      "captain-inbox-#{assistant.hermes_profile_name}"
+    else
+      "captain-inbox-#{inbox.id}"
+    end
   end
 
   def subscription_signing_secret(inbox)
+    assistant = assistant_for(inbox)
+    return assistant.hermes_subscription_secret if assistant&.hermes_subscription_secret.present?
+
     ENV.fetch("CAPTAIN_HERMES_SUBSCRIPTION_SECRET_INBOX_#{inbox.id}", nil)
   end
 
