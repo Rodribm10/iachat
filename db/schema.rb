@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_01_030000) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_02_120100) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -336,7 +336,16 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_01_030000) do
     t.text "api_key"
     t.jsonb "handoff_webhook_config", default: {}
     t.text "orchestrator_prompt"
+    t.string "engine", default: "captain_interno", null: false
+    t.string "hermes_profile_name"
+    t.string "hermes_webhook_base_url"
+    t.string "hermes_subscription_secret"
+    t.integer "hermes_port"
+    t.bigint "parent_assistant_id"
     t.index ["account_id"], name: "index_captain_assistants_on_account_id"
+    t.index ["engine"], name: "index_captain_assistants_on_engine"
+    t.index ["hermes_port"], name: "idx_captain_assistants_hermes_port_unique", unique: true, where: "(hermes_port IS NOT NULL)"
+    t.index ["parent_assistant_id"], name: "index_captain_assistants_on_parent_assistant_id"
   end
 
   create_table "captain_brands", force: :cascade do |t|
@@ -673,6 +682,28 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_01_030000) do
     t.index ["unit_id"], name: "index_captain_pix_charges_on_unit_id"
   end
 
+  create_table "captain_pricing_amounts", force: :cascade do |t|
+    t.bigint "captain_pricing_category_id", null: false
+    t.string "period", null: false
+    t.string "day_bucket"
+    t.decimal "amount", precision: 10, scale: 2, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["captain_pricing_category_id", "period", "day_bucket"], name: "idx_captain_pricing_amount_uniq", unique: true
+    t.index ["captain_pricing_category_id"], name: "index_captain_pricing_amounts_on_captain_pricing_category_id"
+  end
+
+  create_table "captain_pricing_categories", force: :cascade do |t|
+    t.bigint "captain_unit_id", null: false
+    t.string "key", null: false
+    t.jsonb "aliases", default: [], null: false
+    t.integer "extra_person_starts_at", default: 3, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["captain_unit_id", "key"], name: "index_captain_pricing_categories_on_captain_unit_id_and_key", unique: true
+    t.index ["captain_unit_id"], name: "index_captain_pricing_categories_on_captain_unit_id"
+  end
+
   create_table "captain_pricing_inboxes", force: :cascade do |t|
     t.bigint "captain_pricing_id", null: false
     t.bigint "inbox_id", null: false
@@ -967,6 +998,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_01_030000) do
     t.uuid "supabase_unit_id"
     t.bigint "supabase_tenant_id", default: 1
     t.uuid "supabase_marca_id"
+    t.decimal "extra_person_fee", precision: 10, scale: 2, default: "0.0", null: false
+    t.string "currency", default: "BRL", null: false
     t.index ["account_id"], name: "index_captain_units_on_account_id"
     t.index ["captain_brand_id"], name: "index_captain_units_on_captain_brand_id"
     t.index ["concierge_inbox_id"], name: "index_captain_units_on_concierge_inbox_id"
@@ -2163,6 +2196,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_01_030000) do
   add_foreign_key "captain_notification_templates", "inboxes"
   add_foreign_key "captain_pix_charges", "captain_reservations", column: "reservation_id"
   add_foreign_key "captain_pix_charges", "captain_units", column: "unit_id"
+  add_foreign_key "captain_pricing_amounts", "captain_pricing_categories"
+  add_foreign_key "captain_pricing_categories", "captain_units"
   add_foreign_key "captain_pricings", "accounts"
   add_foreign_key "captain_pricings", "captain_brands"
   add_foreign_key "captain_prompt_audit_events", "captain_prompt_profiles", column: "prompt_profile_id"

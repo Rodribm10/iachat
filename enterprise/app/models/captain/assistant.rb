@@ -2,24 +2,33 @@
 #
 # Table name: captain_assistants
 #
-#  id                     :bigint           not null, primary key
-#  api_key                :text
-#  config                 :jsonb            not null
-#  description            :string
-#  guardrails             :jsonb
-#  handoff_webhook_config :jsonb
-#  llm_model              :string           default("gpt-3.5-turbo")
-#  llm_provider           :string           default("openai")
-#  name                   :string           not null
-#  orchestrator_prompt    :text
-#  response_guidelines    :jsonb
-#  created_at             :datetime         not null
-#  updated_at             :datetime         not null
-#  account_id             :bigint           not null
+#  id                         :bigint           not null, primary key
+#  api_key                    :text
+#  config                     :jsonb            not null
+#  description                :string
+#  engine                     :string           default("captain_interno"), not null
+#  guardrails                 :jsonb
+#  handoff_webhook_config     :jsonb
+#  hermes_port                :integer
+#  hermes_profile_name        :string
+#  hermes_subscription_secret :string
+#  hermes_webhook_base_url    :string
+#  llm_model                  :string           default("gpt-3.5-turbo")
+#  llm_provider               :string           default("openai")
+#  name                       :string           not null
+#  orchestrator_prompt        :text
+#  response_guidelines        :jsonb
+#  created_at                 :datetime         not null
+#  updated_at                 :datetime         not null
+#  account_id                 :bigint           not null
+#  parent_assistant_id        :bigint
 #
 # Indexes
 #
-#  index_captain_assistants_on_account_id  (account_id)
+#  idx_captain_assistants_hermes_port_unique        (hermes_port) UNIQUE WHERE (hermes_port IS NOT NULL)
+#  index_captain_assistants_on_account_id           (account_id)
+#  index_captain_assistants_on_engine               (engine)
+#  index_captain_assistants_on_parent_assistant_id  (parent_assistant_id)
 #
 class Captain::Assistant < ApplicationRecord
   include Avatarable

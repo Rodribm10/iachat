@@ -24,7 +24,7 @@
 class Captain::PricingAmount < ApplicationRecord
   self.table_name = 'captain_pricing_amounts'
 
-  PERIODS = %w[2h 3h 4h 5h pernoite_promo pernoite_integral diaria].freeze
+  PERIODS = %w[1h 2h 3h 4h 5h pernoite_promo pernoite_integral diaria].freeze
   DAY_BUCKETS = %w[mon_wed thu_sun].freeze
 
   belongs_to :pricing_category,

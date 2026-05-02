@@ -4,6 +4,8 @@
 #
 #  id                             :bigint           not null, primary key
 #  concierge_config               :jsonb            not null
+#  currency                       :string           default("BRL"), not null
+#  extra_person_fee               :decimal(10, 2)   default(0.0), not null
 #  inter_account_number           :string
 #  inter_cert_content             :text
 #  inter_cert_path                :string

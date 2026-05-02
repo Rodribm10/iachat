@@ -58,32 +58,51 @@ class Captain::Mcp::Tools::GetAssistantPricingTool < Captain::Mcp::Tools::BaseTo
     "_(assistente #{assistant.name} não tem tabela de preços estruturada nem em scenario)_"
   end
 
-  # Lookup em Captain::Mcp::PricingTables (Hermes-side hardcoded).
+  # Lookup em Captain::PricingCategory + Captain::PricingAmount (DB).
   def structured_pricing_for(assistant)
-    inbox = CaptainInbox.find_by(captain_assistant_id: assistant.id)
-    return nil if inbox.blank?
-
-    unit = Captain::Unit.find_by(inbox_id: inbox.inbox_id)
+    unit = unit_for(assistant)
     return nil if unit.blank?
+    return nil if unit.pricing_categories.empty?
 
-    table = Captain::Mcp::PricingTables::TABLES[unit.id]
-    return nil if table.blank?
-
-    format_structured_table(unit, table)
+    format_structured_table(unit)
   end
 
-  def format_structured_table(unit, table)
-    lines = ["# Tabela de preços — #{unit.name}", '']
-    lines << '| Categoria | 3h | Pernoite Promo | Pernoite Integral | Diária | Pessoa extra a partir |'
-    lines << '|---|---|---|---|---|---|'
-    table[:categories].each do |key, data|
-      prices = data[:prices]
-      lines << "| #{key.tr('_', ' ').capitalize} | #{prices['3h']} | #{prices['pernoite_promo']} | " \
-               "#{prices['pernoite_integral']} | #{prices['diaria']} | #{data[:extra_person_starts_at]}ª pessoa |"
+  def unit_for(assistant)
+    ci = CaptainInbox.find_by(captain_assistant_id: assistant.id)
+    return nil if ci.blank?
+
+    Captain::Unit.find_by(id: ci.captain_unit_id) ||
+      Captain::Unit.find_by(inbox_id: ci.inbox_id)
+  end
+
+  # rubocop:disable Metrics/AbcSize
+  def format_structured_table(unit)
+    lines = ["# Tabela de preços — #{unit.name} (marca #{unit.brand.name})", '']
+
+    unit.pricing_categories.each do |cat|
+      lines << "## #{cat.key.tr('_', ' ').capitalize} (extra a partir da #{cat.extra_person_starts_at}ª pessoa)"
+      cat.amounts.group_by { |a| a.day_bucket || 'default' }.each do |bucket, amounts|
+        lines << "### #{bucket_label(bucket)}"
+        lines << '| Período | Valor |'
+        lines << '|---|---|'
+        amounts.sort_by { |a| Captain::PricingAmount::PERIODS.index(a.period) || 99 }.each do |a|
+          lines << "| #{a.period} | R$ #{a.amount.to_f} |"
+        end
+        lines << ''
+      end
     end
-    lines << ''
-    lines << "**Taxa pessoa extra:** R$ #{table[:extra_person_fee]}"
+
+    lines << "**Taxa pessoa extra:** R$ #{unit.extra_person_fee.to_f}" if unit.extra_person_fee.to_f.positive?
     lines.join("\n")
+  end
+  # rubocop:enable Metrics/AbcSize
+
+  def bucket_label(bucket)
+    case bucket
+    when 'mon_wed' then 'Seg-Qua'
+    when 'thu_sun' then 'Qui-Dom'
+    else 'Todos os dias'
+    end
   end
 
   # Captain interno guarda a tabela no instruction de algum scenario
