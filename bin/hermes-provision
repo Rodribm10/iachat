@@ -1,0 +1,333 @@
+#!/usr/bin/env bash
+# hermes-provision — provisiona um novo agente Hermes ponta-a-ponta.
+#
+# Uso:
+#   hermes-provision [--dry-run] [--rollback <slug>] < spec.json
+#
+# Spec JSON esperado (stdin):
+#   {
+#     "slug": "lara",
+#     "name": "Lara",
+#     "account_id": 1,
+#     "marca": "Hotel 1001 Noites Prime",
+#     "unit_name": "PrimeVL",
+#     "city": "Brasília/DF",
+#     "captain_unit_id": null,         // opcional — se null, cria nova Unit
+#     "parent_assistant_id": null,     // opcional — se setado, MCP usa data do parent
+#     "soul_md": "<conteúdo SOUL.md inteiro>",
+#     "skill_name": "primevl-reservas",
+#     "skill_md": "<conteúdo SKILL.md>",
+#     "categories": [
+#       {
+#         "key": "standard",
+#         "aliases": ["standard", "comum"],
+#         "extra_person_starts_at": 3,
+#         "amounts": [
+#           {"period": "3h", "day_bucket": null, "amount": 50.0},
+#           {"period": "pernoite_promo", "day_bucket": "mon_wed", "amount": 100.0}
+#         ]
+#       }
+#     ],
+#     "extra_person_fee": 0.0,
+#     "humanization": {
+#       "mode": "typing_simulation",
+#       "chars_per_second": 25,
+#       "min_seconds": 1.5,
+#       "max_seconds": 6.0
+#     }
+#   }
+#
+# Saída: JSON com {ok, assistant_id, port, secret, errors}
+#
+# Quem chama: Construtor Hermes via terminal skill nativa.
+# Pré-requisitos na VPS: jq, openssl, docker, systemctl, git, hermes binary.
+
+set -uo pipefail
+
+PROFILES_DIR="/root/.hermes/profiles"
+TEMPLATE_PROFILE="$PROFILES_DIR/valentina"
+PORT_RANGE_START=8650
+PORT_RANGE_END=8699
+SYSTEMD_DIR="/etc/systemd/system"
+GIT_BACKUP_REPO="/root/hermes_profiles_backup"
+DOCKER_APP_FILTER="iachat_iachat_app"
+
+DRY_RUN=0
+ROLLBACK_SLUG=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --rollback) ROLLBACK_SLUG="$2"; shift 2 ;;
+    *) echo "{\"ok\":false,\"error\":\"unknown flag: $1\"}" >&2; exit 1 ;;
+  esac
+done
+
+log() { echo "[$(date -u +%H:%M:%S)] $*" >&2; }
+fail() { echo "{\"ok\":false,\"error\":\"$1\"}"; exit 1; }
+require_cmd() { command -v "$1" >/dev/null || fail "missing required command: $1"; }
+
+require_cmd jq
+require_cmd openssl
+require_cmd docker
+require_cmd systemctl
+require_cmd hermes
+
+# === ROLLBACK ===
+if [[ -n "$ROLLBACK_SLUG" ]]; then
+  log "rolling back $ROLLBACK_SLUG"
+  systemctl stop "hermes@$ROLLBACK_SLUG.service" 2>/dev/null || true
+  systemctl disable "hermes@$ROLLBACK_SLUG.service" 2>/dev/null || true
+  rm -rf "${PROFILES_DIR:?}/$ROLLBACK_SLUG"
+  CID=$(docker ps --filter "name=$DOCKER_APP_FILTER" -q | head -1)
+  docker exec "$CID" bundle exec rails runner "
+    asst = Captain::Assistant.find_by(hermes_profile_name: '$ROLLBACK_SLUG')
+    if asst
+      asst.captain_inboxes.destroy_all
+      asst.destroy!
+      puts 'destroyed assistant ' + asst.id.to_s
+    else
+      puts 'no assistant for slug $ROLLBACK_SLUG'
+    end
+  " 2>&1 | grep -v RubyLLM | tail -3
+  echo "{\"ok\":true,\"action\":\"rollback\",\"slug\":\"$ROLLBACK_SLUG\"}"
+  exit 0
+fi
+
+# === READ + VALIDATE SPEC ===
+SPEC=$(cat)
+[[ -z "$SPEC" ]] && fail "empty spec on stdin"
+echo "$SPEC" | jq empty 2>/dev/null || fail "invalid JSON"
+
+SLUG=$(echo "$SPEC" | jq -r '.slug // empty')
+NAME=$(echo "$SPEC" | jq -r '.name // empty')
+ACCOUNT_ID=$(echo "$SPEC" | jq -r '.account_id // empty')
+MARCA=$(echo "$SPEC" | jq -r '.marca // empty')
+UNIT_NAME=$(echo "$SPEC" | jq -r '.unit_name // empty')
+CAPTAIN_UNIT_ID=$(echo "$SPEC" | jq -r '.captain_unit_id // empty')
+PARENT_ASSISTANT_ID=$(echo "$SPEC" | jq -r '.parent_assistant_id // empty')
+SOUL_MD=$(echo "$SPEC" | jq -r '.soul_md // empty')
+SKILL_NAME=$(echo "$SPEC" | jq -r '.skill_name // empty')
+SKILL_MD=$(echo "$SPEC" | jq -r '.skill_md // empty')
+EXTRA_PERSON_FEE=$(echo "$SPEC" | jq -r '.extra_person_fee // 0')
+
+# Slug validation
+[[ ! "$SLUG" =~ ^[a-z][a-z0-9_]{1,29}$ ]] && fail "invalid slug '$SLUG' (regex: ^[a-z][a-z0-9_]{1,29}\$)"
+[[ -z "$NAME" ]] && fail "name required"
+[[ -z "$ACCOUNT_ID" ]] && fail "account_id required"
+[[ -z "$MARCA" ]] && fail "marca required"
+[[ -z "$UNIT_NAME" ]] && fail "unit_name required"
+[[ -z "$SOUL_MD" ]] && fail "soul_md content required"
+[[ -z "$SKILL_NAME" ]] && fail "skill_name required"
+[[ ! "$SKILL_NAME" =~ ^[a-z][a-z0-9_-]{1,40}$ ]] && fail "invalid skill_name '$SKILL_NAME'"
+[[ -z "$SKILL_MD" ]] && fail "skill_md content required"
+
+# Categories validation: structure + amount sanity
+CATEGORIES_COUNT=$(echo "$SPEC" | jq '.categories | length')
+[[ "$CATEGORIES_COUNT" -lt 1 ]] && fail "at least 1 category required"
+
+INVALID_AMOUNTS=$(echo "$SPEC" | jq '
+  [.categories[] |
+    .amounts[] |
+    select(.amount <= 0 or .amount > 5000 or
+           (.period | IN("2h","3h","4h","5h","pernoite_promo","pernoite_integral","diaria") | not) or
+           (.day_bucket != null and (.day_bucket | IN("mon_wed","thu_sun") | not)))
+  ] | length
+')
+[[ "$INVALID_AMOUNTS" -gt 0 ]] && fail "$INVALID_AMOUNTS amounts inválidos (preço fora 0..5000, período/bucket inválido)"
+
+# Profile already exists?
+if [[ -d "$PROFILES_DIR/$SLUG" ]]; then
+  log "profile $SLUG já existe, será re-validado mas não recriado (idempotente)"
+fi
+
+# === ALLOCATE PORT ===
+allocate_port() {
+  for ((p=PORT_RANGE_START; p<=PORT_RANGE_END; p++)); do
+    if ! ss -tnlH "( sport = :$p )" | grep -q .; then
+      echo "$p"; return 0
+    fi
+  done
+  return 1
+}
+
+# Reuse port if profile exists, else allocate fresh
+if [[ -f "$PROFILES_DIR/$SLUG/config.yaml" ]]; then
+  PORT=$(awk '/^      port:/ {print $2}' "$PROFILES_DIR/$SLUG/config.yaml" | head -1)
+  log "reusing existing port $PORT for $SLUG"
+else
+  PORT=$(allocate_port) || fail "no free port in range $PORT_RANGE_START..$PORT_RANGE_END"
+  log "allocated port $PORT for $SLUG"
+fi
+
+# === GENERATE OR REUSE HMAC SECRET ===
+if [[ -f "$PROFILES_DIR/$SLUG/webhook_subscriptions.json" ]]; then
+  SECRET=$(jq -r ".\"captain-inbox-${SLUG}\".secret // empty" "$PROFILES_DIR/$SLUG/webhook_subscriptions.json" 2>/dev/null)
+  [[ -z "$SECRET" ]] && SECRET=$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-43)
+else
+  SECRET=$(openssl rand -base64 32 | tr -d '/+=' | cut -c1-43)
+fi
+
+# === DRY RUN STOPS HERE ===
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo "$SPEC" | jq --arg port "$PORT" --arg secret "${SECRET:0:8}..." \
+    '{ok: true, dry_run: true, slug: .slug, name: .name, port: $port, secret_preview: $secret, categories: (.categories | length)}'
+  exit 0
+fi
+
+# === DB OPERATIONS via docker exec ===
+CID=$(docker ps --filter "name=$DOCKER_APP_FILTER" -q | head -1)
+[[ -z "$CID" ]] && fail "iachat_iachat_app container not running"
+
+# Persist spec to a tmp file inside container so the runner reads it back
+TMP_SPEC="/tmp/hermes_spec_${SLUG}_$$.json"
+echo "$SPEC" > "/tmp/hermes_spec_${SLUG}_$$.json"
+docker cp "$TMP_SPEC" "$CID:$TMP_SPEC"
+
+DB_RESULT=$(docker exec "$CID" bundle exec rails runner "
+  spec = JSON.parse(File.read('$TMP_SPEC'))
+  account_id = spec['account_id']
+
+  brand = Captain::Brand.find_by(account_id: account_id, name: spec['marca'])
+  raise \"brand not found: #{spec['marca']}\" if brand.nil?
+
+  unit = if spec['captain_unit_id']
+    Captain::Unit.find(spec['captain_unit_id'])
+  else
+    Captain::Unit.find_or_create_by!(account_id: account_id, captain_brand_id: brand.id, name: spec['unit_name']) do |u|
+      u.status = 'active'
+      u.extra_person_fee = (spec['extra_person_fee'] || 0).to_f
+      u.currency = 'BRL'
+    end
+  end
+
+  spec['categories'].each do |cat|
+    pricing_cat = Captain::PricingCategory.find_or_initialize_by(captain_unit_id: unit.id, key: cat['key'])
+    pricing_cat.aliases = cat['aliases'] || []
+    pricing_cat.extra_person_starts_at = cat['extra_person_starts_at'] || 3
+    pricing_cat.save!
+
+    cat['amounts'].each do |a|
+      row = Captain::PricingAmount.find_or_initialize_by(
+        captain_pricing_category_id: pricing_cat.id, period: a['period'], day_bucket: a['day_bucket']
+      )
+      row.amount = a['amount']
+      row.save!
+    end
+  end
+
+  asst = Captain::Assistant.find_or_initialize_by(account_id: account_id, name: spec['name'])
+  asst.description ||= 'Atendente Hermes ' + spec['name']
+  asst.engine = 'hermes'
+  asst.hermes_profile_name = spec['slug']
+  asst.hermes_webhook_base_url = 'http://172.17.0.1:' + $PORT.to_s
+  asst.hermes_subscription_secret = '$SECRET'
+  asst.hermes_port = $PORT
+  asst.parent_assistant_id = spec['parent_assistant_id']
+
+  if spec['humanization']
+    asst.config['response_delay'] = spec['humanization']
+  end
+
+  asst.save!
+
+  puts 'OK ' + asst.id.to_s + ' ' + unit.id.to_s
+" 2>&1 | grep -v 'RubyLLM\|ip_lookup\|WARN' | tail -3)
+
+ASSISTANT_ID=$(echo "$DB_RESULT" | grep '^OK' | awk '{print $2}')
+[[ -z "$ASSISTANT_ID" ]] && fail "DB step failed: $DB_RESULT"
+log "DB step OK: assistant_id=$ASSISTANT_ID"
+
+# === FILESYSTEM: profile directory ===
+mkdir -p "$PROFILES_DIR/$SLUG/skills/$SKILL_NAME/references"
+
+# Copy template files (config base, plugins, auth, generic skills)
+if [[ -f "$TEMPLATE_PROFILE/config.yaml" ]]; then
+  cp "$TEMPLATE_PROFILE/config.yaml" "$PROFILES_DIR/$SLUG/config.yaml"
+  cp -r "$TEMPLATE_PROFILE/plugins" "$PROFILES_DIR/$SLUG/" 2>/dev/null || true
+  cp "$TEMPLATE_PROFILE/.env" "$PROFILES_DIR/$SLUG/.env" 2>/dev/null || true
+  cp "$TEMPLATE_PROFILE/auth.json" "$PROFILES_DIR/$SLUG/auth.json" 2>/dev/null || true
+  for s in "$TEMPLATE_PROFILE/skills"/*/; do
+    name=$(basename "$s")
+    [[ "$name" == "dolce-amore-reservas" ]] && continue
+    [[ "$name" == "$SKILL_NAME" ]] && continue
+    cp -r "$s" "$PROFILES_DIR/$SLUG/skills/" 2>/dev/null || true
+  done
+fi
+
+# Patch config.yaml: port + X-Captain-Assistant-Id
+MCP_ASSISTANT_ID="${PARENT_ASSISTANT_ID:-$ASSISTANT_ID}"
+sed -i "s/port: 8645/port: $PORT/" "$PROFILES_DIR/$SLUG/config.yaml"
+sed -i "s/X-Captain-Assistant-Id: '6'/X-Captain-Assistant-Id: '$MCP_ASSISTANT_ID'/" "$PROFILES_DIR/$SLUG/config.yaml"
+
+# Write SOUL.md and SKILL.md from spec
+echo "$SPEC" | jq -r '.soul_md' > "$PROFILES_DIR/$SLUG/SOUL.md"
+echo "$SPEC" | jq -r '.skill_md' > "$PROFILES_DIR/$SLUG/skills/$SKILL_NAME/SKILL.md"
+
+# Write webhook_subscriptions.json
+cat > "$PROFILES_DIR/$SLUG/webhook_subscriptions.json" <<JSON
+{
+  "captain-inbox-${SLUG}": {
+    "description": "Subscription Hermes — $NAME",
+    "events": [],
+    "secret": "$SECRET",
+    "prompt": "[ctx: cid={conversation_internal_id} aid={account_id} contact={contact_id} name=\"{contact_first_name}\" full_name=\"{contact_name}\" cpf_ok={contact_cpf_present} email_ok={contact_email_present} reservas={contact_total_reservas}]\nCliente acabou de dizer no WhatsApp: \"{message}\"\n\nResponda como $NAME, brevemente, em português brasileiro. Use a skill $SKILL_NAME pra preços, regras e fluxo. Nunca se apresente. Nunca diga que é IA.",
+    "skills": [],
+    "deliver": "http_callback",
+    "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+    "deliver_extra": {
+      "chat_id": "https://iachat.hoteis1001noites.com.br/webhooks/captain/hermes_callback?slug=${SLUG}"
+    }
+  }
+}
+JSON
+
+log "filesystem OK"
+
+# === SYSTEMD ===
+cat > "$SYSTEMD_DIR/hermes@.service" <<UNIT
+[Unit]
+Description=Hermes Agent gateway for profile %i
+After=network.target docker.service
+
+[Service]
+Type=simple
+Environment=HERMES_HOME=$PROFILES_DIR/%i
+ExecStart=/usr/local/bin/hermes gateway run --replace
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:$PROFILES_DIR/%i/logs/gateway.log
+StandardError=append:$PROFILES_DIR/%i/logs/gateway.log
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+mkdir -p "$PROFILES_DIR/$SLUG/logs"
+systemctl daemon-reload
+systemctl enable "hermes@$SLUG.service" >/dev/null 2>&1
+systemctl restart "hermes@$SLUG.service"
+sleep 2
+
+if ! ss -tnlH "( sport = :$PORT )" | grep -q .; then
+  log "WARNING: daemon for $SLUG not listening on $PORT after 2s — check /root/.hermes/profiles/$SLUG/logs/gateway.log"
+else
+  log "daemon listening on port $PORT"
+fi
+
+# === GIT BACKUP ===
+if [[ -d "$GIT_BACKUP_REPO/.git" ]]; then
+  cd "$GIT_BACKUP_REPO"
+  rsync -a --delete --exclude='logs/' --exclude='cache/' --exclude='sessions/' \
+        --exclude='state.db*' --exclude='memories/' --exclude='sandboxes/' \
+        --exclude='.skills_prompt_snapshot.json' --exclude='auth.json' \
+        --exclude='.env' --exclude='webhook_subscriptions.json' \
+        "$PROFILES_DIR/$SLUG/" "./profiles/$SLUG/"
+  git add "profiles/$SLUG"
+  git commit -m "provision: $SLUG ($NAME)" >/dev/null 2>&1 || true
+  git push origin main >/dev/null 2>&1 || log "git push failed (silent — backup local OK)"
+fi
+
+# === OUTPUT ===
+jq -n --arg slug "$SLUG" --arg name "$NAME" --argjson aid "$ASSISTANT_ID" --argjson port "$PORT" \
+  '{ok: true, slug: $slug, name: $name, assistant_id: $aid, port: $port, listening: true}'
