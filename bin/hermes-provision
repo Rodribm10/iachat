@@ -107,6 +107,7 @@ UNIT_NAME=$(echo "$SPEC" | jq -r '.unit_name // empty')
 CAPTAIN_UNIT_ID=$(echo "$SPEC" | jq -r '.captain_unit_id // empty')
 PARENT_ASSISTANT_ID=$(echo "$SPEC" | jq -r '.parent_assistant_id // empty')
 SOUL_MD=$(echo "$SPEC" | jq -r '.soul_md // empty')
+CITY=$(echo "$SPEC" | jq -r '.city // ""')
 SKILL_NAME=$(echo "$SPEC" | jq -r '.skill_name // empty')
 SKILL_MD=$(echo "$SPEC" | jq -r '.skill_md // empty')
 EXTRA_PERSON_FEE=$(echo "$SPEC" | jq -r '.extra_person_fee // 0')
@@ -299,6 +300,13 @@ FIRST_CAT=$(echo "$SPEC" | jq -r '.categories[0].key // "categoria"')
 sed -i "s|\"Master\", \"Luxo\", \"Mini Chalé 45\"|$EX_CATS_LIST|g" "$PROFILES_DIR/$SLUG/SOUL.md"
 sed -i "s|Prefere Suíte Master|Prefere $FIRST_CAT|g" "$PROFILES_DIR/$SLUG/SOUL.md"
 sed -i "s|prefiro suíte master|prefiro $FIRST_CAT|g" "$PROFILES_DIR/$SLUG/SOUL.md"
+
+# Localização: a Valentina template é Dolce Amore (Ponta Negra, Natal/RN).
+# Sem este sed, novos agentes vazam essa cidade — vimos isso na Juliana
+# Qnn01 que ficou "em Ponta Negra, Natal/RN" mesmo sendo de Brasília.
+if [[ -n "$CITY" ]]; then
+  sed -i "s|em Ponta Negra, Natal/RN|em $CITY|g" "$PROFILES_DIR/$SLUG/SOUL.md"
+fi
 
 # Skill: usa o markdown gerado pelo expand_spec (tabela do banco + regras).
 echo "$SPEC" | jq -r '.skill_md' > "$PROFILES_DIR/$SLUG/skills/$SKILL_NAME/SKILL.md"
