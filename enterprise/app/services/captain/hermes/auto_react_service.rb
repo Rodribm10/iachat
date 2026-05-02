@@ -22,6 +22,15 @@ class Captain::Hermes::AutoReactService
   GREETING_REGEX = /\A(bom\s*dia|boa\s*tarde|boa\s*noite|oi|olá|ola|e\s*aí|hey|hi|hello)[\s.!,]*\z/i
   FAREWELL_REGEX = /\A(tchau|até\s*(mais|logo|breve)|valeu\s*flw|flw|abraço|abraços|bjs|beijos)[\s.!,]*\z/i
 
+  # Reação "ambiente" — em msgs neutras que não bateram nenhum padrão
+  # acima, rola dado e reage com emoji discreto. Cobre o gap entre
+  # saudação e despedida pra agente parecer mais vivo (~1 a cada 5 msgs).
+  # Filtros em ambient_eligible? evitam reagir em momentos de fluxo
+  # crítico (cliente mandando dados de reserva, fazendo pergunta).
+  AMBIENT_EMOJIS = %w[😊 💕 ✨ 💯 🤗].freeze
+  AMBIENT_PROBABILITY = 0.20
+  AMBIENT_RESERVATION_KEYWORDS = /cpf|reserv|pix|valor|preço|preco|quanto|hor[áa]rio|dia\b|data\b|categori|suite|quart|chal[ée]/i
+
   def self.maybe_react!(message)
     new(message).maybe_react!
   end
@@ -73,8 +82,22 @@ class Captain::Hermes::AutoReactService
     return '👍' if CONFIRMATION_REGEX.match?(text)
     return '👋' if GREETING_REGEX.match?(text) && first_incoming_in_conversation?
     return '❤️' if FAREWELL_REGEX.match?(text)
+    return AMBIENT_EMOJIS.sample if ambient_eligible?(text) && rand < AMBIENT_PROBABILITY
 
     nil
+  end
+
+  # Mensagens "neutras" elegíveis pra reação ambiente: nem curtas demais
+  # (provavelmente saudação que já pega regex), nem longas (geralmente
+  # narrativa que pede atenção), sem ?, sem termos de fluxo de reserva
+  # (preço/cpf/data — cliente está esperando ação, não emoji).
+  def ambient_eligible?(text)
+    return false if text.length < 6 || text.length > 180
+    return false if text.include?('?')
+    return false if text.match?(AMBIENT_RESERVATION_KEYWORDS)
+    return false if text.match?(/\A\d/)
+
+    true
   end
 
   # Saudação só reage na PRIMEIRA mensagem da conversa pra não ficar
