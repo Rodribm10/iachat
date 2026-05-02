@@ -271,9 +271,14 @@ fi
 # (Hermes-level memory_enabled e user_profile_enabled vazam contexto entre
 # agentes que compartilham OAuth Codex; manter desligado pra evitar
 # contaminação cross-unit).
-MCP_ASSISTANT_ID="${PARENT_ASSISTANT_ID:-$ASSISTANT_ID}"
+#
+# X-Captain-Assistant-Id usa o id PRÓPRIO do Hermes assistant (não do
+# parent). Caso contrário tools como faq_lookup buscam dados do parent
+# (Captain interno, com FAQs antigos) — vazou senha errada do Wi-Fi em
+# 2026-05-02 porque parent.id=1 tinha "presencial" enquanto own.id=10
+# tinha a senha real "Prime2025".
 sed -i "s/port: 8645/port: $PORT/" "$PROFILES_DIR/$SLUG/config.yaml"
-sed -i "s/X-Captain-Assistant-Id: '6'/X-Captain-Assistant-Id: '$MCP_ASSISTANT_ID'/" "$PROFILES_DIR/$SLUG/config.yaml"
+sed -i "s/X-Captain-Assistant-Id: '6'/X-Captain-Assistant-Id: '$ASSISTANT_ID'/" "$PROFILES_DIR/$SLUG/config.yaml"
 sed -i 's/  memory_enabled: true/  memory_enabled: false/' "$PROFILES_DIR/$SLUG/config.yaml"
 sed -i 's/  user_profile_enabled: true/  user_profile_enabled: false/' "$PROFILES_DIR/$SLUG/config.yaml"
 
