@@ -88,12 +88,13 @@ class Captain::Hermes::AutoReactService
   end
 
   # Mensagens "neutras" elegíveis pra reação ambiente: nem curtas demais
-  # (provavelmente saudação que já pega regex), nem longas (geralmente
-  # narrativa que pede atenção), sem ?, sem termos de fluxo de reserva
-  # (preço/cpf/data — cliente está esperando ação, não emoji).
+  # (provavelmente saudação que já pega regex), nem longas (narrativa
+  # pede atenção), sem termos de fluxo de reserva crítico (preço/cpf/data
+  # — cliente está esperando ação, não emoji). AS perguntas comuns
+  # (com "?") TAMBÉM elegíveis: WhatsApp de motel é majoritariamente
+  # interrogativo; se filtrar "?" o ambient nunca dispara em prod.
   def ambient_eligible?(text)
     return false if text.length < 6 || text.length > 180
-    return false if text.include?('?')
     return false if text.match?(AMBIENT_RESERVATION_KEYWORDS)
     return false if text.match?(/\A\d/)
 

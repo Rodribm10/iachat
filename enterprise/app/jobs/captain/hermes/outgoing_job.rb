@@ -35,12 +35,22 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
     # texto agrupado pra Hermes ver o pensamento completo do cliente.
     combined = combined_incoming_content(conversation, message)
 
+    snapshot_tool_call_baseline(conversation)
+
     Captain::Hermes::Client.new(conversation.inbox).dispatch(
       message: message, conversation: conversation, content_override: combined
     )
   end
 
   private
+
+  # Salva o contador atual de tool calls da conv ANTES do dispatch.
+  # HermesCallbackController compara contra valor pós-callback pra detectar
+  # respostas factuais sem chamada de tool (alucinação de memória).
+  def snapshot_tool_call_baseline(conversation)
+    current = Rails.cache.read("hermes_tool_calls:#{conversation.id}", raw: true).to_i
+    Rails.cache.write("hermes_tool_calls_baseline:#{conversation.id}", current, expires_in: 5.minutes, raw: true)
+  end
 
   # Concatena texto de todas as msgs incoming entre a última resposta real
   # (não-reaction) do agente e a msg âncora. Retorna nil se só tem 1 msg

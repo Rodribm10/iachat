@@ -13,7 +13,7 @@
 # de forma confiável, identificamos pela ÚLTIMA conversation pending da inbox
 # que recebeu mensagem nos últimos 5 minutos. Aceitável pra PoC com 1 conversa
 # de teste por vez. Pra produção, melhorar com Redis: delivery_id → conversation_id.
-class Webhooks::Captain::HermesCallbackController < ApplicationController
+class Webhooks::Captain::HermesCallbackController < ApplicationController # rubocop:disable Metrics/ClassLength
   RECENT_WINDOW = 5.minutes
 
   # "Um momento — vou verificar" é a frase-âncora de handoff intencional
@@ -25,6 +25,24 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     /\A\s*[⏳⌛]?\s*um\s+instante.*verificar/i,
     /\A\s*aguarde\s+um\s+instante/i
   ].freeze
+
+  # Camada 2 — Gating de saída factual:
+  # Se a resposta do Hermes contém info factual (preço, senha, regra,
+  # horário) E o LLM NÃO chamou nenhuma tool MCP entre o dispatch e o
+  # callback, é alucinação de memória. Bloqueia a resposta, força
+  # consulta a tool via notify_event. 1 retry; se persistir, escala humano.
+  FACTUAL_PATTERNS = [
+    /R\$\s*\d/i,                                                # R$ 50, R$ 125,00
+    /\b\d+\s*(reais|reai|real)\b/i,
+    /\b\d+\s*%/,                                                # 50%
+    /\bsenha\b/i,                                               # qualquer menção a senha
+    /\b(c[óo]digo)\s+(de|do)\s+(porta|portao|portão|garagem)\b/i,
+    /\b(check[-]?in|check[-]?out|hor[áa]rio)\s+(é|eh|de)\s+\d/i, # check-in é 14h
+    /\b(política|politica|regra)\s+de\s+(cancelamento|no[\s-]?show|reembolso)/i,
+    /(n[ãa]o\s+(é\s+)?permitido|é\s+permitido)\s+\w{3,}/i,
+    /(pode|podem)\s+(levar|trazer)\s+(animal|pet|cachorro|gato|crian[çc]a)/i
+  ].freeze
+  MAX_FACTUAL_GATE_RETRIES = 1
 
   # Loop detection: 2 sinais combinados.
   # 1. Jaccard de tokens >= 0.50 → resposta praticamente igual.
@@ -56,6 +74,12 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     return log_no_conversation_and_ack if conversation.blank?
 
     log_reply(conversation, content)
+
+    # Camada 2: resposta factual sem chamada de tool durante a turn é
+    # alucinação de memória. Bloqueia entrega + re-dispara forçando tool
+    # call. NÃO entrega a msg pro cliente até o LLM consultar a fonte.
+    return head :ok if gate_factual_no_tool!(conversation, content)
+
     detect_handoff_or_loop(conversation, content)
     deliver_outgoing(conversation, content)
     head :ok
@@ -91,6 +115,62 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     return false if content.blank?
 
     HANDOFF_PATTERNS.any? { |re| content.match?(re) }
+  end
+
+  # Retorna true se bloqueou a resposta (callback deve dar 200 + sair sem
+  # entregar). Retorna false pra fluxo normal continuar.
+  def gate_factual_no_tool!(conversation, content)
+    return false unless looks_factual?(content)
+    return false if tool_called_in_this_turn?(conversation)
+
+    retry_key = "hermes_factual_gate_retry:#{conversation.id}"
+    retries = Rails.cache.read(retry_key, raw: true).to_i
+    if retries >= MAX_FACTUAL_GATE_RETRIES
+      Rails.logger.error("[Hermes::Callback] factual sem tool persistente em conv #{conversation.display_id} — escalando")
+      mark_for_human_triage(conversation, reason: 'factual_no_tool_persistente')
+      Rails.cache.delete(retry_key)
+      # Entrega o conteúdo nesse caso (melhor algo do que silêncio); humano vê pela label.
+      deliver_outgoing(conversation, content)
+      return true
+    end
+
+    Rails.cache.write(retry_key, retries + 1, expires_in: 5.minutes, raw: true)
+    Rails.logger.warn("[Hermes::Callback] factual sem tool em conv #{conversation.display_id} — re-dispatch (retry #{retries + 1})")
+    trigger_force_tool_call!(conversation, content)
+    true
+  end
+
+  def looks_factual?(content)
+    return false if content.blank?
+
+    FACTUAL_PATTERNS.any? { |re| content.match?(re) }
+  end
+
+  # Compara contador de tool calls atual com baseline gravado pelo
+  # OutgoingJob no momento do dispatch. Se subiu, o LLM chamou tool —
+  # resposta é fundamentada. Se igual, é puro palpite.
+  def tool_called_in_this_turn?(conversation)
+    baseline = Rails.cache.read("hermes_tool_calls_baseline:#{conversation.id}", raw: true).to_i
+    current = Rails.cache.read("hermes_tool_calls:#{conversation.id}", raw: true).to_i
+    current > baseline
+  end
+
+  def trigger_force_tool_call!(conversation, original_content)
+    Captain::Hermes::Client.new(@inbox).notify_event(
+      conversation: conversation,
+      event_type: 'force_factual_tool',
+      system_message: '[SISTEMA: force_factual_tool] Você emitiu uma resposta com info ' \
+                      "factual ('#{original_content.truncate(120)}') SEM consultar tool. " \
+                      'Cliente NÃO recebeu essa mensagem. Releia a última pergunta do ' \
+                      'cliente e CHAME a tool relevante AGORA: faq_lookup pra regra/' \
+                      'política/Wi-Fi/horário, tabela de preços da skill pra valores. ' \
+                      'Se a tool retornar vazio, NÃO INVENTE: responda exatamente ' \
+                      "'⏳ Um momento — vou verificar.' e pare."
+    )
+  rescue Captain::Hermes::Client::DispatchError => e
+    Rails.logger.error("[Hermes::Callback] force_factual_tool dispatch falhou: #{e.message}")
+    mark_for_human_triage(conversation, reason: 'force_factual_dispatch_falhou')
+    deliver_outgoing(conversation, original_content)
   end
 
   # Detecta loop: a resposta atual do Hermes é muito parecida com a anterior
