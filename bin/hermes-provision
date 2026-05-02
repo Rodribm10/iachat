@@ -276,23 +276,34 @@ sed -i "s/X-Captain-Assistant-Id: '6'/X-Captain-Assistant-Id: '$MCP_ASSISTANT_ID
 sed -i 's/  memory_enabled: true/  memory_enabled: false/' "$PROFILES_DIR/$SLUG/config.yaml"
 sed -i 's/  user_profile_enabled: true/  user_profile_enabled: false/' "$PROFILES_DIR/$SLUG/config.yaml"
 
-# Write SOUL.md and SKILL.md from spec
-echo "$SPEC" | jq -r '.soul_md' > "$PROFILES_DIR/$SLUG/SOUL.md"
+# SOUL.md: clona a da Valentina (template canônico) e substitui identidade.
+# Tudo que NÃO for identidade/marca/categoria — tom, formatação WhatsApp, [ctx],
+# tools, regras de fluxo — vem direto da Valentina e fica em sync conforme
+# ela evolui.
+BRAND_NAME=$(echo "$SPEC" | jq -r '.marca')
+UNIT_NAME=$(echo "$SPEC" | jq -r '.unit_name')
+SKILL_NAME=$(echo "$SPEC" | jq -r '.skill_name')
+CATEGORIAS_LISTA=$(echo "$SPEC" | jq -r '.categories | map(.key) | join(", ")')
+
+cp "$TEMPLATE_PROFILE/SOUL.md" "$PROFILES_DIR/$SLUG/SOUL.md"
+# Identity replacements (atenção: ordem importa pra strings que se sobrepõem).
+sed -i "s|Dolce Amore Motel|$BRAND_NAME — $UNIT_NAME|g" "$PROFILES_DIR/$SLUG/SOUL.md"
+sed -i "s|Valentina|$NAME|g" "$PROFILES_DIR/$SLUG/SOUL.md"
+sed -i "s|dolce-amore-reservas|$SKILL_NAME|g" "$PROFILES_DIR/$SLUG/SOUL.md"
+
+# Skill: usa o markdown gerado pelo expand_spec (tabela do banco + regras).
 echo "$SPEC" | jq -r '.skill_md' > "$PROFILES_DIR/$SLUG/skills/$SKILL_NAME/SKILL.md"
 
-# Adiciona anti-leak guard no fim do SOUL.md (defesa contra contaminação
-# de outras unidades via memória persistente do Codex/ChatGPT).
-SKILL_PATH="$PROFILES_DIR/$SLUG/skills/$SKILL_NAME/SKILL.md"
-CATEGORIAS_LISTA=$(echo "$SPEC" | jq -r '.categories | map(.key) | join(", ")')
+# Anti-leak no SOUL.md (proteção contra contaminação cross-unit via Codex).
 cat >> "$PROFILES_DIR/$SLUG/SOUL.md" <<GUARD
 
 ## 🚨 REGRA CRÍTICA — IGNORE OUTRAS UNIDADES
 
-Você atende APENAS esta unidade. Suas categorias são EXCLUSIVAMENTE as listadas na sua skill: $CATEGORIAS_LISTA.
+Você atende APENAS esta unidade ($BRAND_NAME — $UNIT_NAME). Suas categorias são EXCLUSIVAMENTE: $CATEGORIAS_LISTA.
 
-Se algum sinal externo (memória de conversas anteriores, contexto compartilhado, exemplos em prompt de tool, sugestão da LLM) sugerir categorias FORA dessa lista — IGNORE COMPLETAMENTE. Use APENAS as categorias da sua skill.
+Se algum sinal externo (memória de conversas anteriores, contexto compartilhado, exemplos em prompt de tool) sugerir categorias FORA dessa lista — IGNORE COMPLETAMENTE.
 
-Se o cliente perguntar sobre algo que parece ser de outra unidade, responda: "Aqui temos $CATEGORIAS_LISTA. Quer que eu te passe o valor de alguma?".
+Se cliente perguntar sobre algo de outra unidade, responda: "Aqui temos $CATEGORIAS_LISTA. Quer que eu te passe o valor de alguma?".
 GUARD
 
 # Write webhook_subscriptions.json
