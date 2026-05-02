@@ -36,9 +36,38 @@ module Enterprise::MessageTemplates::HookExecutionService
   end
 
   def schedule_hermes_response
-    # Inbox marcada via CAPTAIN_HERMES_INBOX_IDS roteia pro gateway do Hermes
-    # Agent em vez do orquestrador interno do Captain.
-    Captain::Hermes::OutgoingJob.perform_later(conversation.id, message.id)
+    # Inbox roteada pro Hermes Agent (engine='hermes' no assistant ou env var legacy).
+    # Usa inbox.typing_delay como buffer/debounce: se outra msg chegar antes do delay
+    # vencer, cancela a anterior e reenfileira (a OutgoingJob agrupa msgs incoming
+    # desde a última resposta real do Hermes ao dispatch).
+    delay = conversation.inbox.typing_delay.to_i
+    cancel_pending_hermes_jobs!(conversation.id) if delay.positive?
+
+    if delay.positive?
+      Captain::Hermes::OutgoingJob.set(wait: delay.seconds).perform_later(conversation.id, message.id)
+    else
+      Captain::Hermes::OutgoingJob.perform_later(conversation.id, message.id)
+    end
+  end
+
+  def cancel_pending_hermes_jobs!(conv_id)
+    require 'sidekiq/api'
+    cancelled = 0
+    Sidekiq::ScheduledSet.new.each do |job|
+      args = begin
+        job.args.first
+      rescue StandardError
+        {}
+      end
+      next unless args.is_a?(Hash) && args['job_class'] == 'Captain::Hermes::OutgoingJob'
+      next unless args['arguments']&.first == conv_id
+
+      job.delete
+      cancelled += 1
+    end
+    Rails.logger.info("[Captain::Hermes::Debounce] cancelled #{cancelled} pending OutgoingJob for conv #{conv_id}") if cancelled.positive?
+  rescue StandardError => e
+    Rails.logger.warn("[Captain::Hermes::Debounce] failed to cancel pending: #{e.class} - #{e.message}")
   end
 
   def schedule_internal_response

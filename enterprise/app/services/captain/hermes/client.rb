@@ -16,8 +16,8 @@ class Captain::Hermes::Client
     @inbox = inbox
   end
 
-  def dispatch(message:, conversation:)
-    payload = build_payload(message: message, conversation: conversation)
+  def dispatch(message:, conversation:, content_override: nil)
+    payload = build_payload(message: message, conversation: conversation, content_override: content_override)
     body = payload.to_json
     headers = signed_headers(body)
 
@@ -66,14 +66,14 @@ class Captain::Hermes::Client
     Captain::Hermes.webhook_url_for(inbox)
   end
 
-  def build_payload(message:, conversation:) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+  def build_payload(message:, conversation:, content_override: nil) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     contact = conversation.contact
     contact_attrs = contact&.custom_attributes.to_h.with_indifferent_access
     cpf_digits = contact_attrs[:cpf].to_s.gsub(/\D/, '')
     history = contact_history_snapshot(contact, conversation)
 
     {
-      message: text_for_hermes(message),
+      message: content_override.presence || text_for_hermes(message),
       image_urls: image_urls_for_hermes(message),
       contact_name: contact&.name,
       contact_first_name: contact&.name.to_s.split.first,
