@@ -22,6 +22,7 @@ class Captain::Mcp::ToolRegistry
     Captain::Mcp::Tools::ListAssistantsTool,
     Captain::Mcp::Tools::GetAssistantPricingTool,
     Captain::Mcp::Tools::GetAssistantFaqsTool,
+    Captain::Mcp::Tools::GetAssistantScenarioTool,
     Captain::Mcp::Tools::SaveAgentSpecTool
     # Captain::Mcp::Tools::HandoffTool         — fluxo via automation hoje, MCP futuro
   ].freeze
