@@ -425,6 +425,12 @@ const menuItems = computed(() => {
           to: accountScopedRoute('captain_roleta_index'),
         },
         {
+          name: 'HermesBuilder',
+          label: t('SIDEBAR.CAPTAIN_HERMES_BUILDER'),
+          activeOn: ['captain_hermes_builder_index'],
+          to: accountScopedRoute('captain_hermes_builder_index'),
+        },
+        {
           name: 'Funnel',
           label: t('SIDEBAR.CAPTAIN_FUNNEL'),
           activeOn: ['captain_funnel_index'],

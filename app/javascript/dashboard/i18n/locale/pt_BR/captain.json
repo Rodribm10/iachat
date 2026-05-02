@@ -437,6 +437,20 @@
     }
   },
   "CAPTAIN": {
+    "HERMES_BUILDER": {
+      "TITLE": "Construtor de Agentes",
+      "DESCRIPTION": "Crie novos agentes Hermes via chat guiado com o Construtor.",
+      "HEADER_TITLE": "Construtor de Agentes",
+      "HEADER_DESCRIPTION": "Converse com o Construtor pra criar um novo agente Hermes. Ele faz perguntas e ao final salva a especificação em JSON pra revisão.",
+      "RESET": "Limpar conversa",
+      "RESET_CONFIRM": "Limpar conversa atual com o Construtor?",
+      "EMPTY_STATE": "Mande \"olá\" pra começar. O Construtor vai te guiar.",
+      "PLACEHOLDER": "Escreva e Enter pra enviar (Shift+Enter pula linha)",
+      "SEND": "Enviar",
+      "SESSION_LABEL": "Sessão:",
+      "SEND_FAILED": "Erro ao enviar: {message}",
+      "RESET_FAILED": "Falha ao limpar sessão."
+    },
     "BANNER": {
       "RESPONSES": "Você usou mais de 80% do seu limite de respostas. Para continuar usando o Capitão IA, faça um upgrade.",
       "DOCUMENTS": "Limite de documentos atingido. Faça um upgrade para continuar usando o Capitão IA."
