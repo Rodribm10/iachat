@@ -16,6 +16,18 @@
 class Webhooks::Captain::HermesCallbackController < ApplicationController
   RECENT_WINDOW = 5.minutes
 
+  # Placeholders que o LLM emite quando "decide" mandar um sinal de espera
+  # antes de chamar uma tool — mas às vezes manda E PARA, sem chamar a tool
+  # (api_calls=1 no daemon). Quando detectamos, NÃO entregamos pro cliente
+  # e re-disparamos pro Hermes uma instrução pra retomar e chamar a tool.
+  PLACEHOLDER_PATTERNS = [
+    /\A\s*[⏳⌛]?\s*um\s+momento/i,
+    /\A\s*[⏳⌛]\s*vou\s+verificar/i,
+    /\A\s*aguarde\s+um\s+instante/i,
+    /\A\s*deixa\s+eu\s+(verificar|conferir|checar)/i
+  ].freeze
+  MAX_PLACEHOLDER_RETRIES = 2
+
   skip_before_action :verify_authenticity_token, raise: false
   before_action :verify_signature
   before_action :fetch_inbox
@@ -26,6 +38,11 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
 
     conversation = recent_conversation_for(@inbox)
     return log_no_conversation_and_ack if conversation.blank?
+
+    if placeholder_response?(content)
+      handle_placeholder_response(conversation, content)
+      return head :ok
+    end
 
     log_reply(conversation, content)
     if defined?(Captain::Hermes::DelayedReplyJob)
@@ -41,6 +58,59 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   end
 
   private
+
+  def placeholder_response?(content)
+    return false if content.blank?
+
+    PLACEHOLDER_PATTERNS.any? { |re| content.match?(re) }
+  end
+
+  # Quando o Hermes responde só placeholder e para, fazemos 2 coisas:
+  #   1. NÃO entregamos a msg pro cliente (UX terrível ver "vou verificar" e
+  #      ficar esperando indefinidamente);
+  #   2. Disparamos notify_event pro Hermes com instrução pra retomar e
+  #      chamar a tool relevante. Limite 2 retries por conversation pra
+  #      evitar loop. Após esgotar, marcamos pix_falhou_fallback pra
+  #      triagem humana.
+  def handle_placeholder_response(conversation, content)
+    cache_key = "hermes_placeholder_retry:#{conversation.id}"
+    retries = Rails.cache.read(cache_key).to_i
+
+    Rails.logger.warn(
+      "[Hermes::Callback] placeholder detectado em conv #{conversation.display_id} (retries=#{retries}): #{content.truncate(80)}"
+    )
+
+    if retries >= MAX_PLACEHOLDER_RETRIES
+      Rails.logger.error("[Hermes::Callback] esgotou retries de placeholder em conv #{conversation.display_id} — marcando triagem")
+      mark_for_human_triage(conversation)
+      Rails.cache.delete(cache_key)
+      return
+    end
+
+    Rails.cache.write(cache_key, retries + 1, expires_in: 5.minutes)
+    retrigger_hermes_no_placeholder!(conversation)
+  end
+
+  def retrigger_hermes_no_placeholder!(conversation)
+    Captain::Hermes::Client.new(@inbox).notify_event(
+      conversation: conversation,
+      event_type: 'force_tool_call',
+      system_message: '[SISTEMA: force_tool_call] Você acabou de emitir um placeholder ' \
+                      '("Um momento", "vou verificar" etc) sem chamar tool. Cliente NÃO ' \
+                      'recebeu essa mensagem. Releia a última mensagem do cliente e ' \
+                      'CHAME A TOOL CORRESPONDENTE AGORA (generate_pix se confirmou ' \
+                      'reserva, send_suite_images se pediu foto, faq_lookup se pediu ' \
+                      'info de regra). Se faltar dado, pergunte direto sem placeholder.'
+    )
+  rescue Captain::Hermes::Client::DispatchError => e
+    Rails.logger.error("[Hermes::Callback] retrigger falhou: #{e.message}")
+    mark_for_human_triage(conversation)
+  end
+
+  def mark_for_human_triage(conversation)
+    current = conversation.label_list
+    conversation.update_labels((current + %w[hermes_placeholder triagem_humana]).uniq)
+  end
 
   def fetch_inbox
     inbox_id = params[:inbox_id].presence || params.dig(:metadata, :inbox_id).presence
