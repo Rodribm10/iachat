@@ -143,9 +143,14 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
       <section ref="scrollContainer" class="messages">
         <div v-if="!messages.length" class="empty-state">
           <p>{{ t('CAPTAIN_HERMES_BUILDER.EMPTY_STATE') }}</p>
-          <Button variant="primary" :disabled="sending" @click="startSession">
+          <button
+            type="button"
+            class="start-button"
+            :disabled="sending"
+            @click="startSession"
+          >
             {{ t('CAPTAIN_HERMES_BUILDER.START') }}
-          </Button>
+          </button>
         </div>
         <div
           v-for="(msg, idx) in messages"
@@ -244,6 +249,27 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
 
   p {
     margin: 0;
+  }
+}
+
+.start-button {
+  background: var(--color-woot-500, #1f93ff);
+  color: #fff;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--color-woot-600, #1976d2);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 }
 
