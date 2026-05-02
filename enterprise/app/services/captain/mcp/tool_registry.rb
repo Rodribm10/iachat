@@ -18,6 +18,7 @@ class Captain::Mcp::ToolRegistry
     Captain::Mcp::Tools::SendSuiteImagesTool,
     Captain::Mcp::Tools::RescheduleReservationTool,
     Captain::Mcp::Tools::ReactToMessageTool,
+    Captain::Mcp::Tools::CheckSuiteAvailabilityTool,
     # Construtor (admin scope) — usadas pelo profile Hermes "construtor" pra criar novos agentes
     Captain::Mcp::Tools::ListAssistantsTool,
     Captain::Mcp::Tools::GetAssistantPricingTool,
