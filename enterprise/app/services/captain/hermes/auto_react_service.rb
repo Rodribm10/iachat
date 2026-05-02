@@ -19,6 +19,8 @@
 class Captain::Hermes::AutoReactService
   THANKS_REGEX = /\A(obrigad[oa]|valeu|vlw|thanks|brigad[oa]|grat[oa])[\s.!,]*\z/i
   CONFIRMATION_REGEX = /\A(ok|okay|fechado|perfeit[oa]|blz|beleza|combinado|certo|ótim[oa]|legal|pode\s*ser|isso\s*mesmo)[\s.!,]*\z/i
+  GREETING_REGEX = /\A(bom\s*dia|boa\s*tarde|boa\s*noite|oi|olá|ola|e\s*aí|hey|hi|hello)[\s.!,]*\z/i
+  FAREWELL_REGEX = /\A(tchau|até\s*(mais|logo|breve)|valeu\s*flw|flw|abraço|abraços|bjs|beijos)[\s.!,]*\z/i
 
   def self.maybe_react!(message)
     new(message).maybe_react!
@@ -58,8 +60,19 @@ class Captain::Hermes::AutoReactService
     return audio_emoji if audio_attachment? && text.length < 10
     return '🙏' if THANKS_REGEX.match?(text)
     return '👍' if CONFIRMATION_REGEX.match?(text)
+    return '👋' if GREETING_REGEX.match?(text) && first_incoming_in_conversation?
+    return '❤️' if FAREWELL_REGEX.match?(text)
 
     nil
+  end
+
+  # Saudação só reage na PRIMEIRA mensagem da conversa pra não ficar
+  # forçado em conversa longa que retoma com "oi".
+  def first_incoming_in_conversation?
+    @conversation.messages
+                 .where(message_type: :incoming)
+                 .where('created_at <= ?', @message.created_at)
+                 .count <= 1
   end
 
   def image_attachment?
