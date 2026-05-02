@@ -99,6 +99,7 @@ class Captain::Mcp::Tools::SaveAgentSpecTool < Captain::Mcp::Tools::BaseTool
     return [{}, errors] if errors.any?
 
     name = spec['name'].presence || slug.tr('_', ' ').split.map(&:capitalize).join(' ')
+    serialized_categories = pricing_categories.map { |c| serialize_category(c) }
 
     {
       'slug' => slug,
@@ -112,8 +113,8 @@ class Captain::Mcp::Tools::SaveAgentSpecTool < Captain::Mcp::Tools::BaseTool
       'skill_name' => "#{slug.tr('_', '-')}-reservas",
       'humanization' => spec['humanization'] || default_humanization,
       'soul_md' => build_soul_md(name, brand, spec),
-      'skill_md' => build_skill_md(name, brand, spec, pricing_categories),
-      'categories' => pricing_categories.map { |c| serialize_category(c) },
+      'skill_md' => build_skill_md(name, brand, spec, serialized_categories),
+      'categories' => serialized_categories,
       'saved_at' => Time.current.iso8601,
       'saved_by_tool' => 'mcp_save_agent_spec'
     }
