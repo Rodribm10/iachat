@@ -60,6 +60,21 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
   # (<5 chars) são preservadas.
   REPEAT_OVERLAP_THRESHOLD = 0.70
   REPEAT_LOOKBACK_OUTGOINGS = 3
+
+  # Camada 4 — Topic gating:
+  # Detecta quando a resposta menciona um tópico factual (Wi-Fi/senha/pet/
+  # estacionamento/etc) que NÃO foi pedido na última msg do cliente.
+  # Caso clássico: cliente pergunta só sobre pet, Hermes responde com
+  # "Senha=X e pode levar pet" (puxando wifi de turn anterior). Bloqueia,
+  # dispara notify_event forçando responder só o tópico atual. 1 retry.
+  TOPIC_INDICATORS = {
+    wifi: %w[wifi wi-fi internet rede prime2025 senha password],
+    pet: %w[pet pets animal animais cachorro gato bicho],
+    estacionamento: %w[estacionamento garagem carro vaga],
+    cancelamento: %w[cancelar cancelamento reembolso desmarcar],
+    preco: %w[preco preço valor reais]
+  }.freeze
+  MAX_OFFTOPIC_RETRIES = 1
   LOOP_STOPWORDS = %w[
     voce voces para por pra como mas isso esse essa estou esta este aqui ali
     eles elas tem ter tinha tendo era ser sou foi fui agora ainda ja muito mais
@@ -92,6 +107,11 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     # Camada 3: strip de linhas repetidas de outgoings anteriores
     # (LLM resumindo info de turns anteriores em cada nova resposta).
     content = strip_repeated_lines(conversation, content)
+
+    # Camada 4: detecta tópico factual misturado na resposta sem ter sido
+    # pedido (ex: cliente pergunta sobre pet, Hermes manda Wi-Fi+pet juntos).
+    # Bloqueia + retrigger forçando responder só o tópico atual.
+    return head :ok if gate_off_topic_factual!(conversation, content)
 
     detect_handoff_or_loop(conversation, content)
     deliver_outgoing(conversation, content)
@@ -273,6 +293,59 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     return '' if texts.empty?
 
     ActiveSupport::Inflector.transliterate(texts.join("\n").downcase)
+  end
+
+  # Detecta tópico factual na resposta que NÃO foi pedido na última pergunta
+  # do cliente. Retorna true se bloqueou (callback retorna 200 sem entregar);
+  # false pra fluxo normal continuar.
+  def gate_off_topic_factual!(conversation, content)
+    off_topics = unrequested_topics(conversation, content)
+    return false if off_topics.empty?
+
+    retry_key = "hermes_off_topic_retry:#{conversation.id}"
+    retries = Rails.cache.read(retry_key, raw: true).to_i
+    if retries >= MAX_OFFTOPIC_RETRIES
+      Rails.logger.warn("[Hermes::Callback] off-topic persistente em conv #{conversation.display_id} — entregando")
+      Rails.cache.delete(retry_key)
+      return false
+    end
+    Rails.cache.write(retry_key, retries + 1, expires_in: 5.minutes, raw: true)
+
+    Rails.logger.warn("[Hermes::Callback] off-topic detectado em conv #{conversation.display_id} (#{off_topics.join(',')}) — re-dispatch")
+    trigger_force_topic_focus!(conversation, content, off_topics)
+    true
+  end
+
+  # Retorna lista de tópicos presentes na resposta MAS ausentes da última
+  # pergunta do cliente. Vazio = resposta é coerente com pergunta.
+  def unrequested_topics(conversation, content)
+    last_q = conversation.messages.where(message_type: :incoming).order(created_at: :desc).limit(1).pick(:content).to_s
+    return [] if last_q.blank?
+
+    q_norm = ActiveSupport::Inflector.transliterate(last_q.downcase)
+    r_norm = ActiveSupport::Inflector.transliterate(content.to_s.downcase)
+
+    TOPIC_INDICATORS.filter_map do |topic, words|
+      in_response = words.any? { |w| r_norm.include?(w) }
+      in_query = words.any? { |w| q_norm.include?(w) }
+      topic if in_response && !in_query
+    end
+  end
+
+  def trigger_force_topic_focus!(conversation, original, off_topics)
+    last_q = conversation.messages.where(message_type: :incoming).order(created_at: :desc).limit(1).pick(:content).to_s
+    Captain::Hermes::Client.new(@inbox).notify_event(
+      conversation: conversation,
+      event_type: 'force_topic_focus',
+      system_message: '[SISTEMA: force_topic_focus] Sua última resposta misturou tópicos ' \
+                      "(#{off_topics.join(', ')}) que o cliente NÃO pediu agora. Cliente NÃO " \
+                      "recebeu. Releia APENAS a última pergunta dele ('#{last_q.truncate(100)}') " \
+                      'e responda EXCLUSIVAMENTE sobre esse tópico. NÃO mencione info de ' \
+                      'turns anteriores se não foi explicitamente pedido nesta pergunta.'
+    )
+  rescue Captain::Hermes::Client::DispatchError => e
+    Rails.logger.error("[Hermes::Callback] force_topic dispatch falhou: #{e.message}")
+    deliver_outgoing(conversation, original)
   end
 
   def line_already_said?(line, pool)
