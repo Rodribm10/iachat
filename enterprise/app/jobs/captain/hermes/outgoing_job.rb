@@ -9,11 +9,21 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
 
   retry_on Captain::Hermes::Client::DispatchError, attempts: 3, wait: 5.seconds
 
+  HUMAN_TRIAGE_LABELS = %w[triagem_humana hermes_placeholder].freeze
+
   def perform(conversation_id, message_id)
     conversation = Conversation.find_by(id: conversation_id)
     message = Message.find_by(id: message_id)
     return if conversation.blank? || message.blank?
     return unless Captain::Hermes.enabled_for?(conversation.inbox)
+
+    # Conv marcada pra triagem humana = Hermes não responde mais (até admin
+    # remover label). Evita gastar token e gerar loop em msgs claramente fora
+    # de escopo (operadora telefonia, banco, suporte de outro app, etc).
+    if conversation.label_list.intersect?(HUMAN_TRIAGE_LABELS)
+      Rails.logger.info("[Captain::Hermes::OutgoingJob] conv #{conversation.display_id} em triagem humana — pulando dispatch")
+      return
+    end
 
     # Auto-react ANTES do dispatch — gesto chega <1s sem esperar Codex.
     # Não bloqueia fluxo: se falhar, dispatch normal continua.

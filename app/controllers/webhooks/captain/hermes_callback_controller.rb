@@ -16,17 +16,33 @@
 class Webhooks::Captain::HermesCallbackController < ApplicationController
   RECENT_WINDOW = 5.minutes
 
-  # Placeholders que o LLM emite quando "decide" mandar um sinal de espera
-  # antes de chamar uma tool — mas às vezes manda E PARA, sem chamar a tool
-  # (api_calls=1 no daemon). Quando detectamos, NÃO entregamos pro cliente
-  # e re-disparamos pro Hermes uma instrução pra retomar e chamar a tool.
-  PLACEHOLDER_PATTERNS = [
-    /\A\s*[⏳⌛]?\s*um\s+momento/i,
-    /\A\s*[⏳⌛]\s*vou\s+verificar/i,
-    /\A\s*aguarde\s+um\s+instante/i,
-    /\A\s*deixa\s+eu\s+(verificar|conferir|checar)/i
+  # "Um momento — vou verificar" é a frase-âncora de handoff intencional
+  # (quando o agente não sabe responder e quer escalar pra humano). NÃO
+  # bloqueamos — entregamos pro cliente e marcamos triagem_humana pra
+  # próximas msgs não dispararem Hermes.
+  HANDOFF_PATTERNS = [
+    /\A\s*[⏳⌛]?\s*um\s+momento.*verificar/i,
+    /\A\s*[⏳⌛]?\s*um\s+instante.*verificar/i,
+    /\A\s*aguarde\s+um\s+instante/i
   ].freeze
-  MAX_PLACEHOLDER_RETRIES = 2
+
+  # Loop detection: 2 sinais combinados.
+  # 1. Jaccard de tokens >= 0.50 → resposta praticamente igual.
+  # 2. >= 3 palavras-chave em comum (sem stopwords) E ambas terminam com
+  #    "?" → repetiu pergunta sobre o mesmo tópico (caso clássico do
+  #    "endereço completo ou link?" → "apenas link ou link + endereço?").
+  LOOP_SIMILARITY_THRESHOLD = 0.50
+  LOOP_TOPIC_KEYWORD_OVERLAP = 3
+  LOOP_STOPWORDS = %w[
+    voce voces para por pra como mas isso esse essa estou esta este aqui ali
+    eles elas tem ter tinha tendo era ser sou foi fui agora ainda ja muito mais
+    quer quero queria pode posso podia consegue consigo conseguia preciso precisar
+    sim nao não talvez bom boa olha veja oi ola ola tchau certo ok blz beleza
+    obrigado obrigada valeu vlw thanks por favor please
+    apenas somente algum alguma quem onde quando o a os as do da dos das no na nos nas
+    em com sem sob sobre antes apos depois entre meio tudo todo toda
+    perfeito otimo certinho confirma confirme
+  ].freeze
 
   skip_before_action :verify_authenticity_token, raise: false
   before_action :verify_signature
@@ -39,17 +55,9 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     conversation = recent_conversation_for(@inbox)
     return log_no_conversation_and_ack if conversation.blank?
 
-    if placeholder_response?(content)
-      handle_placeholder_response(conversation, content)
-      return head :ok
-    end
-
     log_reply(conversation, content)
-    if defined?(Captain::Hermes::DelayedReplyJob)
-      Captain::Hermes::DelayedReplyJob.perform_later(conversation.id, content)
-    else
-      create_outgoing_message(conversation, content)
-    end
+    detect_handoff_or_loop(conversation, content)
+    deliver_outgoing(conversation, content)
     head :ok
   rescue StandardError => e
     Rails.logger.error "[Hermes::Callback] error: #{e.class}: #{e.message}"
@@ -57,59 +65,90 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     head :internal_server_error
   end
 
+  # Hermes mandou frase-âncora de handoff: entrega ao cliente normalmente,
+  # mas marca conv pra triagem humana — próximas msgs não disparam Hermes
+  # de novo (guard em OutgoingJob). OU: detectou loop (mesma resposta /
+  # pergunta reformulada) e escala.
+  def detect_handoff_or_loop(conversation, content)
+    if handoff_response?(content)
+      mark_for_human_triage(conversation, reason: 'handoff_intencional')
+    elsif looped_response?(conversation, content)
+      mark_for_human_triage(conversation, reason: 'loop_detectado')
+    end
+  end
+
+  def deliver_outgoing(conversation, content)
+    if defined?(Captain::Hermes::DelayedReplyJob)
+      Captain::Hermes::DelayedReplyJob.perform_later(conversation.id, content)
+    else
+      create_outgoing_message(conversation, content)
+    end
+  end
+
   private
 
-  def placeholder_response?(content)
+  def handoff_response?(content)
     return false if content.blank?
 
-    PLACEHOLDER_PATTERNS.any? { |re| content.match?(re) }
+    HANDOFF_PATTERNS.any? { |re| content.match?(re) }
   end
 
-  # Quando o Hermes responde só placeholder e para, fazemos 2 coisas:
-  #   1. NÃO entregamos a msg pro cliente (UX terrível ver "vou verificar" e
-  #      ficar esperando indefinidamente);
-  #   2. Disparamos notify_event pro Hermes com instrução pra retomar e
-  #      chamar a tool relevante. Limite 2 retries por conversation pra
-  #      evitar loop. Após esgotar, marcamos pix_falhou_fallback pra
-  #      triagem humana.
-  def handle_placeholder_response(conversation, content)
-    cache_key = "hermes_placeholder_retry:#{conversation.id}"
-    retries = Rails.cache.read(cache_key).to_i
+  # Detecta loop: a resposta atual do Hermes é muito parecida com a anterior
+  # outgoing dele na mesma conv (Jaccard de tokens >= 0.70). Sinaliza que o
+  # agente está repetindo pergunta/resposta sem progredir — geralmente
+  # cliente fora do escopo OU fluxo travado (pediu link sem ter como
+  # entregar, perguntou de novo a mesma confirmação, etc).
+  def looped_response?(conversation, content)
+    prev = conversation.messages
+                       .where(message_type: :outgoing)
+                       .where("content_attributes ->> 'external_source' = ?", 'hermes_callback')
+                       .order(created_at: :desc)
+                       .limit(1)
+                       .pick(:content)
+    return false if prev.blank?
 
-    Rails.logger.warn(
-      "[Hermes::Callback] placeholder detectado em conv #{conversation.display_id} (retries=#{retries}): #{content.truncate(80)}"
-    )
+    return true if similarity(content, prev) >= LOOP_SIMILARITY_THRESHOLD
 
-    if retries >= MAX_PLACEHOLDER_RETRIES
-      Rails.logger.error("[Hermes::Callback] esgotou retries de placeholder em conv #{conversation.display_id} — marcando triagem")
-      mark_for_human_triage(conversation)
-      Rails.cache.delete(cache_key)
-      return
-    end
-
-    Rails.cache.write(cache_key, retries + 1, expires_in: 5.minutes)
-    retrigger_hermes_no_placeholder!(conversation)
+    # Caso "pergunta reformulada sobre o mesmo tópico": ambas terminam com "?"
+    # e compartilham >= 3 palavras-chave (sem stopwords).
+    repeated_question?(content, prev)
   end
 
-  def retrigger_hermes_no_placeholder!(conversation)
-    Captain::Hermes::Client.new(@inbox).notify_event(
-      conversation: conversation,
-      event_type: 'force_tool_call',
-      system_message: '[SISTEMA: force_tool_call] Você acabou de emitir um placeholder ' \
-                      '("Um momento", "vou verificar" etc) sem chamar tool. Cliente NÃO ' \
-                      'recebeu essa mensagem. Releia a última mensagem do cliente e ' \
-                      'CHAME A TOOL CORRESPONDENTE AGORA (generate_pix se confirmou ' \
-                      'reserva, send_suite_images se pediu foto, faq_lookup se pediu ' \
-                      'info de regra). Se faltar dado, pergunte direto sem placeholder.'
-    )
-  rescue Captain::Hermes::Client::DispatchError => e
-    Rails.logger.error("[Hermes::Callback] retrigger falhou: #{e.message}")
-    mark_for_human_triage(conversation)
+  def similarity(text_a, text_b)
+    set_a = tokenize(text_a)
+    set_b = tokenize(text_b)
+    return 0.0 if set_a.empty? || set_b.empty?
+
+    intersection = (set_a & set_b).size
+    union = (set_a | set_b).size
+    intersection.to_f / union
   end
 
-  def mark_for_human_triage(conversation)
+  # Pergunta/confirmação reformulada sobre o mesmo tópico. Detecta tanto "?"
+  # quanto formas imperativas comuns ("me confirma", "qual", "quer").
+  def repeated_question?(text_a, text_b)
+    return false unless inquisitive?(text_a) && inquisitive?(text_b)
+
+    keywords_a = tokenize(text_a) - LOOP_STOPWORDS
+    keywords_b = tokenize(text_b) - LOOP_STOPWORDS
+    (keywords_a & keywords_b).size >= LOOP_TOPIC_KEYWORD_OVERLAP
+  end
+
+  INQUISITIVE_REGEX = /(\?|\bme\s+confirm|\bvoce\s+(prefere|quer)|\bqual\s+(prefere|deseja|seria)|\bquer\s+(que|saber|ver|um|uma))/i
+
+  def inquisitive?(text)
+    INQUISITIVE_REGEX.match?(ActiveSupport::Inflector.transliterate(text.to_s))
+  end
+
+  def tokenize(text)
+    normalized = ActiveSupport::Inflector.transliterate(text.to_s.downcase)
+    normalized.scan(/[a-z0-9]+/).reject { |w| w.length < 3 }.to_set
+  end
+
+  def mark_for_human_triage(conversation, reason: nil)
     current = conversation.label_list
-    conversation.update_labels((current + %w[hermes_placeholder triagem_humana]).uniq)
+    conversation.update_labels((current + %w[triagem_humana]).uniq)
+    Rails.logger.info("[Hermes::Callback] conv #{conversation.display_id} → triagem_humana (#{reason})")
   end
 
   def fetch_inbox
