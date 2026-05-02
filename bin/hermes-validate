@@ -59,6 +59,17 @@ DB_DUMP=$(docker exec "$CID" bundle exec rails runner "
   hum = asst.config['response_delay']
   cats = unit&.pricing_categories&.includes(:amounts)&.to_a || []
   galleria = unit&.gallery_items&.count || 0
+  ci_unit_id = ci&.captain_unit_id
+  inter_ok = unit && unit.respond_to?(:inter_credentials_present?) ? unit.inter_credentials_present? : false
+  pricing_dry_run = nil
+  if unit && cats.any?
+    first_cat_key = cats.first.key
+    res = Captain::Mcp::PricingTables.calculate(
+      unit_id: unit.id, suite_category: first_cat_key,
+      period: 'pernoite_promo', total_guests: 2
+    )
+    pricing_dry_run = res[:error] ? \"ERR: #{res[:error]}\" : \"OK R$ #{res[:amount]} (#{first_cat_key}/pernoite)\"
+  end
   out = {
     assistant_id: asst.id,
     name: asst.name,
@@ -81,7 +92,10 @@ DB_DUMP=$(docker exec "$CID" bundle exec rails runner "
     gallery_count: galleria,
     enabled_for: inbox ? Captain::Hermes.enabled_for?(inbox) : nil,
     webhook_url: inbox ? Captain::Hermes.webhook_url_for(inbox) : nil,
-    secret_via: inbox ? Captain::Hermes.subscription_signing_secret(inbox)&.first(8) : nil
+    secret_via: inbox ? Captain::Hermes.subscription_signing_secret(inbox)&.first(8) : nil,
+    ci_unit_id: ci_unit_id,
+    inter_ok: inter_ok,
+    pricing_dry_run: pricing_dry_run
   }
   puts out.to_json
 " 2>&1 | grep -v 'WARN\|RubyLLM\|ip_lookup' | tail -1)
@@ -114,9 +128,16 @@ check "hermes_subscription_secret setado" "$([[ $(echo "$DB_DUMP" | jq -r '.secr
 check "hermes_webhook_base_url" "$([[ $(echo "$DB_DUMP" | jq -r '.base_url') =~ ^http ]] && echo PASS || echo FAIL)"
 check "parent_assistant_id setado" "$([[ "$PARENT_ID" != 'null' && "$PARENT_ID" != '' ]] && echo PASS || echo WARN)" "parent=$PARENT_ID"
 check "captain_unit_id setado" "$([[ $(echo "$DB_DUMP" | jq -r '.unit_id') != 'null' ]] && echo PASS || echo FAIL)" "$(echo "$DB_DUMP" | jq -r '.unit_name')"
+ASSIST_UNIT=$(echo "$DB_DUMP" | jq -r '.unit_id // ""')
+CI_UNIT=$(echo "$DB_DUMP" | jq -r '.ci_unit_id // ""')
+check "CaptainInbox.unit == Assistant.unit (sem divergência)" "$([[ -n "$ASSIST_UNIT" && "$ASSIST_UNIT" == "$CI_UNIT" ]] && echo PASS || echo FAIL)" "asst=$ASSIST_UNIT ci=$CI_UNIT"
 check "Brand resolvida" "$([[ $(echo "$DB_DUMP" | jq -r '.brand_name') != 'null' ]] && echo PASS || echo FAIL)" "$(echo "$DB_DUMP" | jq -r '.brand_name')"
 check "Pricing categorias > 0" "$([[ $(echo "$DB_DUMP" | jq -r '.cats_count') -gt 0 ]] && echo PASS || echo FAIL)" "$(echo "$DB_DUMP" | jq -r '.cats_count') cats: $(echo "$DB_DUMP" | jq -r '.cats_keys | join(",")')"
 check "Pricing amounts > 0" "$([[ $(echo "$DB_DUMP" | jq -r '.amounts_total') -gt 0 ]] && echo PASS || echo FAIL)" "$(echo "$DB_DUMP" | jq -r '.amounts_total') amounts"
+PRICING_DRY=$(echo "$DB_DUMP" | jq -r '.pricing_dry_run // ""')
+check "Pricing dry-run (calcula sem erro)" "$([[ "$PRICING_DRY" == OK* ]] && echo PASS || echo FAIL)" "$PRICING_DRY"
+INTER_OK=$(echo "$DB_DUMP" | jq -r '.inter_ok // false')
+check "Credenciais Inter completas (cert+key+client_id)" "$([[ "$INTER_OK" == 'true' ]] && echo PASS || echo WARN)" "Sem isso generate_pix cai no fallback de link"
 check "CaptainInbox mapeada" "$([[ "$INBOX_ID" != 'null' && "$INBOX_ID" != '' ]] && echo PASS || echo WARN)" "inbox=$INBOX_ID"
 check "Inbox.typing_delay > 0 (debounce)" "$([[ $(echo "$DB_DUMP" | jq -r '.inbox_typing_delay // 0') -gt 0 ]] && echo PASS || echo WARN)" "$(echo "$DB_DUMP" | jq -r '.inbox_typing_delay // 0')s"
 check "config.response_delay (typing simulation)" "$([[ $(echo "$DB_DUMP" | jq -r '.response_delay.mode // ""') == 'typing_simulation' ]] && echo PASS || echo WARN)" "$(echo "$DB_DUMP" | jq -r '.response_delay.mode // "none"')"

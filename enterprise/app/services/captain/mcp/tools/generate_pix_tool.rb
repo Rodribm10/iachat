@@ -77,7 +77,7 @@ class Captain::Mcp::Tools::GeneratePixTool < Captain::Mcp::Tools::BaseTool
     conversation = resolve_conversation(args, context)
     return error_response('Conversa não encontrada. Passe conversation_id (cid do [ctx]) em arguments.') if conversation.blank?
 
-    unit = resolve_unit(conversation)
+    unit = resolve_unit(conversation, context)
     return error_response('Unidade do Captain não vinculada à inbox dessa conversa.') if unit.blank?
     return error_response('Unidade não tem credenciais Inter configuradas. Avise a gerência.') unless unit.inter_credentials_present?
 
@@ -135,7 +135,20 @@ class Captain::Mcp::Tools::GeneratePixTool < Captain::Mcp::Tools::BaseTool
     Conversation.find_by(id: conv_id) || Conversation.find_by(display_id: conv_id)
   end
 
-  def resolve_unit(conversation)
+  # Resolve unit em 3 níveis (defesa em profundidade contra divergência
+  # entre Captain::Assistant.captain_unit_id e CaptainInbox.captain_unit_id):
+  #   1. Assistant.captain_unit (autoritativo — setado por hermes-provision
+  #      e admin UI; não vaza entre agentes que compartilham inbox).
+  #   2. CaptainInbox legacy (fallback pré-engine column; só funciona se
+  #      a inbox tem 1 agente único).
+  #   3. Captain::Unit.inbox_id legacy (fallback antigo, antes de CaptainInbox).
+  def resolve_unit(conversation, context = nil)
+    asst_id = context && (context[:assistant_id] || context['assistant_id'])
+    if asst_id
+      asst = Captain::Assistant.find_by(id: asst_id)
+      return asst.captain_unit if asst&.captain_unit_id.present?
+    end
+
     captain_inbox = CaptainInbox.find_by(inbox_id: conversation.inbox_id)
     return captain_inbox.captain_unit if captain_inbox&.captain_unit.present?
 
