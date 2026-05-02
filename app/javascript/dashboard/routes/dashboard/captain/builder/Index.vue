@@ -61,7 +61,7 @@ const sendMessage = async () => {
     await hermesBuilderApi.sendMessage(text);
   } catch (e) {
     useAlert(
-      t('CAPTAIN.HERMES_BUILDER.SEND_FAILED', {
+      t('CAPTAIN_HERMES_BUILDER.SEND_FAILED', {
         message: e.response?.data?.error || e.message || 'unknown',
       })
     );
@@ -79,12 +79,12 @@ const handleKeydown = e => {
 
 const resetSession = async () => {
   // eslint-disable-next-line no-alert
-  if (!window.confirm(t('CAPTAIN.HERMES_BUILDER.RESET_CONFIRM'))) return;
+  if (!window.confirm(t('CAPTAIN_HERMES_BUILDER.RESET_CONFIRM'))) return;
   try {
     await hermesBuilderApi.reset();
     messages.value = [];
   } catch (e) {
-    useAlert(t('CAPTAIN.HERMES_BUILDER.RESET_FAILED'));
+    useAlert(t('CAPTAIN_HERMES_BUILDER.RESET_FAILED'));
   }
 };
 
@@ -108,23 +108,23 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
 
 <template>
   <PageLayout
-    :title="t('CAPTAIN.HERMES_BUILDER.TITLE')"
-    :description="t('CAPTAIN.HERMES_BUILDER.DESCRIPTION')"
+    :title="t('CAPTAIN_HERMES_BUILDER.TITLE')"
+    :description="t('CAPTAIN_HERMES_BUILDER.DESCRIPTION')"
   >
     <div class="builder-wrapper">
       <header class="builder-header">
         <div>
-          <h2>{{ t('CAPTAIN.HERMES_BUILDER.HEADER_TITLE') }}</h2>
-          <p>{{ t('CAPTAIN.HERMES_BUILDER.HEADER_DESCRIPTION') }}</p>
+          <h2>{{ t('CAPTAIN_HERMES_BUILDER.HEADER_TITLE') }}</h2>
+          <p>{{ t('CAPTAIN_HERMES_BUILDER.HEADER_DESCRIPTION') }}</p>
         </div>
         <Button variant="ghost" size="sm" @click="resetSession">
-          {{ t('CAPTAIN.HERMES_BUILDER.RESET') }}
+          {{ t('CAPTAIN_HERMES_BUILDER.RESET') }}
         </Button>
       </header>
 
       <section ref="scrollContainer" class="messages">
         <div v-if="!messages.length" class="empty-state">
-          {{ t('CAPTAIN.HERMES_BUILDER.EMPTY_STATE') }}
+          {{ t('CAPTAIN_HERMES_BUILDER.EMPTY_STATE') }}
         </div>
         <div
           v-for="(msg, idx) in messages"
@@ -148,7 +148,7 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
         <textarea
           v-model="input"
           rows="2"
-          :placeholder="t('CAPTAIN.HERMES_BUILDER.PLACEHOLDER')"
+          :placeholder="t('CAPTAIN_HERMES_BUILDER.PLACEHOLDER')"
           :disabled="sending"
           @keydown="handleKeydown"
         />
@@ -157,12 +157,12 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
           :disabled="!input.trim() || sending"
           @click="sendMessage"
         >
-          {{ t('CAPTAIN.HERMES_BUILDER.SEND') }}
+          {{ t('CAPTAIN_HERMES_BUILDER.SEND') }}
         </Button>
       </footer>
 
       <p v-if="sessionId" class="session-debug">
-        {{ t('CAPTAIN.HERMES_BUILDER.SESSION_LABEL') }} {{ sessionId }}
+        {{ t('CAPTAIN_HERMES_BUILDER.SESSION_LABEL') }} {{ sessionId }}
       </p>
     </div>
   </PageLayout>

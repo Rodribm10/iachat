@@ -436,20 +436,6 @@
     }
   },
   "CAPTAIN": {
-    "HERMES_BUILDER": {
-      "TITLE": "Agent Builder",
-      "DESCRIPTION": "Create new Hermes agents through a guided chat with the Builder.",
-      "HEADER_TITLE": "Agent Builder",
-      "HEADER_DESCRIPTION": "Chat with the Builder to create a new Hermes agent. It asks questions and saves the spec as JSON for review at the end.",
-      "RESET": "Clear conversation",
-      "RESET_CONFIRM": "Clear current conversation with the Builder?",
-      "EMPTY_STATE": "Type \"hello\" to start. The Builder will guide you.",
-      "PLACEHOLDER": "Type and press Enter to send (Shift+Enter for new line)",
-      "SEND": "Send",
-      "SESSION_LABEL": "Session:",
-      "SEND_FAILED": "Send failed: {message}",
-      "RESET_FAILED": "Failed to clear session."
-    },
     "BANNER": {
       "RESPONSES": "You have used more than 80% of your responses limit. To continue using Captain AI, please upgrade.",
       "DOCUMENTS": "Documents limit reached. Please upgrade to continue using Captain AI."
@@ -905,5 +891,19 @@
         "RESERVATION_ID": "Reservation #"
       }
     }
+  },
+  "CAPTAIN_HERMES_BUILDER": {
+    "TITLE": "Agent Builder",
+    "DESCRIPTION": "Create new Hermes agents through a guided chat with the Builder.",
+    "HEADER_TITLE": "Agent Builder",
+    "HEADER_DESCRIPTION": "Chat with the Builder to create a new Hermes agent. It asks questions and saves the spec as JSON for review at the end.",
+    "RESET": "Clear conversation",
+    "RESET_CONFIRM": "Clear current conversation with the Builder?",
+    "EMPTY_STATE": "Type \"hello\" to start. The Builder will guide you.",
+    "PLACEHOLDER": "Type and press Enter to send (Shift+Enter for new line)",
+    "SEND": "Send",
+    "SESSION_LABEL": "Session:",
+    "SEND_FAILED": "Send failed: {message}",
+    "RESET_FAILED": "Failed to clear session."
   }
 }
