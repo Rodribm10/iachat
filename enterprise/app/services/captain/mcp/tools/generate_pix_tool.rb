@@ -79,7 +79,12 @@ class Captain::Mcp::Tools::GeneratePixTool < Captain::Mcp::Tools::BaseTool
 
     unit = resolve_unit(conversation, context)
     return error_response('Unidade do Captain não vinculada à inbox dessa conversa.') if unit.blank?
-    return error_response('Unidade não tem credenciais Inter configuradas. Avise a gerência.') unless unit.inter_credentials_present?
+
+    # Sem credencial Inter: vai DIRETO pro fallback de página de reserva ao
+    # invés de retornar erro pro LLM (que ele ia transformar em "vou
+    # verificar" e travar). Cliente recebe link da página oficial pra
+    # finalizar manualmente — UX uniforme.
+    return dispatch_no_pricing_fallback!(conversation, unit, args, 'inter_credentials_missing') unless unit.inter_credentials_present?
 
     contact = conversation.contact
     hydrate_contact_from_recent_messages!(contact, conversation)
@@ -92,7 +97,14 @@ class Captain::Mcp::Tools::GeneratePixTool < Captain::Mcp::Tools::BaseTool
       period: args['period'],
       total_guests: (args['total_guests'] || 2).to_i
     )
-    return error_response("Preço não calculado: #{pricing[:error]}") if pricing[:error].present?
+    # Erro estrutural (categoria não existe nessa unit, período inválido,
+    # dia indisponível). Antes retornava error_response e o LLM travava em
+    # "Um momento" sem mandar nada. Agora despacha link da página de
+    # reserva pra cliente concluir lá — UX consistente, marca pra triagem.
+    if pricing[:error].present?
+      Rails.logger.warn("[Captain::Mcp::GeneratePixTool] pricing inválido — usando fallback: #{pricing[:error]}")
+      return dispatch_no_pricing_fallback!(conversation, unit, args, "pricing: #{pricing[:error]}")
+    end
 
     total_amount = pricing[:amount]
     deposit = (total_amount * DEFAULT_DEPOSIT_RATIO).round(2)
@@ -308,6 +320,47 @@ class Captain::Mcp::Tools::GeneratePixTool < Captain::Mcp::Tools::BaseTool
     current = conversation.label_list
     merged = (current + ['aguardando_pagamento']).uniq - %w[pagamento_confirmado reserva_feita]
     conversation.update_labels(merged)
+  end
+
+  # Fallback "leve" pra cenários onde Pix nem foi tentado (categoria não
+  # existe na unit, período inválido, sem credencial Inter cadastrada).
+  # Sem reservation/pricing/valores — só monta link com o que tem do
+  # contact + args. UX é igual ao fallback de Inter falhar: cliente recebe
+  # link pra página oficial e conversa fica marcada pra triagem.
+  def dispatch_no_pricing_fallback!(conversation, unit, args, reason_code)
+    base = ENV.fetch('RESERVA_1001_BASE_URL',
+                     InstallationConfig.find_by(name: 'RESERVA_1001_BASE_URL')&.value.presence ||
+                       'https://reservas.hoteis1001noites.com.br')
+    contact = conversation.contact
+    custom = contact&.custom_attributes.to_h.with_indifferent_access
+
+    params = {
+      marca: unit&.brand&.name,
+      unidade: unit&.name,
+      permanencia: humanize_period(args['period'].to_s),
+      categoria: humanize_category(args['suite_category'].to_s),
+      checkin: parse_check_in(args['check_in_date'], conversation.account)&.iso8601,
+      nome: contact&.name,
+      telefone: contact&.phone_number,
+      cpf: custom[:cpf],
+      email: contact&.email
+    }.compact.reject { |_, v| v.to_s.strip.empty? }
+
+    url = "#{base.chomp('/')}/?#{URI.encode_www_form(params)}"
+
+    body = 'Pra evitar qualquer atrito no fechamento, é só finalizar pela página oficial ' \
+           "(seus dados já estão pré-preenchidos):\n#{url}"
+
+    Messages::MessageBuilder.new(nil, conversation, content: body, message_type: 'outgoing').perform
+
+    current = conversation.label_list
+    conversation.update_labels((current + %w[aguardando_pagamento pix_falhou_fallback]).uniq)
+
+    text_response(
+      "Pix indisponível (motivo=#{reason_code}). Mandei link da página de reserva pro cliente. " \
+      'Marquei conversa com pix_falhou_fallback pra gerência ver. NÃO repita o link nem fale sobre o problema técnico — ' \
+      'só confirme com o cliente que o link foi enviado.'
+    )
   end
 
   # Quando a Inter API falha (auth, certificado, timeout, etc), em vez de
