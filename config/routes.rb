@@ -62,6 +62,9 @@ Rails.application.routes.draw do
               collection do
                 post :start
                 delete :reset
+                get :assistants
+                get :validate
+                post :repair
               end
             end
             resource :preferences, only: [:show, :update]

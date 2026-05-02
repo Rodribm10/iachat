@@ -21,6 +21,18 @@ class HermesBuilder extends ApiClient {
   reset() {
     return axios.delete(`${this.url}/reset`);
   }
+
+  fetchAssistants() {
+    return axios.get(`${this.url}/assistants`);
+  }
+
+  validate(slug) {
+    return axios.get(`${this.url}/validate`, { params: { slug } });
+  }
+
+  repair(slug, repairId) {
+    return axios.post(`${this.url}/repair`, { slug, repair_id: repairId });
+  }
 }
 
 export default new HermesBuilder();

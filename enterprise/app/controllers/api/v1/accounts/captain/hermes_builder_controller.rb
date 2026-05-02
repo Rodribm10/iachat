@@ -51,6 +51,33 @@ class Api::V1::Accounts::Captain::HermesBuilderController < Api::V1::Accounts::B
     render json: { ok: true }
   end
 
+  # Lista assistentes Hermes da conta atual pra dropdown da aba Verificação.
+  def assistants
+    rows = ::Captain::Assistant.where(account_id: Current.account.id, engine: 'hermes')
+                               .order(:name)
+                               .pluck(:id, :name, :hermes_profile_name)
+                               .map { |id, name, slug| { id: id, name: name, slug: slug } }
+    render json: { assistants: rows }
+  end
+
+  # Roda o validator (porta dos checks DB do CLI hermes-validate).
+  def validate
+    slug = params[:slug].to_s.strip
+    return render json: { error: 'slug required' }, status: :bad_request if slug.blank?
+
+    render json: HermesBuilder::Validator.run(slug)
+  end
+
+  # Aplica reparo automatizado pra um check FAIL/WARN específico.
+  def repair
+    slug = params[:slug].to_s.strip
+    repair_id = params[:repair_id].to_s.strip
+    return render json: { ok: false, error: 'slug e repair_id required' }, status: :bad_request if slug.blank? || repair_id.blank?
+
+    result = HermesBuilder::Repairer.repair(slug: slug, repair_id: repair_id)
+    render json: result, status: result[:ok] ? :ok : :unprocessable_entity
+  end
+
   private
 
   def authorize_admin

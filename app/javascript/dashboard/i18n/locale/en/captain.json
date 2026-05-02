@@ -905,6 +905,35 @@
     "SESSION_LABEL": "Session:",
     "SEND_FAILED": "Send failed: {message}",
     "RESET_FAILED": "Failed to clear session.",
-    "START": "Start creation"
+    "START": "Start creation",
+    "TAB_CHAT": "Chat (Builder)",
+    "TAB_VERIFY": "Verification",
+    "VERIFY": {
+      "TITLE": "Agent verification",
+      "DESCRIPTION": "Runs health checks (database, routing, pricing, MCP) for a Hermes agent. For each failure with a Repair button, the UI attempts an automatic fix. Other failures need hermes-provision on the VPS.",
+      "NO_ASSISTANTS": "No Hermes agents registered",
+      "RUN": "Run check",
+      "RUNNING": "Checking...",
+      "REPAIR": "Repair",
+      "REPAIRING": "Repairing...",
+      "OK_LABEL": "OK",
+      "FAILS_LABEL": "failures",
+      "WARN_LABEL": "warnings",
+      "OF_TOTAL": "of {total} checks",
+      "VERDICT_PASS": "Ready to ship",
+      "VERDICT_FAIL": "Critical failures — fix first",
+      "EMPTY": "Select an agent and click Run check to start verification.",
+      "EMPTY_RESULTS": "No checks returned — agent removed?",
+      "REPAIR_FAILED": "Failed: {message}",
+      "REPAIR_OK": "Repaired: {message}",
+      "FETCH_FAILED": "Error loading assistants: {message}",
+      "VALIDATE_FAILED": "Validation failed: {message}",
+      "CATEGORY_DB": "Database",
+      "CATEGORY_PRICING": "Pricing",
+      "CATEGORY_ROUTING": "Captain → Hermes routing",
+      "CATEGORY_HUMANIZATION": "Humanization (typing/delay/gallery)",
+      "CATEGORY_MCP": "Registered MCP tools",
+      "CATEGORY_OTHER": "Other"
+    }
   }
 }
