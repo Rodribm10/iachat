@@ -33,6 +33,7 @@ class Captain::Hermes::AutoReactService
 
   def maybe_react!
     return unless eligible?
+    return if already_reacted?
 
     emoji = decide_emoji
     return if emoji.blank?
@@ -51,6 +52,16 @@ class Captain::Hermes::AutoReactService
     return false if @message.source_id.blank?
 
     true
+  end
+
+  # Evita reaction duplicada quando OutgoingJob retentar (ex: dispatch
+  # retornou 401/5xx e Sidekiq reenfileirou). Sem essa guarda, cada retry
+  # cria uma reaction nova e cliente vê N emojis seguidos.
+  def already_reacted?
+    @conversation.messages
+                 .where(message_type: :outgoing)
+                 .where("content_attributes ->> 'external_source' = ?", 'hermes_auto_react')
+                 .exists?(["(content_attributes ->> 'in_reply_to')::int = ?", @message.id])
   end
 
   def decide_emoji
