@@ -21,14 +21,20 @@
 #  created_at                 :datetime         not null
 #  updated_at                 :datetime         not null
 #  account_id                 :bigint           not null
+#  captain_unit_id            :bigint
 #  parent_assistant_id        :bigint
 #
 # Indexes
 #
 #  idx_captain_assistants_hermes_port_unique        (hermes_port) UNIQUE WHERE (hermes_port IS NOT NULL)
 #  index_captain_assistants_on_account_id           (account_id)
+#  index_captain_assistants_on_captain_unit_id      (captain_unit_id)
 #  index_captain_assistants_on_engine               (engine)
 #  index_captain_assistants_on_parent_assistant_id  (parent_assistant_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (captain_unit_id => captain_units.id) ON DELETE => nullify
 #
 class Captain::Assistant < ApplicationRecord
   include Avatarable
@@ -38,6 +44,7 @@ class Captain::Assistant < ApplicationRecord
   self.table_name = 'captain_assistants'
 
   belongs_to :account
+  belongs_to :captain_unit, class_name: 'Captain::Unit', optional: true
   has_many :documents, class_name: 'Captain::Document', dependent: :destroy_async
   has_many :responses, class_name: 'Captain::AssistantResponse', dependent: :destroy_async
   has_many :captain_inboxes,

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_02_120100) do
+ActiveRecord::Schema[7.1].define(version: 2026_05_02_160000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -342,7 +342,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_02_120100) do
     t.string "hermes_subscription_secret"
     t.integer "hermes_port"
     t.bigint "parent_assistant_id"
+    t.bigint "captain_unit_id"
     t.index ["account_id"], name: "index_captain_assistants_on_account_id"
+    t.index ["captain_unit_id"], name: "index_captain_assistants_on_captain_unit_id"
     t.index ["engine"], name: "index_captain_assistants_on_engine"
     t.index ["hermes_port"], name: "idx_captain_assistants_hermes_port_unique", unique: true, where: "(hermes_port IS NOT NULL)"
     t.index ["parent_assistant_id"], name: "index_captain_assistants_on_parent_assistant_id"
@@ -2166,6 +2168,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_02_120100) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "captain_assets", "accounts"
   add_foreign_key "captain_assets", "captain_suites"
+  add_foreign_key "captain_assistants", "captain_units", on_delete: :nullify
   add_foreign_key "captain_brands", "accounts"
   add_foreign_key "captain_configurations", "accounts"
   add_foreign_key "captain_contact_memories", "accounts", on_delete: :cascade

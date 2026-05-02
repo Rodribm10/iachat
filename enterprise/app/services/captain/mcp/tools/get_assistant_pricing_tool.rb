@@ -68,6 +68,8 @@ class Captain::Mcp::Tools::GetAssistantPricingTool < Captain::Mcp::Tools::BaseTo
   end
 
   def unit_for(assistant)
+    return assistant.captain_unit if assistant.captain_unit_id.present?
+
     ci = CaptainInbox.find_by(captain_assistant_id: assistant.id)
     return nil if ci.blank?
 

@@ -132,6 +132,7 @@ class Captain::Mcp::Tools::SaveAgentSpecTool < Captain::Mcp::Tools::BaseTool
 
   def parent_unit_for(parent)
     return nil if parent.nil?
+    return parent.captain_unit if parent.captain_unit_id.present?
 
     ci = parent.captain_inboxes.first
     return nil if ci.nil?
