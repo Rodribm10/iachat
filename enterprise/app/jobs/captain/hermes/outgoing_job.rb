@@ -27,6 +27,10 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
       return
     end
 
+    # Auto-react ANTES do dispatch — gesto chega <1s sem esperar Codex.
+    # Não bloqueia fluxo: se falhar, dispatch normal continua.
+    Captain::Hermes::AutoReactService.maybe_react!(message)
+
     Captain::Hermes::Client.new(conversation.inbox).dispatch(message: message, conversation: conversation)
   end
 end
