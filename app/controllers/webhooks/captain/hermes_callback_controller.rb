@@ -13,7 +13,7 @@
 # de forma confiável, identificamos pela ÚLTIMA conversation pending da inbox
 # que recebeu mensagem nos últimos 5 minutos. Aceitável pra PoC com 1 conversa
 # de teste por vez. Pra produção, melhorar com Redis: delivery_id → conversation_id.
-class Webhooks::Captain::HermesCallbackController < ApplicationController # rubocop:disable Metrics/ClassLength
+class Webhooks::Captain::HermesCallbackController < ApplicationController
   RECENT_WINDOW = 5.minutes
 
   # "Um momento — vou verificar" é a frase-âncora de handoff intencional
@@ -26,55 +26,12 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     /\A\s*aguarde\s+um\s+instante/i
   ].freeze
 
-  # Camada 2 — Gating de saída factual:
-  # Se a resposta do Hermes contém info factual (preço, senha, regra,
-  # horário) E o LLM NÃO chamou nenhuma tool MCP entre o dispatch e o
-  # callback, é alucinação de memória. Bloqueia a resposta, força
-  # consulta a tool via notify_event. 1 retry; se persistir, escala humano.
-  FACTUAL_PATTERNS = [
-    /R\$\s*\d/i,                                                # R$ 50, R$ 125,00
-    /\b\d+\s*(reais|reai|real)\b/i,
-    /\b\d+\s*%/,                                                # 50%
-    /\bsenha\b/i,                                               # qualquer menção a senha
-    /\b(c[óo]digo)\s+(de|do)\s+(porta|portao|portão|garagem)\b/i,
-    /\b(check[-]?in|check[-]?out|hor[áa]rio)\s+(é|eh|de)\s+\d/i, # check-in é 14h
-    /\b(política|politica|regra)\s+de\s+(cancelamento|no[\s-]?show|reembolso)/i,
-    /(n[ãa]o\s+(é\s+)?permitido|é\s+permitido)\s+\w{3,}/i,
-    /(pode|podem)\s+(levar|trazer)\s+(animal|pet|cachorro|gato|crian[çc]a)/i
-  ].freeze
-  MAX_FACTUAL_GATE_RETRIES = 1
-
   # Loop detection: 2 sinais combinados.
   # 1. Jaccard de tokens >= 0.50 → resposta praticamente igual.
-  # 2. >= 3 palavras-chave em comum (sem stopwords) E ambas terminam com
-  #    "?" → repetiu pergunta sobre o mesmo tópico (caso clássico do
-  #    "endereço completo ou link?" → "apenas link ou link + endereço?").
+  # 2. >= 3 palavras-chave em comum (sem stopwords) E ambas inquisitivas →
+  #    repetiu pergunta sobre o mesmo tópico.
   LOOP_SIMILARITY_THRESHOLD = 0.50
   LOOP_TOPIC_KEYWORD_OVERLAP = 3
-
-  # Camada 3 — Anti-repetição de linhas:
-  # LLM tende a "resumir" info de turns anteriores em toda nova resposta
-  # (ex: depois que mandou senha do Wi-Fi, repete em todo callback futuro).
-  # Strip de linhas onde >70% das palavras significativas já apareceram em
-  # outgoings recentes da mesma conv. Saudações/confirmações curtas
-  # (<5 chars) são preservadas.
-  REPEAT_OVERLAP_THRESHOLD = 0.70
-  REPEAT_LOOKBACK_OUTGOINGS = 3
-
-  # Camada 4 — Topic gating:
-  # Detecta quando a resposta menciona um tópico factual (Wi-Fi/senha/pet/
-  # estacionamento/etc) que NÃO foi pedido na última msg do cliente.
-  # Caso clássico: cliente pergunta só sobre pet, Hermes responde com
-  # "Senha=X e pode levar pet" (puxando wifi de turn anterior). Bloqueia,
-  # dispara notify_event forçando responder só o tópico atual. 1 retry.
-  TOPIC_INDICATORS = {
-    wifi: %w[wifi wi-fi internet rede prime2025 senha password],
-    pet: %w[pet pets animal animais cachorro gato bicho],
-    estacionamento: %w[estacionamento garagem carro vaga],
-    cancelamento: %w[cancelar cancelamento reembolso desmarcar],
-    preco: %w[preco preço valor reais]
-  }.freeze
-  MAX_OFFTOPIC_RETRIES = 1
   LOOP_STOPWORDS = %w[
     voce voces para por pra como mas isso esse essa estou esta este aqui ali
     eles elas tem ter tinha tendo era ser sou foi fui agora ainda ja muito mais
@@ -98,21 +55,6 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     return log_no_conversation_and_ack if conversation.blank?
 
     log_reply(conversation, content)
-
-    # Camada 2: resposta factual sem chamada de tool durante a turn é
-    # alucinação de memória. Bloqueia entrega + re-dispara forçando tool
-    # call. NÃO entrega a msg pro cliente até o LLM consultar a fonte.
-    return head :ok if gate_factual_no_tool!(conversation, content)
-
-    # Camada 3: strip de linhas repetidas de outgoings anteriores
-    # (LLM resumindo info de turns anteriores em cada nova resposta).
-    content = strip_repeated_lines(conversation, content)
-
-    # Camada 4: detecta tópico factual misturado na resposta sem ter sido
-    # pedido (ex: cliente pergunta sobre pet, Hermes manda Wi-Fi+pet juntos).
-    # Bloqueia + retrigger forçando responder só o tópico atual.
-    return head :ok if gate_off_topic_factual!(conversation, content)
-
     detect_handoff_or_loop(conversation, content)
     deliver_outgoing(conversation, content)
     head :ok
@@ -121,6 +63,8 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     Rails.logger.error e.backtrace.first(5).join("\n")
     head :internal_server_error
   end
+
+  private
 
   # Hermes mandou frase-âncora de handoff: entrega ao cliente normalmente,
   # mas marca conv pra triagem humana — próximas msgs não disparam Hermes
@@ -142,88 +86,28 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     end
   end
 
-  private
-
   def handoff_response?(content)
     return false if content.blank?
 
     HANDOFF_PATTERNS.any? { |re| content.match?(re) }
   end
 
-  # Retorna true se bloqueou a resposta (callback deve dar 200 + sair sem
-  # entregar). Retorna false pra fluxo normal continuar.
-  def gate_factual_no_tool!(conversation, content)
-    return false unless looks_factual?(content)
-    return false if tool_called_in_this_turn?(conversation)
-
-    retry_key = "hermes_factual_gate_retry:#{conversation.id}"
-    retries = Rails.cache.read(retry_key, raw: true).to_i
-    if retries >= MAX_FACTUAL_GATE_RETRIES
-      Rails.logger.error("[Hermes::Callback] factual sem tool persistente em conv #{conversation.display_id} — escalando")
-      mark_for_human_triage(conversation, reason: 'factual_no_tool_persistente')
-      Rails.cache.delete(retry_key)
-      # Entrega o conteúdo nesse caso (melhor algo do que silêncio); humano vê pela label.
-      deliver_outgoing(conversation, content)
-      return true
-    end
-
-    Rails.cache.write(retry_key, retries + 1, expires_in: 5.minutes, raw: true)
-    Rails.logger.warn("[Hermes::Callback] factual sem tool em conv #{conversation.display_id} — re-dispatch (retry #{retries + 1})")
-    trigger_force_tool_call!(conversation, content)
-    true
-  end
-
-  def looks_factual?(content)
-    return false if content.blank?
-
-    FACTUAL_PATTERNS.any? { |re| content.match?(re) }
-  end
-
-  # Compara contador de tool calls atual com baseline gravado pelo
-  # OutgoingJob no momento do dispatch. Se subiu, o LLM chamou tool —
-  # resposta é fundamentada. Se igual, é puro palpite.
-  def tool_called_in_this_turn?(conversation)
-    baseline = Rails.cache.read("hermes_tool_calls_baseline:#{conversation.id}", raw: true).to_i
-    current = Rails.cache.read("hermes_tool_calls:#{conversation.id}", raw: true).to_i
-    current > baseline
-  end
-
-  def trigger_force_tool_call!(conversation, original_content)
-    Captain::Hermes::Client.new(@inbox).notify_event(
-      conversation: conversation,
-      event_type: 'force_factual_tool',
-      system_message: '[SISTEMA: force_factual_tool] Você emitiu uma resposta com info ' \
-                      "factual ('#{original_content.truncate(120)}') SEM consultar tool. " \
-                      'Cliente NÃO recebeu essa mensagem. Releia a última pergunta do ' \
-                      'cliente e CHAME a tool relevante AGORA: faq_lookup pra regra/' \
-                      'política/Wi-Fi/horário, tabela de preços da skill pra valores. ' \
-                      'Se a tool retornar vazio, NÃO INVENTE: responda exatamente ' \
-                      "'⏳ Um momento — vou verificar.' e pare."
-    )
-  rescue Captain::Hermes::Client::DispatchError => e
-    Rails.logger.error("[Hermes::Callback] force_factual_tool dispatch falhou: #{e.message}")
-    mark_for_human_triage(conversation, reason: 'force_factual_dispatch_falhou')
-    deliver_outgoing(conversation, original_content)
-  end
-
   # Detecta loop: a resposta atual do Hermes é muito parecida com a anterior
-  # outgoing dele na mesma conv (Jaccard de tokens >= 0.70). Sinaliza que o
+  # outgoing dele na mesma conv (Jaccard de tokens >= 0.50). Sinaliza que o
   # agente está repetindo pergunta/resposta sem progredir — geralmente
-  # cliente fora do escopo OU fluxo travado (pediu link sem ter como
-  # entregar, perguntou de novo a mesma confirmação, etc).
+  # cliente fora do escopo (operadora telefonia, banco, suporte de outro
+  # app, etc) OU fluxo travado.
   def looped_response?(conversation, content)
     prev = conversation.messages
                        .where(message_type: :outgoing)
                        .where("content_attributes ->> 'external_source' = ?", 'hermes_callback')
-                       .order(created_at: :desc)
+                       .reorder(created_at: :desc)
                        .limit(1)
                        .pick(:content)
     return false if prev.blank?
 
     return true if similarity(content, prev) >= LOOP_SIMILARITY_THRESHOLD
 
-    # Caso "pergunta reformulada sobre o mesmo tópico": ambas terminam com "?"
-    # e compartilham >= 3 palavras-chave (sem stopwords).
     repeated_question?(content, prev)
   end
 
@@ -264,101 +148,6 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     Rails.logger.info("[Hermes::Callback] conv #{conversation.display_id} → triagem_humana (#{reason})")
   end
 
-  # Strip linhas onde a maioria das palavras significativas já foi
-  # enviada em outgoings recentes. Preserva saudações curtas (<5 chars)
-  # e tudo se a resposta ficaria vazia (melhor repetido do que mudo).
-  def strip_repeated_lines(conversation, content)
-    pool = recent_outgoings_pool(conversation)
-    return content if pool.blank?
-
-    lines = content.split("\n")
-    kept = lines.reject { |line| line_already_said?(line, pool) }
-    return content if kept.empty? || kept.size == lines.size
-
-    Rails.logger.info(
-      "[Hermes::Callback] strip de #{lines.size - kept.size} linha(s) repetida(s) em conv #{conversation.display_id}"
-    )
-    kept.join("\n").strip
-  end
-
-  def recent_outgoings_pool(conversation)
-    msgs = conversation.messages
-                       .where(message_type: :outgoing)
-                       .order(created_at: :desc)
-                       .limit(REPEAT_LOOKBACK_OUTGOINGS * 2)
-    texts = msgs.reject do |m|
-      attrs = m.content_attributes.to_h
-      attrs['is_reaction'] || attrs['external_source'] != 'hermes_callback'
-    end.first(REPEAT_LOOKBACK_OUTGOINGS).map(&:content)
-    return '' if texts.empty?
-
-    ActiveSupport::Inflector.transliterate(texts.join("\n").downcase)
-  end
-
-  # Detecta tópico factual na resposta que NÃO foi pedido na última pergunta
-  # do cliente. Retorna true se bloqueou (callback retorna 200 sem entregar);
-  # false pra fluxo normal continuar.
-  def gate_off_topic_factual!(conversation, content)
-    off_topics = unrequested_topics(conversation, content)
-    return false if off_topics.empty?
-
-    retry_key = "hermes_off_topic_retry:#{conversation.id}"
-    retries = Rails.cache.read(retry_key, raw: true).to_i
-    if retries >= MAX_OFFTOPIC_RETRIES
-      Rails.logger.warn("[Hermes::Callback] off-topic persistente em conv #{conversation.display_id} — entregando")
-      Rails.cache.delete(retry_key)
-      return false
-    end
-    Rails.cache.write(retry_key, retries + 1, expires_in: 5.minutes, raw: true)
-
-    Rails.logger.warn("[Hermes::Callback] off-topic detectado em conv #{conversation.display_id} (#{off_topics.join(',')}) — re-dispatch")
-    trigger_force_topic_focus!(conversation, content, off_topics)
-    true
-  end
-
-  # Retorna lista de tópicos presentes na resposta MAS ausentes da última
-  # pergunta do cliente. Vazio = resposta é coerente com pergunta.
-  def unrequested_topics(conversation, content)
-    last_q = conversation.messages.where(message_type: :incoming).order(created_at: :desc).limit(1).pick(:content).to_s
-    return [] if last_q.blank?
-
-    q_norm = ActiveSupport::Inflector.transliterate(last_q.downcase)
-    r_norm = ActiveSupport::Inflector.transliterate(content.to_s.downcase)
-
-    TOPIC_INDICATORS.filter_map do |topic, words|
-      in_response = words.any? { |w| r_norm.include?(w) }
-      in_query = words.any? { |w| q_norm.include?(w) }
-      topic if in_response && !in_query
-    end
-  end
-
-  def trigger_force_topic_focus!(conversation, original, off_topics)
-    last_q = conversation.messages.where(message_type: :incoming).order(created_at: :desc).limit(1).pick(:content).to_s
-    Captain::Hermes::Client.new(@inbox).notify_event(
-      conversation: conversation,
-      event_type: 'force_topic_focus',
-      system_message: '[SISTEMA: force_topic_focus] Sua última resposta misturou tópicos ' \
-                      "(#{off_topics.join(', ')}) que o cliente NÃO pediu agora. Cliente NÃO " \
-                      "recebeu. Releia APENAS a última pergunta dele ('#{last_q.truncate(100)}') " \
-                      'e responda EXCLUSIVAMENTE sobre esse tópico. NÃO mencione info de ' \
-                      'turns anteriores se não foi explicitamente pedido nesta pergunta.'
-    )
-  rescue Captain::Hermes::Client::DispatchError => e
-    Rails.logger.error("[Hermes::Callback] force_topic dispatch falhou: #{e.message}")
-    deliver_outgoing(conversation, original)
-  end
-
-  def line_already_said?(line, pool)
-    stripped = line.strip
-    return false if stripped.length < 5
-
-    words = ActiveSupport::Inflector.transliterate(stripped.downcase).scan(/[a-z0-9]+/).reject { |w| w.length < 3 }
-    return false if words.empty?
-
-    matches = words.count { |w| pool.include?(w) }
-    matches.to_f / words.size >= REPEAT_OVERLAP_THRESHOLD
-  end
-
   def fetch_inbox
     inbox_id = params[:inbox_id].presence || params.dig(:metadata, :inbox_id).presence
     if inbox_id.present?
@@ -390,7 +179,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
     inbox.conversations
          .where('updated_at >= ?', RECENT_WINDOW.ago)
          .where(status: %w[pending open])
-         .order(updated_at: :desc)
+         .reorder(updated_at: :desc)
          .first
   end
 

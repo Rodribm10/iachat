@@ -33,7 +33,6 @@ class Webhooks::Captain::McpController < ApplicationController
       context: extract_context(request_body)
     )
 
-    track_tool_call!(request_body)
     return head :ok if response.nil? # MCP notifications
 
     render json: response
@@ -107,19 +106,5 @@ class Webhooks::Captain::McpController < ApplicationController
     return nil if value.blank?
 
     value.to_i
-  end
-
-  # Incrementa contador de tool calls por conversation. HermesCallbackController
-  # usa o snapshot pré-dispatch (gravado pelo OutgoingJob) vs valor atual pra
-  # detectar respostas factuais SEM chamada de tool (alucinação de memória).
-  def track_tool_call!(request_body)
-    return unless request_body['method'] == 'tools/call'
-
-    args = request_body.dig('params', 'arguments') || {}
-    conv_id = args['conversation_id'] || args[:conversation_id]
-    return if conv_id.blank?
-
-    Rails.cache.increment("hermes_tool_calls:#{conv_id}", 1, expires_in: 5.minutes, raw: true) ||
-      Rails.cache.write("hermes_tool_calls:#{conv_id}", 1, expires_in: 5.minutes, raw: true)
   end
 end

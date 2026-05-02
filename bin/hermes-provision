@@ -279,8 +279,12 @@ fi
 # tinha a senha real "Prime2025".
 sed -i "s/port: 8645/port: $PORT/" "$PROFILES_DIR/$SLUG/config.yaml"
 sed -i "s/X-Captain-Assistant-Id: '6'/X-Captain-Assistant-Id: '$ASSISTANT_ID'/" "$PROFILES_DIR/$SLUG/config.yaml"
-sed -i 's/  memory_enabled: true/  memory_enabled: false/' "$PROFILES_DIR/$SLUG/config.yaml"
-sed -i 's/  user_profile_enabled: true/  user_profile_enabled: false/' "$PROFILES_DIR/$SLUG/config.yaml"
+# memory_enabled / user_profile_enabled ficam LIGADOS (default da Valentina
+# template). Antes desligávamos achando que evitaria contaminação cross-unit
+# — mas a contaminação real vinha do X-Captain-Assistant-Id apontando pro
+# parent (já corrigido). Memória off mata UX (cliente repete nome/CPF a
+# cada turn), e cada Hermes tem session isolada por chat_id, então memória
+# de uma conv não vaza pra outra naturalmente.
 
 # SOUL.md: clona a da Valentina (template canônico) e substitui identidade.
 # Tudo que NÃO for identidade/marca/categoria — tom, formatação WhatsApp, [ctx],
