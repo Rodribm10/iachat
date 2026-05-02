@@ -36,7 +36,7 @@ class Captain::Mcp::Tools::GetAssistantPricingTool < Captain::Mcp::Tools::BaseTo
     end
   end
 
-  def call(args, _context:)
+  def call(args, context:) # rubocop:disable Lint/UnusedMethodArgument
     assistant = Captain::Assistant.find_by(id: args['assistant_id'])
     return error_response("Assistente #{args['assistant_id']} não encontrado.") if assistant.blank?
 

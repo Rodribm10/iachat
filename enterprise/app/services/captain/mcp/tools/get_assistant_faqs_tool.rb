@@ -31,7 +31,7 @@ class Captain::Mcp::Tools::GetAssistantFaqsTool < Captain::Mcp::Tools::BaseTool
     end
   end
 
-  def call(args, _context:) # rubocop:disable Metrics/AbcSize
+  def call(args, context:) # rubocop:disable Metrics/AbcSize, Lint/UnusedMethodArgument
     assistant = Captain::Assistant.find_by(id: args['assistant_id'])
     return error_response("Assistente #{args['assistant_id']} não encontrado.") if assistant.blank?
 

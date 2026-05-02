@@ -44,7 +44,7 @@ class Captain::Mcp::Tools::SaveAgentSpecTool < Captain::Mcp::Tools::BaseTool
     end
   end
 
-  def call(args, _context:) # rubocop:disable Metrics/AbcSize
+  def call(args, context:) # rubocop:disable Metrics/AbcSize, Lint/UnusedMethodArgument
     slug = args['slug'].to_s.strip.downcase.gsub(/[^a-z0-9_]/, '_').squeeze('_')
     return error_response('slug inválido (use lowercase, snake_case, só letras/números/underscore).') if slug.blank? || slug.length < 3
 
