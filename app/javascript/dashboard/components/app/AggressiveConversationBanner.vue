@@ -119,11 +119,17 @@ export default {
     openConversation(alert) {
       // Clica no item → abre conversa E esconde o alerta dela (mas se
       // não responder, volta a aparecer no próximo threshold).
+      // Param tem que ser `conversation_id` (snake_case, como
+      // declarado no path da rota); camelCase faz Vue Router não casar
+      // e cair em "selecione uma conversa".
       aggressiveAlert.dismiss(alert.id);
       if (!this.currentAccountId) return;
       this.$router.push({
         name: 'inbox_conversation',
-        params: { accountId: this.currentAccountId, conversationId: alert.id },
+        params: {
+          accountId: this.currentAccountId,
+          conversation_id: alert.id,
+        },
       });
     },
     dismissOne(alert) {
