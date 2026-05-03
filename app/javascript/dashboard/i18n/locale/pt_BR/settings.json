@@ -121,6 +121,15 @@
         "RESET_SUCCESS": "Token de acesso gerado novamente com sucesso",
         "RESET_ERROR": "Não foi possível regerar o token de acesso. Por favor, tente novamente"
       },
+      "AGGRESSIVE_ALERT_SECTION": {
+        "TITLE": "Alerta de conversa parada",
+        "NOTE": "Banner vermelho que aparece no topo do painel quando uma conversa fica sem resposta há 5+ minutos.",
+        "DESCRIPTION": "Banner vermelho que aparece quando uma conversa fica sem resposta há 5+ minutos. Útil pra não perder cliente, mas pode ser intrusivo se você não atende todas as inboxes.",
+        "ENABLED": "Ativar alerta de conversa parada",
+        "APPLY_TO_ALL": "Aplicar em todas as caixas de entrada",
+        "INBOX_HINT": "Selecione as caixas onde você quer receber o alerta:",
+        "NO_INBOXES": "Nenhuma caixa de entrada cadastrada."
+      },
       "AUDIO_NOTIFICATIONS_SECTION": {
         "TITLE": "Alertas de áudio",
         "NOTE": "Habilitar notificações de áudio no painel para novas mensagens e conversas.",
