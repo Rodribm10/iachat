@@ -102,7 +102,7 @@ const groupedReservations = computed(() => {
   return groups;
 });
 
-const statusCounts = computed(() => {
+const pageStatusCounts = computed(() => {
   const counts = {
     all: reservations.value.length,
     draft: 0,
@@ -115,6 +115,23 @@ const statusCounts = computed(() => {
     if (counts[key] !== undefined) counts[key] += 1;
   });
   return counts;
+});
+
+const statusCounts = computed(() => {
+  const metaCounts = reservationsMeta.value.statusCounts || {};
+  return {
+    all: Number(
+      metaCounts.all ??
+        reservationsMeta.value.totalCount ??
+        pageStatusCounts.value.all
+    ),
+    draft: Number(metaCounts.draft ?? pageStatusCounts.value.draft),
+    pending_payment: Number(
+      metaCounts.pending_payment ?? pageStatusCounts.value.pending_payment
+    ),
+    confirmed: Number(metaCounts.confirmed ?? pageStatusCounts.value.confirmed),
+    cancelled: Number(metaCounts.cancelled ?? pageStatusCounts.value.cancelled),
+  };
 });
 
 const todayRevenue = computed(() => {

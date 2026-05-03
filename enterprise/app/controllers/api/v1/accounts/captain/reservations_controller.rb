@@ -1,6 +1,6 @@
 # rubocop:disable Metrics/ClassLength
 class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::BaseController
-  CONFIRMED_STATUSES = %i[scheduled active completed].freeze
+  CONFIRMED_STATUSES = %i[scheduled active completed confirmed].freeze
   RESULTS_PER_PAGE = 25
   MAX_RESULTS_PER_PAGE = 100
   SORTABLE_FIELDS = %w[check_in_at created_at updated_at].freeze
@@ -13,7 +13,9 @@ class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::Ba
   before_action :set_reservation, only: [:show, :pix, :cancel, :mark_as_paid, :regenerate_pix]
 
   def index
-    scoped = apply_filters(@reservations_scope)
+    common_scoped = apply_common_filters(@reservations_scope)
+    @status_counts = status_counts_for(common_scoped)
+    scoped = apply_status_filter(common_scoped)
     scoped = apply_sort(scoped)
     @reservations_count = scoped.count
     @reservations = scoped.page(@current_page).per(@per_page)
@@ -178,6 +180,21 @@ class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::Ba
     )
   end
 
+  def status_counts_for(scope)
+    counts_by_status = scope.group(:status).count.transform_keys do |key|
+      Captain::Reservation.statuses.key(key) || key.to_s
+    end
+    confirmed_count = CONFIRMED_STATUSES.sum { |status| counts_by_status[status.to_s].to_i }
+
+    {
+      all: counts_by_status.values.sum,
+      draft: counts_by_status['draft'].to_i,
+      pending_payment: counts_by_status['pending_payment'].to_i,
+      confirmed: confirmed_count,
+      cancelled: counts_by_status['cancelled'].to_i
+    }
+  end
+
   def apply_sort(scope)
     return default_order(scope) if permitted_params[:sort].blank?
 
@@ -192,11 +209,12 @@ class Api::V1::Accounts::Captain::ReservationsController < Api::V1::Accounts::Ba
     scope.order(
       Arel.sql(
         'CASE captain_reservations.status ' \
-        "WHEN #{Captain::Reservation.statuses[:pending_payment]} THEN 0 " \
-        "WHEN #{Captain::Reservation.statuses[:draft]} THEN 1 " \
-        "WHEN #{Captain::Reservation.statuses[:scheduled]} THEN 2 " \
-        "WHEN #{Captain::Reservation.statuses[:active]} THEN 2 " \
-        "WHEN #{Captain::Reservation.statuses[:completed]} THEN 2 " \
+        "WHEN #{Captain::Reservation.statuses[:scheduled]} THEN 0 " \
+        "WHEN #{Captain::Reservation.statuses[:active]} THEN 0 " \
+        "WHEN #{Captain::Reservation.statuses[:completed]} THEN 0 " \
+        "WHEN #{Captain::Reservation.statuses[:confirmed]} THEN 0 " \
+        "WHEN #{Captain::Reservation.statuses[:pending_payment]} THEN 1 " \
+        "WHEN #{Captain::Reservation.statuses[:draft]} THEN 2 " \
         "WHEN #{Captain::Reservation.statuses[:cancelled]} THEN 3 " \
         'ELSE 4 END ASC, captain_reservations.check_in_at ASC'
       )
