@@ -62,14 +62,19 @@ RSpec.describe 'Api::V1::Accounts::Captain::Reservations', type: :request do
       )
     end
 
-    it 'returns paginated reservations ordered by operational priority by default' do
+    it 'returns paginated reservations with confirmed reservations first by default' do
       get "/api/v1/accounts/#{account.id}/captain/reservations",
           headers: admin.create_new_auth_token
 
       expect(response).to have_http_status(:ok)
-      expect(json_response['payload'].pluck('id')).to eq([pending_reservation.id, confirmed_reservation.id])
+      expect(json_response['payload'].pluck('id')).to eq([confirmed_reservation.id, pending_reservation.id])
       expect(json_response.dig('meta', 'total_count')).to eq(2)
-      expect(json_response.dig('payload', 0, 'ui_status')).to eq('pending_payment')
+      expect(json_response.dig('meta', 'status_counts')).to include(
+        'all' => 2,
+        'pending_payment' => 1,
+        'confirmed' => 1
+      )
+      expect(json_response.dig('payload', 0, 'ui_status')).to eq('confirmed')
     end
 
     it 'filters by confirmed ui status and search query' do

@@ -7,4 +7,5 @@ end
 json.meta do
   json.total_count @reservations_count
   json.page @current_page
+  json.status_counts @status_counts || {}
 end
