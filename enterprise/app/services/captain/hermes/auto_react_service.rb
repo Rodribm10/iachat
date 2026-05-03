@@ -9,18 +9,20 @@
 # é COMPLEMENTAR, não substitui.
 #
 # Padrões:
-#   - Agradecimento curto → 🙏
-#   - Confirmação ("ok", "fechado", "perfeito", "blz") → 👍
+#   - Agradecimento/despedida → 🙏/❤️
+#   - Confirmação ("ok", "fechado", "perfeito", "blz", "show") → 👍
 #   - Imagem (sem texto explicativo) → 😍
 #   - Áudio sem ser "diferente" (não é dúvida complexa) → 🙏
 #
 # Conservative: só dispara em casos CLAROS. Em dúvida, deixa pro LLM
 # decidir via react_to_message tool.
 class Captain::Hermes::AutoReactService
-  THANKS_REGEX = /\A(obrigad[oa]|valeu|vlw|thanks|brigad[oa]|grat[oa])[\s.!,]*\z/i
-  CONFIRMATION_REGEX = /\A(ok|okay|fechado|perfeit[oa]|blz|beleza|combinado|certo|ótim[oa]|legal|pode\s*ser|isso\s*mesmo)[\s.!,]*\z/i
+  THANKS_REGEX = /\b(muito\s+)?(obrigad[oa]|brigad[oa]|valeu|vlw|thanks|agrade[cç]o|agradecid[oa]|gratid[aã]o)\b/i
+  CONFIRMATION_REGEX = /\A(ok|okay|fechado|perfeit[oa]|blz|beleza|combinado|certo|certinho|[oó]tim[oa]|legal|show|maravilha|tranquilo|t[aá]\s*bom|pode\s*ser|isso\s*mesmo)[\s.!,]*\z/i
   GREETING_REGEX = /\A(bom\s*dia|boa\s*tarde|boa\s*noite|oi|olá|ola|e\s*aí|hey|hi|hello)[\s.!,]*\z/i
-  FAREWELL_REGEX = /\A(tchau|até\s*(mais|logo|breve)|valeu\s*flw|flw|abraço|abraços|bjs|beijos)[\s.!,]*\z/i
+  FAREWELL_REGEX = /\b(tchau|at[eé]\s*(mais|logo|breve|a\s+pr[oó]xima)|falou|flw|abra[cç]os?|bjs|beijos?|boa\s+noite|bom\s+descanso|at[eé]\s+amanh[aã]|at[eé]\s+depois)\b/i
+  ENDING_CONTEXT_REGEX = /\b(encerr(ar|a|amos)|finaliz(ar|a|amos)|n[aã]o\s+preciso\s+mais|era\s+s[oó]\s+isso|s[oó]\s+isso|por\s+enquanto\s+[eé]\s+s[oó]|obrigad[oa]\s+pelo\s+atendimento)\b/i
+  EMOJI_ONLY_REGEX = /\A[\p{Emoji_Presentation}\p{Emoji}\uFE0F\s]+[\s.!,]*\z/
 
   # Reação "ambiente" — em msgs neutras que não bateram nenhum padrão
   # acima, rola dado e reage com emoji discreto. Cobre o gap entre
@@ -28,7 +30,7 @@ class Captain::Hermes::AutoReactService
   # Filtros em ambient_eligible? evitam reagir em momentos de fluxo
   # crítico (cliente mandando dados de reserva, fazendo pergunta).
   AMBIENT_EMOJIS = %w[😊 💕 ✨ 💯 🤗].freeze
-  AMBIENT_PROBABILITY = 0.20
+  AMBIENT_PROBABILITY = 0.35
   AMBIENT_RESERVATION_KEYWORDS = /cpf|reserv|pix|valor|preço|preco|quanto|hor[áa]rio|dia\b|data\b|categori|suite|quart|chal[ée]/i
 
   def self.maybe_react!(message)
@@ -78,11 +80,12 @@ class Captain::Hermes::AutoReactService
 
     return image_emoji if image_attachment?
     return audio_emoji if audio_attachment? && text.length < 10
+    return '👋' if GREETING_REGEX.match?(text) && first_incoming_in_conversation?
+    return '❤️' if farewell?(text)
     return '🙏' if THANKS_REGEX.match?(text)
     return '👍' if CONFIRMATION_REGEX.match?(text)
-    return '👋' if GREETING_REGEX.match?(text) && first_incoming_in_conversation?
-    return '❤️' if FAREWELL_REGEX.match?(text)
-    return AMBIENT_EMOJIS.sample if ambient_eligible?(text) && rand < AMBIENT_PROBABILITY
+    return '❤️' if emoji_only?(text)
+    return ambient_emoji(text) if ambient_eligible?(text) && ambient_sampled?
 
     nil
   end
@@ -108,6 +111,25 @@ class Captain::Hermes::AutoReactService
                  .where(message_type: :incoming)
                  .where('created_at <= ?', @message.created_at)
                  .count <= 1
+  end
+
+  def farewell?(text)
+    normalized = ActiveSupport::Inflector.transliterate(text.to_s.downcase)
+    FAREWELL_REGEX.match?(normalized) || ENDING_CONTEXT_REGEX.match?(normalized)
+  end
+
+  def emoji_only?(text)
+    text.present? && EMOJI_ONLY_REGEX.match?(text)
+  end
+
+  # Usa amostragem determinística por message.id para retries do Sidekiq
+  # não mudarem a decisão de reagir. O emoji também fica estável.
+  def ambient_sampled?
+    ((@message.id.to_i * 1103515245 + 12_345) % 10_000) < (AMBIENT_PROBABILITY * 10_000)
+  end
+
+  def ambient_emoji(_text)
+    AMBIENT_EMOJIS[@message.id.to_i % AMBIENT_EMOJIS.length]
   end
 
   def image_attachment?
