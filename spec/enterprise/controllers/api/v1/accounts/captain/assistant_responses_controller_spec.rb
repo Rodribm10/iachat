@@ -238,6 +238,23 @@ RSpec.describe 'Api::V1::Accounts::Captain::AssistantResponses', type: :request 
 
         expect(response).to have_http_status(:unprocessable_entity)
       end
+
+      it 'returns unprocessable entity when question exceeds 255 characters' do
+        long_question = 'a' * 256
+        post "/api/v1/accounts/#{account.id}/captain/assistant_responses",
+             params: {
+               assistant_response: {
+                 question: long_question,
+                 answer: 'Test answer',
+                 assistant_id: assistant.id
+               }
+             },
+             headers: admin.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
+
     end
   end
 
