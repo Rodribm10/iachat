@@ -32,6 +32,51 @@ RSpec.describe DeleteObjectJob, type: :job do
         expect(Contact.where(id: contact_ids).reload).not_to be_empty
         expect { inbox.reload }.to raise_error(ActiveRecord::RecordNotFound)
       end
+
+      it 'removes fazer.ai Captain and Jasmine inbox dependencies before destroying the inbox', :aggregate_failures do
+        contact = create(:contact, account: account)
+        contact_inbox = create(:contact_inbox, contact: contact, inbox: inbox)
+        unit = create(:captain_unit, account: account)
+        assistant = create(:captain_assistant, account: account)
+        collection_id = insert_row(:jasmine_collections, account_id: account.id, name: 'Samanbaia', owner_inbox_id: inbox.id)
+        reservation_id = insert_row(
+          :captain_reservations,
+          account_id: account.id,
+          inbox_id: inbox.id,
+          contact_id: contact.id,
+          contact_inbox_id: contact_inbox.id,
+          suite_identifier: 'Suite 101',
+          check_in_at: 1.day.from_now,
+          check_out_at: 2.days.from_now,
+          status: 0
+        )
+
+        unit.update!(inbox_id: inbox.id, concierge_inbox_id: inbox.id)
+        create(:captain_inbox, captain_assistant: assistant, inbox: inbox, captain_unit: unit)
+        create(:captain_conversation_insight, account: account, inbox: inbox)
+        create(:captain_gallery_item, :inbox_scoped, account: account, inbox: inbox, captain_unit: unit)
+        insert_row(:captain_lifecycle_deliveries, account_id: account.id, captain_reservation_id: reservation_id, inbox_id: inbox.id,
+                                                  fire_at: 1.hour.from_now, status: 'scheduled', origin: 'scheduled_lifecycle')
+        insert_row(:captain_pix_charges, reservation_id: reservation_id, unit_id: unit.id, txid: SecureRandom.hex(8), status: 'active')
+        insert_row(:captain_inbox_automations, account_id: account.id, inbox_id: inbox.id, title: 'Menu', message: 'Oi')
+        insert_row(:captain_inbox_reminder_settings, account_id: account.id, inbox_id: inbox.id)
+        insert_row(:captain_notification_templates, inbox_id: inbox.id, label: 'Template', content: 'Oi')
+        insert_row(:captain_tool_configs, account_id: account.id, inbox_id: inbox.id, tool_key: 'availability')
+        insert_row(:jasmine_inbox_collections, account_id: account.id, inbox_id: inbox.id, collection_id: collection_id)
+        insert_row(:jasmine_inbox_settings, account_id: account.id, inbox_id: inbox.id)
+        insert_row(:jasmine_tool_configs, account_id: account.id, inbox_id: inbox.id, tool_key: 'availability')
+
+        expect { described_class.perform_now(inbox) }.not_to raise_error
+
+        expect(Inbox.exists?(inbox.id)).to be false
+        expect(CaptainInbox.where(inbox_id: inbox.id)).to be_empty
+        expect(Captain::Reservation.where(id: reservation_id)).to be_empty
+        expect(Captain::GalleryItem.where(inbox_id: inbox.id)).to be_empty
+        expect(Captain::ConversationInsight.where(inbox_id: inbox.id)).to be_empty
+        expect(unit.reload.inbox_id).to be_nil
+        expect(unit.concierge_inbox_id).to be_nil
+        expect(select_value(:jasmine_collections, collection_id, :owner_inbox_id)).to be_nil
+      end
     end
 
     context 'when object is heavy (Account)' do
@@ -72,5 +117,30 @@ RSpec.describe DeleteObjectJob, type: :job do
         expect { label.reload }.to raise_error(ActiveRecord::RecordNotFound)
       end
     end
+  end
+
+  def insert_row(table, attributes)
+    attributes = attributes.merge(created_at: Time.current, updated_at: Time.current)
+    columns = attributes.keys
+    values = attributes.values.map { |value| quoted_value(value) }
+    sql = "INSERT INTO #{connection.quote_table_name(table)} (#{columns.map { |column| connection.quote_column_name(column) }.join(', ')}) " \
+          "VALUES (#{values.join(', ')}) RETURNING id"
+
+    connection.select_value(sql).to_i
+  end
+
+  def select_value(table, id, column)
+    connection.select_value(
+      "SELECT #{connection.quote_column_name(column)} FROM #{connection.quote_table_name(table)} WHERE id = #{Integer(id)}"
+    )
+  end
+
+  def quoted_value(value)
+    value = value.to_json if value.is_a?(Hash) || value.is_a?(Array)
+    connection.quote(value)
+  end
+
+  def connection
+    ActiveRecord::Base.connection
   end
 end
