@@ -1,6 +1,6 @@
 class Api::V1::Accounts::Captain::BulkActionsController < Api::V1::Accounts::BaseController
   before_action :current_account
-  before_action -> { check_authorization(Captain::Assistant) }
+  before_action -> { check_authorization(Captain::AssistantResponse) }
   before_action :validate_params
   before_action :type_matches?
 

@@ -5,6 +5,16 @@ import { throwErrorMessage } from 'dashboard/store/utils/api';
 export default createStore({
   name: 'CaptainReservation',
   API: CaptainReservationsAPI,
+  mutations: {
+    SET_CAPTAINRESERVATION_META(state, meta) {
+      state.meta = {
+        ...state.meta,
+        totalCount: Number(meta.total_count),
+        page: Number(meta.page),
+        statusCounts: meta.status_counts || meta.statusCounts || {},
+      };
+    },
+  },
   actions: mutations => ({
     fetchRevenue: async function fetchRevenue(_, params = {}) {
       try {

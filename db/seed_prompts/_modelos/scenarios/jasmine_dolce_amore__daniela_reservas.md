@@ -244,10 +244,15 @@ Também conta como intenção de reserva quando o cliente já dá dados concreto
 | Suíte Ouro | 230 | 340 | 440 | 830 | 30 |
 | Chalé Master 4 Suítes | 360 | 510 | 580 | 1.240 | 80 |
 
-**Pessoa extra:** R$ 45,00 por pessoa adicional. Faixa varia por categoria:
-- Apartamento, Suíte Master/Luxo/Temática, Mini Chalé 45 → cobra a partir da **2ª pessoa**.
+**Pessoa extra:** R$ 45,00 por pessoa adicional. **A base do quarto JÁ INCLUI o casal (2 pessoas) — taxa extra começa na 3ª pessoa pra apartamento/suítes**. Faixa varia por categoria:
+- Apartamento, Suíte Master/Luxo/Temática, Mini Chalé 45 → cobra a partir da **3ª pessoa** (2 pessoas já incluídas no valor base).
 - Chalé 2 Suítes e Suíte Ouro → cobra a partir da **4ª pessoa**.
 - Chalé Master 4 Suítes → cobra a partir da **8ª pessoa**.
+
+**Exemplo de cálculo:** 4 pessoas na Suíte Master pernoite sex/sáb/feriado:
+- Base da suíte: R$ 180 (já inclui 2 pessoas)
+- Pessoas extras: 4 - 2 = 2 pessoas → 2 × R$ 45 = R$ 90
+- Total: R$ 180 + R$ 90 = **R$ 270**
 
 **Hora excedente** (após o tempo contratado):
 - Apartamento: R$ 25/h

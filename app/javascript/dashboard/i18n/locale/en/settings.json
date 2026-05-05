@@ -121,6 +121,15 @@
         "RESET_SUCCESS": "Access token regenerated successfully",
         "RESET_ERROR": "Unable to regenerate access token. Please try again"
       },
+      "AGGRESSIVE_ALERT_SECTION": {
+        "TITLE": "Stalled conversation alert",
+        "NOTE": "Red banner that appears at the top of the panel when a conversation has been waiting for a reply for 5+ minutes.",
+        "DESCRIPTION": "Red banner shown when a conversation has no reply for 5+ minutes. Useful to avoid losing customers, but can be intrusive if you don't handle every inbox.",
+        "ENABLED": "Enable stalled conversation alert",
+        "APPLY_TO_ALL": "Apply to all inboxes",
+        "INBOX_HINT": "Pick the inboxes where you want to receive the alert:",
+        "NO_INBOXES": "No inboxes registered."
+      },
       "AUDIO_NOTIFICATIONS_SECTION": {
         "TITLE": "Audio Alerts",
         "NOTE": "Enable audio alerts in dashboard for new messages and conversations.",
@@ -350,6 +359,7 @@
     "CAPTAIN_GALLERY": "Gallery",
     "CAPTAIN_RESERVATIONS": "Reservations",
     "CAPTAIN_ROLETA": "Roulette — Redeem",
+    "CAPTAIN_HERMES_BUILDER": "Builder (Hermes)",
     "CAPTAIN_FUNNEL": "Conversion Funnel",
     "CAPTAIN_LIFECYCLE": "Customer Journey",
     "CAPTAIN_REPORTS": "AI Reports",

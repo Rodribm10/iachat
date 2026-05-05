@@ -4,6 +4,8 @@
 #
 #  id                             :bigint           not null, primary key
 #  concierge_config               :jsonb            not null
+#  currency                       :string           default("BRL"), not null
+#  extra_person_fee               :decimal(10, 2)   default(0.0), not null
 #  inter_account_number           :string
 #  inter_cert_content             :text
 #  inter_cert_path                :string
@@ -63,6 +65,8 @@ class Captain::Unit < ApplicationRecord
   has_many :pix_charges, class_name: 'Captain::PixCharge', dependent: :restrict_with_error
   has_many :gallery_items, class_name: 'Captain::GalleryItem', foreign_key: :captain_unit_id, inverse_of: :captain_unit,
                            dependent: :destroy
+  has_many :pricing_categories, class_name: 'Captain::PricingCategory', foreign_key: :captain_unit_id,
+                                inverse_of: :captain_unit, dependent: :destroy
 
   encrypts :inter_client_secret
   encrypts :inter_account_number

@@ -26,6 +26,10 @@ const props = defineProps({
     type: Number,
     required: true,
   },
+  engine: {
+    type: String,
+    default: 'captain_interno',
+  },
 });
 
 const emit = defineEmits(['action']);
@@ -76,11 +80,27 @@ const handleAction = ({ action, value }) => {
 <template>
   <CardLayout>
     <div class="flex justify-between w-full gap-1">
-      <h6
-        class="text-base font-normal text-n-slate-12 line-clamp-1 hover:underline transition-colors"
-      >
-        {{ name }}
-      </h6>
+      <div class="flex items-center gap-2 min-w-0">
+        <h6
+          class="text-base font-normal text-n-slate-12 line-clamp-1 hover:underline transition-colors"
+        >
+          {{ name }}
+        </h6>
+        <span
+          v-if="engine === 'hermes'"
+          class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-n-amber-3 text-n-amber-11 shrink-0"
+          :title="t('CAPTAIN.ASSISTANT_SWITCHER.ENGINE_HERMES_TOOLTIP')"
+        >
+          {{ t('CAPTAIN.ASSISTANT_SWITCHER.ENGINE_HERMES') }}
+        </span>
+        <span
+          v-else
+          class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-n-slate-3 text-n-slate-11 shrink-0"
+          :title="t('CAPTAIN.ASSISTANT_SWITCHER.ENGINE_INTERNO_TOOLTIP')"
+        >
+          {{ t('CAPTAIN.ASSISTANT_SWITCHER.ENGINE_INTERNO') }}
+        </span>
+      </div>
       <div class="flex items-center gap-2">
         <div
           v-on-clickaway="() => toggleDropdown(false)"

@@ -5,6 +5,7 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
   let(:assistant) { create(:captain_assistant, account: account) }
   let(:admin) { create(:user, account: account, role: :administrator) }
   let(:agent) { create(:user, account: account, role: :agent) }
+  let(:agent_with_custom_role) { create(:user, account: account, role: :agent) }
   let!(:pending_responses) do
     create_list(
       :captain_assistant_response,
@@ -32,7 +33,7 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
       it 'approves the responses and returns the updated records' do
         post "/api/v1/accounts/#{account.id}/captain/bulk_actions",
              params: valid_params,
-             headers: admin.create_new_auth_token,
+             headers: agent.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:ok)
@@ -59,7 +60,7 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
         expect do
           post "/api/v1/accounts/#{account.id}/captain/bulk_actions",
                params: delete_params,
-               headers: admin.create_new_auth_token,
+               headers: agent.create_new_auth_token,
                as: :json
         end.to change(Captain::AssistantResponse, :count).by(-2)
 
@@ -70,6 +71,40 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
         pending_responses.each do |response|
           expect { response.reload }.to raise_error(ActiveRecord::RecordNotFound)
         end
+      end
+    end
+
+    context 'when the user has a custom role' do
+      let(:approve_params) do
+        {
+          type: 'AssistantResponse',
+          ids: pending_responses.map(&:id),
+          fields: { status: 'approve' }
+        }
+      end
+
+      it 'allows bulk actions with knowledge base permission' do
+        custom_role = create(:custom_role, account: account, permissions: ['knowledge_base_manage'])
+        AccountUser.find_by!(account: account, user: agent_with_custom_role).update!(custom_role: custom_role)
+
+        post "/api/v1/accounts/#{account.id}/captain/bulk_actions",
+             params: approve_params,
+             headers: agent_with_custom_role.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:ok)
+      end
+
+      it 'rejects bulk actions without knowledge base permission' do
+        custom_role = create(:custom_role, account: account, permissions: ['conversation_manage'])
+        AccountUser.find_by!(account: account, user: agent_with_custom_role).update!(custom_role: custom_role)
+
+        post "/api/v1/accounts/#{account.id}/captain/bulk_actions",
+             params: approve_params,
+             headers: agent_with_custom_role.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:forbidden)
       end
     end
 

@@ -58,7 +58,7 @@ export default {
           name: 'captain_settings_gallery',
           component: GalleryIndex,
           meta: {
-            permissions: ['administrator'],
+            permissions: ['administrator', 'agent'],
           },
         },
         {
@@ -66,7 +66,7 @@ export default {
           name: 'captain_settings_gallery_edit',
           component: GalleryEdit,
           meta: {
-            permissions: ['administrator'],
+            permissions: ['administrator', 'agent'],
           },
         },
         {

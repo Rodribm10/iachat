@@ -130,6 +130,20 @@ const openCreateAssistantDialog = () => {
         <span class="text-sm font-medium truncate text-n-slate-12">
           {{ assistant.name || '' }}
         </span>
+        <span
+          v-if="assistant.engine === 'hermes'"
+          class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-n-amber-3 text-n-amber-11"
+          :title="t('CAPTAIN.ASSISTANT_SWITCHER.ENGINE_HERMES_TOOLTIP')"
+        >
+          {{ t('CAPTAIN.ASSISTANT_SWITCHER.ENGINE_HERMES') }}
+        </span>
+        <span
+          v-else
+          class="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-n-slate-3 text-n-slate-11"
+          :title="t('CAPTAIN.ASSISTANT_SWITCHER.ENGINE_INTERNO_TOOLTIP')"
+        >
+          {{ t('CAPTAIN.ASSISTANT_SWITCHER.ENGINE_INTERNO') }}
+        </span>
         <Avatar
           v-if="assistant"
           :name="assistant.name"

@@ -45,7 +45,7 @@
       "HIDE": "Ocultar filtros"
     },
     "KPI": {
-      "TOTAL": "Total na página",
+      "TOTAL": "Total filtrado",
       "PENDING_PIX": "Aguardando PIX",
       "CHECKIN_TODAY": "Check-in hoje",
       "REVENUE_TODAY": "Receita hoje"
@@ -891,6 +891,50 @@
         "RENDERED": "Rendered",
         "RESERVATION_ID": "Reserva #"
       }
+    }
+  },
+  "CAPTAIN_HERMES_BUILDER": {
+    "TITLE": "Construtor de Agentes",
+    "DESCRIPTION": "Crie novos agentes Hermes via chat guiado com o Construtor.",
+    "HEADER_TITLE": "Construtor de Agentes",
+    "HEADER_DESCRIPTION": "Converse com o Construtor pra criar um novo agente Hermes. Ele faz perguntas e ao final salva a especificação em JSON pra revisão.",
+    "RESET": "Limpar conversa",
+    "RESET_CONFIRM": "Limpar conversa atual com o Construtor?",
+    "EMPTY_STATE": "Pronto pra criar um novo agente Hermes? Clica em \"Iniciar criação\" e o Construtor te guia.",
+    "PLACEHOLDER": "Escreva e Enter pra enviar (Shift+Enter pula linha)",
+    "SEND": "Enviar",
+    "SESSION_LABEL": "Sessão:",
+    "SEND_FAILED": "Erro ao enviar: {message}",
+    "RESET_FAILED": "Falha ao limpar sessão.",
+    "START": "Iniciar criação",
+    "TAB_CHAT": "Chat (Construtor)",
+    "TAB_VERIFY": "Verificação",
+    "VERIFY": {
+      "TITLE": "Verificação de agente",
+      "DESCRIPTION": "Roda os checks de saúde (banco, roteamento, preços, MCP) de um agente Hermes. Para cada falha com botão Refazer, a UI tenta corrigir automaticamente. Demais falhas precisam de hermes-provision na VPS.",
+      "NO_ASSISTANTS": "Nenhum agente Hermes cadastrado",
+      "RUN": "Conferir agora",
+      "RUNNING": "Conferindo...",
+      "REPAIR": "Refazer",
+      "REPAIRING": "Reparando...",
+      "OK_LABEL": "OK",
+      "FAILS_LABEL": "falhas",
+      "WARN_LABEL": "atenção",
+      "OF_TOTAL": "de {total} checks",
+      "VERDICT_PASS": "Pode soltar",
+      "VERDICT_FAIL": "Há falhas críticas — corrija antes",
+      "EMPTY": "Selecione um agente e clique em Conferir agora pra rodar a verificação.",
+      "EMPTY_RESULTS": "Sem checks retornados — o agente foi removido?",
+      "REPAIR_FAILED": "Falha: {message}",
+      "REPAIR_OK": "Reparado: {message}",
+      "FETCH_FAILED": "Erro carregando assistentes: {message}",
+      "VALIDATE_FAILED": "Falha ao validar: {message}",
+      "CATEGORY_DB": "Banco de dados",
+      "CATEGORY_PRICING": "Preços",
+      "CATEGORY_ROUTING": "Roteamento Captain → Hermes",
+      "CATEGORY_HUMANIZATION": "Humanização (typing/delay/galeria)",
+      "CATEGORY_MCP": "Tools MCP registradas",
+      "CATEGORY_OTHER": "Outros"
     }
   }
 }

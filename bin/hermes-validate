@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+# hermes-validate <slug> — auditoria completa de um agente Hermes
+#
+# Uso:
+#   hermes-validate juliana_qnn1
+#   hermes-validate valentina --json   # output JSON-only pra parsing
+#
+# Roda 42 checks em DB / filesystem / daemon / routing / tripé humanização /
+# tools MCP / pricing. Reporta PASS/FAIL/WARN por item + resumo final.
+#
+# Exit code 0 = sem FAIL. 1 = pelo menos um FAIL.
+
+set -uo pipefail
+
+SLUG="${1:-}"
+JSON_MODE=0
+[[ "${2:-}" == "--json" ]] && JSON_MODE=1
+
+PROFILES_DIR="/root/.hermes/profiles"
+DOCKER_APP_FILTER="iachat_iachat_app"
+
+[[ -z "$SLUG" ]] && { echo "uso: hermes-validate <slug> [--json]"; exit 2; }
+
+PASS=0; FAIL=0; WARN=0
+RESULTS_JSON='[]'
+
+green() { printf "\033[32m✓\033[0m %s\n" "$1"; }
+red()   { printf "\033[31m✗\033[0m %s\n" "$1"; }
+yellow(){ printf "\033[33m⚠\033[0m %s\n" "$1"; }
+
+check() {
+  local label="$1" status="$2" detail="${3:-}"
+  case "$status" in
+    PASS) PASS=$((PASS+1)); [[ $JSON_MODE -eq 0 ]] && green "$label${detail:+ — $detail}" ;;
+    FAIL) FAIL=$((FAIL+1)); [[ $JSON_MODE -eq 0 ]] && red "$label${detail:+ — $detail}" ;;
+    WARN) WARN=$((WARN+1)); [[ $JSON_MODE -eq 0 ]] && yellow "$label${detail:+ — $detail}" ;;
+  esac
+  RESULTS_JSON=$(echo "$RESULTS_JSON" | jq --arg l "$label" --arg s "$status" --arg d "$detail" '. + [{label: $l, status: $s, detail: $d}]')
+}
+
+CID=$(docker ps --filter "name=$DOCKER_APP_FILTER" -q | head -1)
+[[ -z "$CID" ]] && { echo "iachat_iachat_app container não rodando"; exit 2; }
+
+PROFILE_DIR="$PROFILES_DIR/$SLUG"
+
+# ============================================================
+# Coleta dados do DB num único rails runner pra evitar 30 docker execs
+# ============================================================
+DB_DUMP=$(docker exec "$CID" bundle exec rails runner "
+  asst = Captain::Assistant.find_by(hermes_profile_name: '$SLUG', engine: 'hermes')
+  if asst.nil?
+    puts({error: 'no_assistant'}.to_json)
+    exit
+  end
+  unit = asst.captain_unit
+  brand = unit&.brand
+  ci = CaptainInbox.where(captain_assistant_id: asst.id).first
+  inbox = ci&.inbox
+  hum = asst.config['response_delay']
+  cats = unit&.pricing_categories&.includes(:amounts)&.to_a || []
+  galleria = unit&.gallery_items&.count || 0
+  ci_unit_id = ci&.captain_unit_id
+  inter_ok = unit && unit.respond_to?(:inter_credentials_present?) ? unit.inter_credentials_present? : false
+  pricing_dry_run = nil
+  if unit && cats.any?
+    first_cat_key = cats.first.key
+    res = Captain::Mcp::PricingTables.calculate(
+      unit_id: unit.id, suite_category: first_cat_key,
+      period: 'pernoite_promo', total_guests: 2
+    )
+    pricing_dry_run = res[:error] ? \"ERR: #{res[:error]}\" : \"OK R$ #{res[:amount]} (#{first_cat_key}/pernoite)\"
+  end
+  out = {
+    assistant_id: asst.id,
+    name: asst.name,
+    engine: asst.engine,
+    profile_name: asst.hermes_profile_name,
+    port: asst.hermes_port,
+    secret_present: !asst.hermes_subscription_secret.nil?,
+    base_url: asst.hermes_webhook_base_url,
+    parent_id: asst.parent_assistant_id,
+    unit_id: unit&.id,
+    unit_name: unit&.name,
+    brand_name: brand&.name,
+    cats_count: cats.size,
+    cats_keys: cats.map(&:key),
+    amounts_total: cats.flat_map { |c| c.amounts.to_a }.size,
+    inbox_id: inbox&.id,
+    inbox_name: inbox&.name,
+    inbox_typing_delay: inbox&.typing_delay,
+    response_delay: hum,
+    gallery_count: galleria,
+    enabled_for: inbox ? Captain::Hermes.enabled_for?(inbox) : nil,
+    webhook_url: inbox ? Captain::Hermes.webhook_url_for(inbox) : nil,
+    secret_via: inbox ? Captain::Hermes.subscription_signing_secret(inbox)&.first(8) : nil,
+    ci_unit_id: ci_unit_id,
+    inter_ok: inter_ok,
+    pricing_dry_run: pricing_dry_run
+  }
+  puts out.to_json
+" 2>&1 | grep -v 'WARN\|RubyLLM\|ip_lookup' | tail -1)
+
+if [[ -z "$DB_DUMP" ]] || ! echo "$DB_DUMP" | jq -e . >/dev/null 2>&1; then
+  echo "DB query falhou. Output: $DB_DUMP"
+  exit 2
+fi
+
+if echo "$DB_DUMP" | jq -e '.error' >/dev/null; then
+  red "Captain::Assistant com hermes_profile_name='$SLUG' não existe"
+  exit 1
+fi
+
+ASSISTANT_ID=$(echo "$DB_DUMP" | jq -r '.assistant_id')
+PORT=$(echo "$DB_DUMP" | jq -r '.port')
+INBOX_ID=$(echo "$DB_DUMP" | jq -r '.inbox_id // ""')
+PARENT_ID=$(echo "$DB_DUMP" | jq -r '.parent_id // ""')
+
+[[ $JSON_MODE -eq 0 ]] && echo "=== Validando $SLUG (assistant_id=$ASSISTANT_ID, port=$PORT) ==="
+
+# ============================================================
+# A. DB Captain
+# ============================================================
+[[ $JSON_MODE -eq 0 ]] && echo "--- A. DB ---"
+check "engine='hermes'" "$([[ $(echo "$DB_DUMP" | jq -r '.engine') == 'hermes' ]] && echo PASS || echo FAIL)"
+check "hermes_profile_name setado" "$([[ $(echo "$DB_DUMP" | jq -r '.profile_name') != 'null' && $(echo "$DB_DUMP" | jq -r '.profile_name') != '' ]] && echo PASS || echo FAIL)"
+check "hermes_port setado" "$([[ "$PORT" != 'null' && "$PORT" != '' ]] && echo PASS || echo FAIL)" "port=$PORT"
+check "hermes_subscription_secret setado" "$([[ $(echo "$DB_DUMP" | jq -r '.secret_present') == 'true' ]] && echo PASS || echo FAIL)"
+check "hermes_webhook_base_url" "$([[ $(echo "$DB_DUMP" | jq -r '.base_url') =~ ^http ]] && echo PASS || echo FAIL)"
+check "parent_assistant_id setado" "$([[ "$PARENT_ID" != 'null' && "$PARENT_ID" != '' ]] && echo PASS || echo WARN)" "parent=$PARENT_ID"
+check "captain_unit_id setado" "$([[ $(echo "$DB_DUMP" | jq -r '.unit_id') != 'null' ]] && echo PASS || echo FAIL)" "$(echo "$DB_DUMP" | jq -r '.unit_name')"
+ASSIST_UNIT=$(echo "$DB_DUMP" | jq -r '.unit_id // ""')
+CI_UNIT=$(echo "$DB_DUMP" | jq -r '.ci_unit_id // ""')
+check "CaptainInbox.unit == Assistant.unit (sem divergência)" "$([[ -n "$ASSIST_UNIT" && "$ASSIST_UNIT" == "$CI_UNIT" ]] && echo PASS || echo FAIL)" "asst=$ASSIST_UNIT ci=$CI_UNIT"
+check "Brand resolvida" "$([[ $(echo "$DB_DUMP" | jq -r '.brand_name') != 'null' ]] && echo PASS || echo FAIL)" "$(echo "$DB_DUMP" | jq -r '.brand_name')"
+check "Pricing categorias > 0" "$([[ $(echo "$DB_DUMP" | jq -r '.cats_count') -gt 0 ]] && echo PASS || echo FAIL)" "$(echo "$DB_DUMP" | jq -r '.cats_count') cats: $(echo "$DB_DUMP" | jq -r '.cats_keys | join(",")')"
+check "Pricing amounts > 0" "$([[ $(echo "$DB_DUMP" | jq -r '.amounts_total') -gt 0 ]] && echo PASS || echo FAIL)" "$(echo "$DB_DUMP" | jq -r '.amounts_total') amounts"
+PRICING_DRY=$(echo "$DB_DUMP" | jq -r '.pricing_dry_run // ""')
+check "Pricing dry-run (calcula sem erro)" "$([[ "$PRICING_DRY" == OK* ]] && echo PASS || echo FAIL)" "$PRICING_DRY"
+INTER_OK=$(echo "$DB_DUMP" | jq -r '.inter_ok // false')
+check "Credenciais Inter completas (cert+key+client_id)" "$([[ "$INTER_OK" == 'true' ]] && echo PASS || echo WARN)" "Sem isso generate_pix cai no fallback de link"
+check "CaptainInbox mapeada" "$([[ "$INBOX_ID" != 'null' && "$INBOX_ID" != '' ]] && echo PASS || echo WARN)" "inbox=$INBOX_ID"
+check "Inbox.typing_delay > 0 (debounce)" "$([[ $(echo "$DB_DUMP" | jq -r '.inbox_typing_delay // 0') -gt 0 ]] && echo PASS || echo WARN)" "$(echo "$DB_DUMP" | jq -r '.inbox_typing_delay // 0')s"
+check "config.response_delay (typing simulation)" "$([[ $(echo "$DB_DUMP" | jq -r '.response_delay.mode // ""') == 'typing_simulation' ]] && echo PASS || echo WARN)" "$(echo "$DB_DUMP" | jq -r '.response_delay.mode // "none"')"
+check "GalleryItem para fotos" "$([[ $(echo "$DB_DUMP" | jq -r '.gallery_count') -gt 0 ]] && echo PASS || echo WARN)" "$(echo "$DB_DUMP" | jq -r '.gallery_count') items (send_suite_images precisa)"
+
+# ============================================================
+# B. Filesystem
+# ============================================================
+[[ $JSON_MODE -eq 0 ]] && echo "--- B. Filesystem ---"
+check "Pasta do profile existe" "$([[ -d "$PROFILE_DIR" ]] && echo PASS || echo FAIL)" "$PROFILE_DIR"
+
+if [[ -d "$PROFILE_DIR" ]]; then
+  SOUL_LINES=$(wc -l < "$PROFILE_DIR/SOUL.md" 2>/dev/null || echo 0)
+  check "SOUL.md ≥ 300 linhas" "$([[ $SOUL_LINES -ge 300 ]] && echo PASS || echo WARN)" "$SOUL_LINES linhas"
+  RESID=$(grep -c 'Dolce Amore Motel\|Mini Chalé 45\|Suíte Ouro\|Chalé 2 Suítes' "$PROFILE_DIR/SOUL.md" 2>/dev/null || true)
+  RESID=${RESID:-0}
+  check "SOUL.md sem resíduo Dolce Amore" "$([[ $RESID -eq 0 ]] && echo PASS || echo FAIL)" "$RESID ocorrências"
+  IVR=$(grep -c 'RESPONDA ANTES DE PERGUNTAR\|Info vs Reserva' "$PROFILE_DIR/SOUL.md" 2>/dev/null || true)
+  check "SOUL.md tem Info-vs-Reserva" "$([[ ${IVR:-0} -gt 0 ]] && echo PASS || echo WARN)"
+  ALG=$(grep -c 'IGNORE OUTRAS UNIDADES' "$PROFILE_DIR/SOUL.md" 2>/dev/null || true)
+  check "SOUL.md tem anti-leak guard" "$([[ ${ALG:-0} -gt 0 ]] && echo PASS || echo WARN)"
+  check "skills/<skill_name>/SKILL.md existe" "$([[ -n "$(find "$PROFILE_DIR/skills" -mindepth 2 -name 'SKILL.md' | grep -v dogfood | head -1)" ]] && echo PASS || echo FAIL)"
+  check "dolce-amore-reservas NÃO está em skills/" "$([[ ! -d "$PROFILE_DIR/skills/dolce-amore-reservas" ]] && echo PASS || echo FAIL)"
+  SUB_KEY=$(jq -r 'keys[0] // ""' "$PROFILE_DIR/webhook_subscriptions.json" 2>/dev/null)
+  check "webhook_subscriptions.json com chave correta" "$([[ "$SUB_KEY" == "captain-inbox-$SLUG" ]] && echo PASS || echo FAIL)" "$SUB_KEY"
+  PORT_OK=$(grep -c "port: $PORT" "$PROFILE_DIR/config.yaml" 2>/dev/null || true)
+  check "config.yaml port=$PORT" "$([[ ${PORT_OK:-0} -gt 0 ]] && echo PASS || echo FAIL)"
+  HDR_OK=$(grep -c "X-Captain-Assistant-Id: '${PARENT_ID:-$ASSISTANT_ID}'" "$PROFILE_DIR/config.yaml" 2>/dev/null || true)
+  check "config.yaml X-Captain-Assistant-Id correto" "$([[ ${HDR_OK:-0} -gt 0 ]] && echo PASS || echo FAIL)"
+  MEM_OFF=$(grep -c 'memory_enabled: false' "$PROFILE_DIR/config.yaml" 2>/dev/null || true)
+  check "config.yaml memory_enabled: false" "$([[ ${MEM_OFF:-0} -gt 0 ]] && echo PASS || echo WARN)"
+  check "auth.json existe" "$([[ -f "$PROFILE_DIR/auth.json" ]] && echo PASS || echo FAIL)"
+  check "plugins/captain-http-callback presente" "$([[ -d "$PROFILE_DIR/plugins/captain-http-callback" ]] && echo PASS || echo FAIL)"
+  check "plugins/captain-webhook presente" "$([[ -d "$PROFILE_DIR/plugins/captain-webhook" ]] && echo PASS || echo FAIL)"
+fi
+
+# ============================================================
+# C. Daemon / systemd
+# ============================================================
+[[ $JSON_MODE -eq 0 ]] && echo "--- C. Daemon ---"
+check "systemd unit hermes@$SLUG ativa" "$([[ $(systemctl is-active "hermes@$SLUG.service" 2>/dev/null) == 'active' ]] && echo PASS || echo FAIL)"
+check "systemd unit enabled" "$([[ $(systemctl is-enabled "hermes@$SLUG.service" 2>/dev/null) == 'enabled' ]] && echo PASS || echo WARN)"
+check "Daemon escutando na porta $PORT" "$(ss -tnlH "( sport = :$PORT )" 2>/dev/null | grep -q . && echo PASS || echo FAIL)"
+ERR_COUNT=$(journalctl -u "hermes@$SLUG.service" --since '10 minutes ago' --no-pager 2>/dev/null | grep -ciE 'error|fatal|critical' || true)
+ERR_COUNT=${ERR_COUNT:-0}
+check "Logs sem erro recente" "$([[ $ERR_COUNT -eq 0 ]] && echo PASS || echo WARN)" "$ERR_COUNT erros nos últimos 10min"
+
+# ============================================================
+# D. Roteamento Captain ↔ Hermes
+# ============================================================
+[[ $JSON_MODE -eq 0 ]] && echo "--- D. Roteamento ---"
+check "Captain::Hermes.enabled_for? = true" "$([[ $(echo "$DB_DUMP" | jq -r '.enabled_for') == 'true' ]] && echo PASS || echo FAIL)"
+EXPECTED_URL="$(echo "$DB_DUMP" | jq -r '.base_url')/webhooks/captain-inbox-$SLUG"
+ACTUAL_URL=$(echo "$DB_DUMP" | jq -r '.webhook_url // ""')
+check "webhook_url aponta pra $SLUG" "$([[ "$ACTUAL_URL" == "$EXPECTED_URL" ]] && echo PASS || echo FAIL)" "$ACTUAL_URL"
+check "subscription_signing_secret retorna do DB" "$([[ -n "$(echo "$DB_DUMP" | jq -r '.secret_via // ""')" && "$(echo "$DB_DUMP" | jq -r '.secret_via // ""')" != 'null' ]] && echo PASS || echo WARN)" "$(echo "$DB_DUMP" | jq -r '.secret_via // "nil"')..."
+
+# ============================================================
+# E. MCP tools list (daemon registra todas)
+# ============================================================
+[[ $JSON_MODE -eq 0 ]] && echo "--- E. MCP tools (no Captain) ---"
+EXPECTED_TOOLS=(generate_pix faq_lookup add_label send_suite_images react_to_message update_contact get_contact_history check_pix_payment reschedule_reservation)
+TOOLS_REGISTRY=$(docker exec "$CID" bundle exec rails runner "puts Captain::Mcp::ToolRegistry::TOOLS.map(&:name).join(',')" 2>&1 | grep -v 'WARN\|RubyLLM\|ip_lookup' | tail -1)
+for tool in "${EXPECTED_TOOLS[@]}"; do
+  check "MCP tool '$tool' registrado" "$([[ "$TOOLS_REGISTRY" == *"$tool"* ]] && echo PASS || echo FAIL)"
+done
+
+# ============================================================
+# Resumo
+# ============================================================
+TOTAL=$((PASS+FAIL+WARN))
+if [[ $JSON_MODE -eq 1 ]]; then
+  jq -n --arg slug "$SLUG" --argjson pass $PASS --argjson fail $FAIL --argjson warn $WARN --argjson total $TOTAL --argjson results "$RESULTS_JSON" \
+    '{slug: $slug, total: $total, pass: $pass, fail: $fail, warn: $warn, ok: ($fail == 0), results: $results}'
+else
+  echo
+  echo "=== Resumo de $SLUG ==="
+  echo "Total: $TOTAL · ${PASS} PASS · ${FAIL} FAIL · ${WARN} WARN"
+  if [[ $FAIL -eq 0 ]]; then
+    echo "✅ Sem falhas críticas. Pode soltar."
+  else
+    echo "❌ $FAIL falha(s) — corrigir antes de soltar pro cliente."
+  fi
+fi
+
+[[ $FAIL -gt 0 ]] && exit 1
+exit 0

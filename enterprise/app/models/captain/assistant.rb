@@ -2,24 +2,39 @@
 #
 # Table name: captain_assistants
 #
-#  id                     :bigint           not null, primary key
-#  api_key                :text
-#  config                 :jsonb            not null
-#  description            :string
-#  guardrails             :jsonb
-#  handoff_webhook_config :jsonb
-#  llm_model              :string           default("gpt-3.5-turbo")
-#  llm_provider           :string           default("openai")
-#  name                   :string           not null
-#  orchestrator_prompt    :text
-#  response_guidelines    :jsonb
-#  created_at             :datetime         not null
-#  updated_at             :datetime         not null
-#  account_id             :bigint           not null
+#  id                         :bigint           not null, primary key
+#  api_key                    :text
+#  config                     :jsonb            not null
+#  description                :string
+#  engine                     :string           default("captain_interno"), not null
+#  guardrails                 :jsonb
+#  handoff_webhook_config     :jsonb
+#  hermes_port                :integer
+#  hermes_profile_name        :string
+#  hermes_subscription_secret :string
+#  hermes_webhook_base_url    :string
+#  llm_model                  :string           default("gpt-3.5-turbo")
+#  llm_provider               :string           default("openai")
+#  name                       :string           not null
+#  orchestrator_prompt        :text
+#  response_guidelines        :jsonb
+#  created_at                 :datetime         not null
+#  updated_at                 :datetime         not null
+#  account_id                 :bigint           not null
+#  captain_unit_id            :bigint
+#  parent_assistant_id        :bigint
 #
 # Indexes
 #
-#  index_captain_assistants_on_account_id  (account_id)
+#  idx_captain_assistants_hermes_port_unique        (hermes_port) UNIQUE WHERE (hermes_port IS NOT NULL)
+#  index_captain_assistants_on_account_id           (account_id)
+#  index_captain_assistants_on_captain_unit_id      (captain_unit_id)
+#  index_captain_assistants_on_engine               (engine)
+#  index_captain_assistants_on_parent_assistant_id  (parent_assistant_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (captain_unit_id => captain_units.id) ON DELETE => nullify
 #
 class Captain::Assistant < ApplicationRecord
   include Avatarable
@@ -29,6 +44,7 @@ class Captain::Assistant < ApplicationRecord
   self.table_name = 'captain_assistants'
 
   belongs_to :account
+  belongs_to :captain_unit, class_name: 'Captain::Unit', optional: true
   has_many :documents, class_name: 'Captain::Document', dependent: :destroy_async
   has_many :responses, class_name: 'Captain::AssistantResponse', dependent: :destroy_async
   has_many :captain_inboxes,
@@ -43,9 +59,17 @@ class Captain::Assistant < ApplicationRecord
 
   store_accessor :config, :temperature, :feature_faq, :feature_memory, :product_name
 
+  ENGINES = %w[captain_interno hermes].freeze
+
   validates :name, presence: true
   validates :description, presence: true
   validates :account_id, presence: true
+  validates :engine, inclusion: { in: ENGINES }
+  validates :hermes_profile_name, presence: true, if: :hermes?
+  validates :hermes_webhook_base_url, presence: true, if: :hermes?
+
+  scope :hermes, -> { where(engine: 'hermes') }
+  scope :captain_interno, -> { where(engine: 'captain_interno') }
 
   scope :ordered, -> { order(created_at: :desc) }
 
@@ -53,6 +77,14 @@ class Captain::Assistant < ApplicationRecord
 
   def available_name
     name
+  end
+
+  def hermes?
+    engine == 'hermes'
+  end
+
+  def captain_interno?
+    engine == 'captain_interno'
   end
 
   def available_agent_tools

@@ -34,6 +34,7 @@ RSpec.describe Captain::Reservations::MarkerBuilder do
       expect(described_class.ui_status(:scheduled)).to eq('confirmed')
       expect(described_class.ui_status(:active)).to eq('confirmed')
       expect(described_class.ui_status(:completed)).to eq('confirmed')
+      expect(described_class.ui_status(:confirmed)).to eq('confirmed')
       expect(described_class.ui_status(:cancelled)).to eq('cancelled')
     end
   end

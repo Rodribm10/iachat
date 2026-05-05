@@ -5,6 +5,7 @@ class Captain::Reservations::MarkerBuilder
     'scheduled' => 'confirmed',
     'active' => 'confirmed',
     'completed' => 'confirmed',
+    'confirmed' => 'confirmed',
     'cancelled' => 'cancelled'
   }.freeze
 

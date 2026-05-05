@@ -58,6 +58,15 @@ Rails.application.routes.draw do
             post :bulk_create, on: :collection
           end
           namespace :captain do
+            resources :hermes_builder, only: [:index, :create] do
+              collection do
+                post :start
+                delete :reset
+                get :assistants
+                get :validate
+                post :repair
+              end
+            end
             resource :preferences, only: [:show, :update]
             resources :assistants do
               member do
@@ -637,6 +646,9 @@ Rails.application.routes.draw do
   post 'webhooks/tiktok', to: 'webhooks/tiktok#events'
   post 'webhooks/shopify', to: 'webhooks/shopify#events'
   post 'webhooks/wuzapi/:inbox_id', to: 'webhooks/wuzapi#process_payload'
+  post 'webhooks/captain/hermes_callback', to: 'webhooks/captain/hermes_callback#process_payload'
+  post 'webhooks/captain/builder_callback', to: 'webhooks/captain/hermes_builder_callback#process_payload'
+  post 'webhooks/captain/mcp', to: 'webhooks/captain/mcp#process_payload'
 
   namespace :twitter do
     resource :callback, only: [:show]

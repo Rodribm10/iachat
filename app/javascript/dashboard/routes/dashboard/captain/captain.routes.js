@@ -18,6 +18,7 @@ import ResponsesPendingIndex from './responses/Pending.vue';
 import CustomToolsIndex from './tools/Index.vue';
 import ReservationsIndex from './reservations/Index.vue';
 import RoletaIndex from './roleta/Index.vue';
+import HermesBuilderIndex from './builder/Index.vue';
 import FunnelIndex from './funnel/Index.vue';
 import LifecycleIndex from './lifecycle/Index.vue';
 import LifecycleRules from './lifecycle/Rules.vue';
@@ -148,6 +149,19 @@ export const routes = [
     component: RoletaIndex,
     name: 'captain_roleta_index',
     meta,
+  },
+  {
+    path: frontendURL('accounts/:accountId/captain/hermes-builder'),
+    component: HermesBuilderIndex,
+    name: 'captain_hermes_builder_index',
+    meta: {
+      permissions: ['administrator'],
+      featureFlag: FEATURE_FLAGS.CAPTAIN,
+      installationTypes: [
+        INSTALLATION_TYPES.CLOUD,
+        INSTALLATION_TYPES.ENTERPRISE,
+      ],
+    },
   },
   {
     path: frontendURL('accounts/:accountId/captain/funnel'),
