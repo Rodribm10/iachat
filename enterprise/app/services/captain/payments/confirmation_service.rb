@@ -66,6 +66,7 @@ class Captain::Payments::ConfirmationService
     when 'payment_callback' then 'callback de pagamento'
     when 'inter_cob_query_polling' then 'consulta periódica no Inter'
     when 'inter_cob_query' then 'consulta manual no Inter'
+    when 'manual_pix_proof' then 'comprovante PIX manual validado'
     else
       'integração de pagamento'
     end

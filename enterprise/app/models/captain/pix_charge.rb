@@ -36,10 +36,28 @@ class Captain::PixCharge < ApplicationRecord
   belongs_to :reservation, class_name: 'Captain::Reservation'
   belongs_to :unit, class_name: 'Captain::Unit'
 
-  enum status: { active: 'active', paid: 'paid', expired: 'expired', failed: 'failed' }
+  enum status: {
+    active: 'active',
+    paid: 'paid',
+    expired: 'expired',
+    failed: 'failed',
+    awaiting_proof: 'awaiting_proof',
+    pending_review: 'pending_review'
+  }
 
   validates :txid, presence: true, uniqueness: true
   validates :unit_id, presence: true
+
+  scope :manual, -> { where(provider: 'manual') }
+  scope :inter, -> { where(provider: 'inter') }
+
+  def manual?
+    provider.to_s == 'manual'
+  end
+
+  def inter?
+    provider.to_s == 'inter'
+  end
 
   after_create_commit :post_internal_pix_sent_note
   after_create_commit :enqueue_retention_recalc
@@ -64,16 +82,7 @@ class Captain::PixCharge < ApplicationRecord
     conversation = reservation&.conversation
     return if conversation.blank?
 
-    value = original_value.to_f
-    expires_fmt = expires_at&.strftime('%d/%m/%Y %H:%M') || '—'
-
-    content = [
-      '💸 *PIX enviado ao cliente* — aguardando pagamento',
-      "Valor: R$ #{format('%.2f', value)}",
-      "Txid: #{txid}",
-      "Expira em: #{expires_fmt}",
-      "Reserva ##{reservation_id}"
-    ].join("\n")
+    content = manual? ? manual_pix_note_content : inter_pix_note_content
 
     Messages::MessageBuilder.new(
       nil,
@@ -110,6 +119,34 @@ class Captain::PixCharge < ApplicationRecord
       return val.to_f if val.present?
     end
 
+    if manual?
+      deposit = reservation&.metadata.to_h['deposit_amount']
+      return deposit.to_f if deposit.present?
+    end
+
     reservation&.total_amount
+  end
+
+  private
+
+  def manual_pix_note_content
+    [
+      '💸 *PIX MANUAL enviado ao cliente* — aguardando comprovante',
+      "Valor: R$ #{format('%.2f', original_value.to_f)}",
+      "Chave: #{unit&.manual_pix_key} (#{unit&.manual_pix_bank_name})",
+      "Beneficiário esperado: #{unit&.manual_pix_owner_name}",
+      "Reserva ##{reservation_id}"
+    ].join("\n")
+  end
+
+  def inter_pix_note_content
+    expires_fmt = expires_at&.strftime('%d/%m/%Y %H:%M') || '—'
+    [
+      '💸 *PIX enviado ao cliente* — aguardando pagamento',
+      "Valor: R$ #{format('%.2f', original_value.to_f)}",
+      "Txid: #{txid}",
+      "Expira em: #{expires_fmt}",
+      "Reserva ##{reservation_id}"
+    ].join("\n")
   end
 end

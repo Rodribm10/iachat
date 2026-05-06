@@ -74,9 +74,14 @@ class Captain::Unit < ApplicationRecord
   encrypts :inter_key_content
 
   enum status: { active: 'active', inactive: 'inactive' }, _default: 'active'
+  enum pix_mode: { inter_dynamic: 'inter_dynamic', manual_static: 'manual_static' }, _default: 'inter_dynamic', _prefix: true
+
+  MANUAL_PIX_KEY_TYPES = %w[cpf cnpj email phone random].freeze
 
   validates :name, presence: true
+  validates :manual_pix_key_type, inclusion: { in: MANUAL_PIX_KEY_TYPES }, allow_nil: true
   validate :proactive_pix_polling_requires_inter_credentials
+  validate :manual_static_requires_manual_pix_fields
 
   after_commit :enqueue_supabase_provisioning, on: :create
 
@@ -104,6 +109,13 @@ class Captain::Unit < ApplicationRecord
       (inter_key_content.present? || resolved_inter_key_path.present?)
   end
 
+  def manual_pix_configured?
+    pix_mode_manual_static? &&
+      manual_pix_key.present? &&
+      manual_pix_owner_name.present? &&
+      manual_pix_bank_name.present?
+  end
+
   def resolved_inter_cert_path
     resolve_certificate_path(inter_cert_path)
   end
@@ -126,6 +138,14 @@ class Captain::Unit < ApplicationRecord
       :proactive_pix_polling_enabled,
       'só pode ser habilitado quando a integração Inter estiver completa (client id/secret, chave pix, cert e key)'
     )
+  end
+
+  def manual_static_requires_manual_pix_fields
+    return unless pix_mode_manual_static?
+
+    %i[manual_pix_key manual_pix_owner_name manual_pix_bank_name].each do |field|
+      errors.add(field, 'é obrigatório quando pix_mode = manual_static') if public_send(field).blank?
+    end
   end
 
   # Resolve o path do certificado — suporta caminho absoluto, relativo ao Rails.root

@@ -80,6 +80,12 @@ class Captain::Mcp::Tools::GeneratePixTool < Captain::Mcp::Tools::BaseTool
     unit = resolve_unit(conversation, context)
     return error_response('Unidade do Captain não vinculada à inbox dessa conversa.') if unit.blank?
 
+    # Modo PIX manual estático (Padova, Express AL): sem integração Inter,
+    # sem QR/copia-cola dinâmico, sem fallback de página de reserva.
+    # Hermes apresenta a chave PIX fixa da unidade e o cliente envia
+    # comprovante pra validação por vision.
+    return dispatch_manual_pix_flow!(conversation, unit, args) if unit.pix_mode_manual_static?
+
     # Sem credencial Inter: vai DIRETO pro fallback de página de reserva ao
     # invés de retornar erro pro LLM (que ele ia transformar em "vou
     # verificar" e travar). Cliente recebe link da página oficial pra
@@ -320,6 +326,81 @@ class Captain::Mcp::Tools::GeneratePixTool < Captain::Mcp::Tools::BaseTool
     current = conversation.label_list
     merged = (current + ['aguardando_pagamento']).uniq - %w[pagamento_confirmado reserva_feita]
     conversation.update_labels(merged)
+  end
+
+  # Fluxo PIX manual: unidade tem chave PIX estática (Padova, Express AL).
+  # Sem Inter, sem QR, sem fallback. Apresenta chave + nome do beneficiário
+  # pro cliente; aguarda comprovante (que será validado via vision pela
+  # tool verificar_comprovante_pix).
+  def dispatch_manual_pix_flow!(conversation, unit, args)
+    contact = conversation.contact
+    hydrate_contact_from_recent_messages!(contact, conversation)
+    missing = identity_missing_fields(contact)
+    return error_response("Faltam dados do cliente pra gerar Pix: #{missing.join(', ')}. Peça ao cliente antes de chamar esta tool.") if missing.any?
+
+    pricing = Captain::Mcp::PricingTables.calculate(
+      unit_id: unit.id,
+      suite_category: args['suite_category'],
+      period: args['period'],
+      total_guests: (args['total_guests'] || 2).to_i
+    )
+    if pricing[:error].present?
+      Rails.logger.warn("[Captain::Mcp::GeneratePixTool] manual pricing inválido: #{pricing[:error]}")
+      return error_response("Não consegui calcular o valor: #{pricing[:error]}. Confirma a categoria/permanência com o cliente.")
+    end
+
+    total_amount = pricing[:amount]
+    deposit = (total_amount * DEFAULT_DEPOSIT_RATIO).round(2)
+
+    reservation = build_or_update_reservation!(conversation, unit, args, pricing, total_amount, deposit)
+
+    charge = Captain::PixCharge.create!(
+      reservation: reservation,
+      unit: unit,
+      provider: 'manual',
+      status: 'awaiting_proof',
+      txid: "manual_#{SecureRandom.uuid}"
+    )
+
+    reservation.update!(status: :pending_payment)
+
+    dispatch_manual_pix_message(conversation, unit, deposit)
+    mark_awaiting_payment(conversation)
+    label_manual_pix(conversation)
+
+    deposit_str = format('%.2f', deposit)
+    total_str = format('%.2f', total_amount)
+    breakdown = "#{pricing[:breakdown][:suite_category]} / #{pricing[:breakdown][:period]}"
+    text_response(
+      "Pix MANUAL enviado: chave #{unit.manual_pix_key} (#{unit.manual_pix_bank_name}) — " \
+      "sinal R$ #{deposit_str} (50% de R$ #{total_str} — #{breakdown}). " \
+      "Charge ##{charge.id}. Cliente vai mandar comprovante por imagem — quando chegar, " \
+      "chame verificar_comprovante_pix(image_url, pix_charge_id=#{charge.id})."
+    )
+  end
+
+  def dispatch_manual_pix_message(conversation, unit, deposit)
+    body = [
+      'Pode fazer o Pix:',
+      '',
+      "🔑 Chave: #{unit.manual_pix_key}",
+      "🏦 Banco: #{unit.manual_pix_bank_name}",
+      "💰 Valor: R$ #{format('%.2f', deposit)}",
+      "👤 Nome que aparece: *#{unit.manual_pix_owner_name}*",
+      '',
+      'Quando pagar, me manda o comprovante por aqui que eu confirmo.'
+    ].join("\n")
+
+    Messages::MessageBuilder.new(nil, conversation, content: body, message_type: 'outgoing').perform
+  rescue StandardError => e
+    Rails.logger.warn("[Captain::Mcp::GeneratePixTool] failed to dispatch manual pix message: #{e.class} - #{e.message}")
+  end
+
+  def label_manual_pix(conversation)
+    current = conversation.label_list
+    conversation.update_labels((current + ['pix_manual']).uniq)
+  rescue StandardError => e
+    Rails.logger.warn("[Captain::Mcp::GeneratePixTool] failed to label manual pix: #{e.class} - #{e.message}")
   end
 
   # Fallback "leve" pra cenários onde Pix nem foi tentado (categoria não

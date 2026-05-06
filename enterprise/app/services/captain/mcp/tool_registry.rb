@@ -19,6 +19,11 @@ class Captain::Mcp::ToolRegistry
     Captain::Mcp::Tools::RescheduleReservationTool,
     Captain::Mcp::Tools::ReactToMessageTool,
     Captain::Mcp::Tools::CheckSuiteAvailabilityTool,
+    # PIX manual estático (Padova, Express AL) — fluxo paralelo ao Inter
+    Captain::Mcp::Tools::VerifyPixProofTool,
+    Captain::Mcp::Tools::CreateInternalNoteTool,
+    Captain::Mcp::Tools::ConfirmPixManualTool,
+    Captain::Mcp::Tools::MarkReservationPendingTool,
     # Construtor (admin scope) — usadas pelo profile Hermes "construtor" pra criar novos agentes
     Captain::Mcp::Tools::ListAssistantsTool,
     Captain::Mcp::Tools::GetAssistantPricingTool,
