@@ -253,12 +253,22 @@ const fetchLpStats = async () => {
 
 let pollInterval = null;
 
+const insightFilterParams = () => {
+  const { period_start, period_end } = getPeriodDates(selectedPeriod.value);
+  return {
+    ...(selectedInboxId.value && { inbox_id: selectedInboxId.value }),
+    ...(period_start && period_end && { period_start, period_end }),
+  };
+};
+
+const fetchInsightsForSelectedFilters = async () => {
+  await store.dispatch('captainReports/fetchInsights', insightFilterParams());
+};
+
 const startPolling = () => {
   if (pollInterval) return;
   pollInterval = setInterval(async () => {
-    await store.dispatch('captainReports/fetchInsights', {
-      inbox_id: selectedInboxId.value,
-    });
+    await fetchInsightsForSelectedFilters();
   }, 10000);
 };
 
@@ -289,6 +299,7 @@ watch(activeTab, async tab => {
 watch([customStartDate, customEndDate], async () => {
   if (selectedPeriod.value !== 'custom') return;
   if (!customStartDate.value || !customEndDate.value) return;
+  await fetchInsightsForSelectedFilters();
   if (activeTab.value === 'landing_pages') await fetchLpStats();
   if (activeTab.value === 'operational') await fetchOperational();
   if (activeTab.value === 'executive') await fetchExecutive();
@@ -308,7 +319,7 @@ watch(
 onMounted(async () => {
   await store.dispatch('inboxes/get');
   await store.dispatch('captainAssistants/get');
-  await store.dispatch('captainReports/fetchInsights', {});
+  await fetchInsightsForSelectedFilters();
   if (hasProcessingInsights.value) startPolling();
   await fetchLpStats();
 });
@@ -320,9 +331,7 @@ onUnmounted(() => {
 const onFilterChange = async event => {
   const value = event.target.value;
   selectedInboxId.value = value ? Number(value) : null;
-  await store.dispatch('captainReports/fetchInsights', {
-    inbox_id: selectedInboxId.value,
-  });
+  await fetchInsightsForSelectedFilters();
   if (activeTab.value === 'landing_pages') await fetchLpStats();
   if (activeTab.value === 'operational') await fetchOperational();
   if (activeTab.value === 'executive') await fetchExecutive();
@@ -330,6 +339,7 @@ const onFilterChange = async event => {
 
 const onPeriodChange = async event => {
   selectedPeriod.value = event.target.value;
+  await fetchInsightsForSelectedFilters();
   if (activeTab.value === 'landing_pages') await fetchLpStats();
   if (activeTab.value === 'operational') await fetchOperational();
   if (activeTab.value === 'executive') await fetchExecutive();

@@ -46,17 +46,21 @@ class Captain::Reports::GenerateInsightsJob < ApplicationJob
       account: account,
       unit: unit,
       inbox: inbox,
-      conversations: conversations
+      conversations: conversations,
+      period_start: period_start,
+      period_end: period_end
     ).analyze
 
-    insight.update!(messages_count: conversations.sum { |conv| conv.messages.count })
+    insight.update!(messages_count: messages_in_period(conversations, period_start, period_end).count)
     insight.mark_done!(payload)
   end
 
   def fetch_conversations(account, unit, inbox, period_start, period_end)
     scope = account.conversations
-                   .where(created_at: period_start.beginning_of_day..period_end.end_of_day)
-                   .includes(:messages)
+                   .joins(:messages)
+                   .where(messages: { created_at: period_start.beginning_of_day..period_end.end_of_day })
+                   .where.not(messages: { message_type: [Message.message_types[:activity], Message.message_types[:template]] })
+                   .where(messages: { private: false })
 
     if inbox
       scope = scope.where(inbox_id: inbox.id)
@@ -65,6 +69,19 @@ class Captain::Reports::GenerateInsightsJob < ApplicationJob
       scope = scope.where(inbox_id: inbox_ids) if inbox_ids.any?
     end
 
-    scope.to_a
+    account.conversations
+           .where(id: scope.select(:id).distinct)
+           .includes(:inbox, :contact, :messages)
+           .to_a
+  end
+
+  def messages_in_period(conversations, period_start, period_end)
+    conversation_ids = conversations.map(&:id)
+    return Message.none if conversation_ids.empty?
+
+    Message.where(conversation_id: conversation_ids)
+           .where(created_at: period_start.beginning_of_day..period_end.end_of_day)
+           .where.not(message_type: %i[activity template])
+           .where(private: false)
   end
 end

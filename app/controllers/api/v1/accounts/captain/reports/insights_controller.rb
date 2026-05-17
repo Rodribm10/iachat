@@ -1,13 +1,6 @@
 class Api::V1::Accounts::Captain::Reports::InsightsController < Api::V1::Accounts::BaseController
   def index
-    unit_id = params[:unit_id].present? ? params[:unit_id].to_i : nil
-    inbox_id = params[:inbox_id].present? ? params[:inbox_id].to_i : nil
-
-    scope = Captain::ConversationInsight.where(account_id: Current.account.id)
-    scope = scope.where(captain_unit_id: unit_id) if unit_id
-    scope = scope.where(inbox_id: inbox_id) if inbox_id
-
-    insights = scope.order(period_start: :desc).limit(12)
+    insights = filtered_insights.order(period_start: :desc).limit(12)
 
     render json: insights.map { |i| format_insight(i) }
   end
@@ -38,6 +31,22 @@ class Api::V1::Accounts::Captain::Reports::InsightsController < Api::V1::Account
   # rubocop:enable Metrics/AbcSize
 
   private
+
+  def filtered_insights
+    scope = Captain::ConversationInsight.where(account_id: Current.account.id)
+    scope = scope.where(captain_unit_id: filter_unit_id) if filter_unit_id
+    scope = scope.where(inbox_id: filter_inbox_id) if filter_inbox_id
+    scope = scope.for_period(*requested_period) if requested_period
+    scope
+  end
+
+  def filter_unit_id
+    params[:unit_id].presence&.to_i
+  end
+
+  def filter_inbox_id
+    params[:inbox_id].presence&.to_i
+  end
 
   def enqueue_insight(unit_id, inbox_id, period_start, period_end)
     insight = find_or_init_insight(unit_id, inbox_id, period_start, period_end)
@@ -75,6 +84,14 @@ class Api::V1::Accounts::Captain::Reports::InsightsController < Api::V1::Account
     Date.parse(param.to_s)
   rescue ArgumentError, TypeError
     default
+  end
+
+  def requested_period
+    return nil if params[:period_start].blank? || params[:period_end].blank?
+
+    [Date.parse(params[:period_start].to_s), Date.parse(params[:period_end].to_s)]
+  rescue ArgumentError, TypeError
+    nil
   end
 
   def format_insight(insight)

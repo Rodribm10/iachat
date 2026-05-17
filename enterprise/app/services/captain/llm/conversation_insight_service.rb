@@ -3,12 +3,14 @@ class Captain::Llm::ConversationInsightService < Llm::BaseAiService
 
   MAX_CHARS_PER_CHUNK = 40_000
 
-  def initialize(account:, conversations:, unit: nil, inbox: nil)
+  def initialize(account:, conversations:, unit: nil, inbox: nil, period_start: nil, period_end: nil)
     super()
     @account = account
     @unit = unit
     @inbox = inbox
     @conversations = conversations
+    @period_start = period_start
+    @period_end = period_end
   end
 
   # Analisa as conversas e retorna o payload de insights
@@ -24,10 +26,10 @@ class Captain::Llm::ConversationInsightService < Llm::BaseAiService
 
   private
 
-  attr_reader :account, :unit, :inbox, :conversations
+  attr_reader :account, :unit, :inbox, :conversations, :period_start, :period_end
 
   def build_chunks
-    texts = conversations.map(&:to_llm_text).reject(&:blank?)
+    texts = conversations.map { |conversation| conversation_text(conversation) }.reject(&:blank?)
     return [] if texts.empty?
 
     chunks = []
@@ -46,6 +48,38 @@ class Captain::Llm::ConversationInsightService < Llm::BaseAiService
 
     chunks << current.join("\n\n---\n\n") if current.any?
     chunks
+  end
+
+  def conversation_text(conversation)
+    return conversation.to_llm_text unless period_start && period_end
+
+    messages = conversation.messages
+                           .where(created_at: period_start.beginning_of_day..period_end.end_of_day)
+                           .where.not(message_type: %i[activity template])
+                           .where(private: false)
+                           .order(created_at: :asc)
+
+    return nil if messages.empty?
+
+    [
+      "Conversation ID: ##{conversation.display_id}",
+      "Channel: #{conversation.inbox.channel.name}",
+      'Message History:',
+      messages.map { |message| format_message(message) }.join
+    ].join("\n")
+  end
+
+  def format_message(message)
+    sender = case message.sender_type
+             when 'User'
+               'Support Agent'
+             when 'Contact'
+               'User'
+             else
+               'Bot'
+             end
+
+    "#{sender}: #{message.content_for_llm}\n"
   end
 
   def analyze_chunk(chunk)
