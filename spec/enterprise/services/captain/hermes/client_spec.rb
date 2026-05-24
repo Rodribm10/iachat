@@ -50,6 +50,40 @@ RSpec.describe Captain::Hermes::Client do
       expect(payload[:message]).to include('Pode reservar essa')
     end
 
+    it 'includes quoted context when Chatwoot stores the reply as an internal message id' do
+      quoted_message = create(
+        :message,
+        account: account,
+        inbox: inbox,
+        conversation: conversation,
+        message_type: :outgoing,
+        content: "Stilo hoje fica assim:\n1h R$ 50\nValor pra ate 2 pessoas.",
+        source_id: 'WAID:quoted-stilo'
+      )
+      reply = create(
+        :message,
+        account: account,
+        inbox: inbox,
+        conversation: conversation,
+        message_type: :incoming,
+        content: 'Quero uma 1 hora na suite desse valor',
+        source_id: 'WAID:reply-stilo',
+        in_reply_to_id: quoted_message.id
+      )
+
+      payload = client.send(:build_payload, message: reply, conversation: conversation)
+
+      expect(payload[:reply_context]).to include(
+        message_id: quoted_message.id,
+        external_id: quoted_message.source_id,
+        found: true
+      )
+      expect(payload[:message]).to include('Stilo hoje fica assim')
+      expect(payload[:message]).to include('1h R$ 50')
+      expect(payload[:message]).to include('resolva a referência usando a mensagem citada')
+      expect(payload[:message]).to include('Quero uma 1 hora na suite desse valor')
+    end
+
     it 'keeps the combined incoming text while adding quote context' do
       quoted_message = create(
         :message,

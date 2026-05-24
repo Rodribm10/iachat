@@ -5,10 +5,11 @@ class Captain::Hermes::ReplyContextBuilder
   end
 
   def perform
-    return nil if reply_to_external_id.blank?
+    return nil if reply_reference.blank?
 
     {
       external_id: reply_to_external_id,
+      message_id: reply_to_message_id,
       found: quoted_message.present?,
       quoted_message: quoted_message_snapshot
     }.compact
@@ -38,6 +39,8 @@ class Captain::Hermes::ReplyContextBuilder
       [CONTEXTO DE RESPOSTA DO WHATSAPP]
       O cliente respondeu citando uma mensagem anterior.
       Interprete a resposta atual como referência direta a essa mensagem citada.
+      Se a resposta atual usar termos como "esse valor", "desse valor", "essa", "esse" ou "isso",
+      resolva a referência usando a mensagem citada antes do restante do histórico.
       Mensagem citada (#{quoted[:sender_label]}, #{quoted[:created_at]}): #{quoted_content}
     TEXT
   end
@@ -46,8 +49,12 @@ class Captain::Hermes::ReplyContextBuilder
     <<~TEXT.strip
       [CONTEXTO DE RESPOSTA DO WHATSAPP]
       O cliente respondeu citando uma mensagem anterior, mas o Chatwoot não encontrou o conteúdo da mensagem citada.
-      ID externo citado: #{reply_context[:external_id]}
+      Referência citada: #{reply_reference}
     TEXT
+  end
+
+  def reply_reference
+    reply_to_external_id.presence || reply_to_message_id.presence
   end
 
   def reply_to_external_id
@@ -56,8 +63,17 @@ class Captain::Hermes::ReplyContextBuilder
                               message.content_attributes.to_h[:in_reply_to_external_id].presence
   end
 
+  def reply_to_message_id
+    @reply_to_message_id ||= message.in_reply_to_id.presence ||
+                             message.content_attributes.to_h['in_reply_to'].presence ||
+                             message.content_attributes.to_h[:in_reply_to].presence
+  end
+
   def quoted_message
-    @quoted_message ||= conversation.messages.find_by(source_id: reply_to_external_id)
+    @quoted_message ||= begin
+      found_by_id = conversation.messages.find_by(id: reply_to_message_id) if reply_to_message_id.present?
+      found_by_id || conversation.messages.find_by(source_id: reply_to_external_id)
+    end
   end
 
   def quoted_message_snapshot
