@@ -71,10 +71,13 @@ class Captain::Hermes::Client
     contact_attrs = contact&.custom_attributes.to_h.with_indifferent_access
     cpf_digits = contact_attrs[:cpf].to_s.gsub(/\D/, '')
     history = contact_history_snapshot(contact, conversation)
+    reply_context_builder = Captain::Hermes::ReplyContextBuilder.new(message: message, conversation: conversation)
+    reply_context = reply_context_builder.perform
 
     {
-      message: content_override.presence || text_for_hermes(message),
+      message: reply_context_builder.wrap_message(content_override.presence || text_for_hermes(message)),
       image_urls: image_urls_for_hermes(message),
+      reply_context: reply_context,
       contact_name: contact&.name,
       contact_first_name: contact&.name.to_s.split.first,
       contact_id: conversation.contact_id,
