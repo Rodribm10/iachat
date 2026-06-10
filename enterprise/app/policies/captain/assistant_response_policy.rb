@@ -24,10 +24,6 @@ class Captain::AssistantResponsePolicy < ApplicationPolicy
   def manage?
     return true if @account_user.administrator?
 
-    if @account_user.custom_role.present?
-      return @account_user.custom_role.permissions.include?('knowledge_base_manage')
-    end
-
-    @account_user.agent?
+    @account_user.custom_role&.permissions&.include?('knowledge_base_manage') || false
   end
 end

@@ -6,6 +6,7 @@ import { useMapGetter, useStore } from 'dashboard/composables/store.js';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
+import Policy from 'dashboard/components/policy.vue';
 
 const emit = defineEmits(['close', 'createAssistant']);
 
@@ -105,14 +106,16 @@ const openCreateAssistantDialog = () => {
           {{ t('CAPTAIN.ASSISTANT_SWITCHER.SWITCH_ASSISTANT') }}
         </p>
       </div>
-      <Button
-        :label="t('CAPTAIN.ASSISTANT_SWITCHER.NEW_ASSISTANT')"
-        color="slate"
-        icon="i-lucide-plus"
-        size="sm"
-        class="!bg-n-alpha-2 hover:!bg-n-alpha-3"
-        @click="openCreateAssistantDialog"
-      />
+      <Policy :permissions="['administrator']">
+        <Button
+          :label="t('CAPTAIN.ASSISTANT_SWITCHER.NEW_ASSISTANT')"
+          color="slate"
+          icon="i-lucide-plus"
+          size="sm"
+          class="!bg-n-alpha-2 hover:!bg-n-alpha-3"
+          @click="openCreateAssistantDialog"
+        />
+      </Policy>
     </div>
     <div v-if="assistants.length > 0" class="flex flex-col gap-2 px-4">
       <Button

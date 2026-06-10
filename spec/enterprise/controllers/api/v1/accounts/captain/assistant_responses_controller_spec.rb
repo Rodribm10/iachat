@@ -180,16 +180,15 @@ RSpec.describe 'Api::V1::Accounts::Captain::AssistantResponses', type: :request 
       expect(json_response[:answer]).to eq('Test answer')
     end
 
-    it 'creates a new response if the user is an agent' do
+    it 'does not create a new response if the user is an agent without knowledge base permission' do
       expect do
         post "/api/v1/accounts/#{account.id}/captain/assistant_responses",
              params: valid_params,
              headers: agent.create_new_auth_token,
              as: :json
-      end.to change(Captain::AssistantResponse, :count).by(1)
+      end.not_to change(Captain::AssistantResponse, :count)
 
-      expect(response).to have_http_status(:success)
-      expect(json_response[:question]).to eq('Test question?')
+      expect(response).to have_http_status(:forbidden)
     end
 
     it 'creates a new response if the user has a custom role with knowledge base permission' do
@@ -254,7 +253,6 @@ RSpec.describe 'Api::V1::Accounts::Captain::AssistantResponses', type: :request 
 
         expect(response).to have_http_status(:unprocessable_entity)
       end
-
     end
   end
 
@@ -281,10 +279,23 @@ RSpec.describe 'Api::V1::Accounts::Captain::AssistantResponses', type: :request 
       expect(json_response[:answer]).to eq('Updated answer')
     end
 
-    it 'updates the response if the user is an agent' do
+    it 'does not update the response if the user is an agent without knowledge base permission' do
       patch "/api/v1/accounts/#{account.id}/captain/assistant_responses/#{response_record.id}",
             params: update_params,
             headers: agent.create_new_auth_token,
+            as: :json
+
+      expect(response).to have_http_status(:forbidden)
+      expect(response_record.reload.question).not_to eq('Updated question?')
+    end
+
+    it 'updates the response if the user has a custom role with knowledge base permission' do
+      custom_role = create(:custom_role, account: account, permissions: ['knowledge_base_manage'])
+      AccountUser.find_by!(account: account, user: agent_with_custom_role).update!(custom_role: custom_role)
+
+      patch "/api/v1/accounts/#{account.id}/captain/assistant_responses/#{response_record.id}",
+            params: update_params,
+            headers: agent_with_custom_role.create_new_auth_token,
             as: :json
 
       expect(response).to have_http_status(:ok)
@@ -315,10 +326,23 @@ RSpec.describe 'Api::V1::Accounts::Captain::AssistantResponses', type: :request 
   describe 'DELETE /api/v1/accounts/:account_id/captain/assistant_responses/:id' do
     let!(:response_record) { create(:captain_assistant_response, assistant: assistant) }
 
-    it 'deletes the response' do
+    it 'does not delete the response if the user is an agent without knowledge base permission' do
       expect do
         delete "/api/v1/accounts/#{account.id}/captain/assistant_responses/#{response_record.id}",
                headers: agent.create_new_auth_token,
+               as: :json
+      end.not_to change(Captain::AssistantResponse, :count)
+
+      expect(response).to have_http_status(:forbidden)
+    end
+
+    it 'deletes the response if the user has a custom role with knowledge base permission' do
+      custom_role = create(:custom_role, account: account, permissions: ['knowledge_base_manage'])
+      AccountUser.find_by!(account: account, user: agent_with_custom_role).update!(custom_role: custom_role)
+
+      expect do
+        delete "/api/v1/accounts/#{account.id}/captain/assistant_responses/#{response_record.id}",
+               headers: agent_with_custom_role.create_new_auth_token,
                as: :json
       end.to change(Captain::AssistantResponse, :count).by(-1)
 

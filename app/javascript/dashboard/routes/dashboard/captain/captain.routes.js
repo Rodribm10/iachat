@@ -1,5 +1,6 @@
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { INSTALLATION_TYPES } from 'dashboard/constants/installationTypes';
+import { PORTAL_PERMISSIONS } from 'dashboard/constants/permissions';
 import { frontendURL } from '../../../helper/URLHelper';
 
 import CaptainPageRouteView from './pages/CaptainPageRouteView.vue';
@@ -31,6 +32,11 @@ const meta = {
   installationTypes: [INSTALLATION_TYPES.CLOUD, INSTALLATION_TYPES.ENTERPRISE],
 };
 
+const knowledgeBaseMeta = {
+  ...meta,
+  permissions: ['administrator', 'agent', PORTAL_PERMISSIONS],
+};
+
 const metaV2 = {
   permissions: ['administrator', 'agent'],
   featureFlag: FEATURE_FLAGS.CAPTAIN_V2,
@@ -42,13 +48,13 @@ const assistantRoutes = [
     path: frontendURL('accounts/:accountId/captain/:assistantId/faqs'),
     component: ResponsesIndex,
     name: 'captain_assistants_responses_index',
-    meta,
+    meta: knowledgeBaseMeta,
   },
   {
     path: frontendURL('accounts/:accountId/captain/:assistantId/documents'),
     component: DocumentsIndex,
     name: 'captain_assistants_documents_index',
-    meta,
+    meta: knowledgeBaseMeta,
   },
   {
     path: frontendURL('accounts/:accountId/captain/:assistantId/tools'),
@@ -78,7 +84,7 @@ const assistantRoutes = [
     path: frontendURL('accounts/:accountId/captain/:assistantId/faqs/pending'),
     component: ResponsesPendingIndex,
     name: 'captain_assistants_responses_pending',
-    meta,
+    meta: knowledgeBaseMeta,
   },
   {
     path: frontendURL('accounts/:accountId/captain/:assistantId/settings'),
@@ -119,7 +125,7 @@ const assistantRoutes = [
     path: frontendURL('accounts/:accountId/captain/:navigationPath'),
     component: AssistantsIndexPage,
     name: 'captain_assistants_index',
-    meta,
+    meta: knowledgeBaseMeta,
   },
 ];
 
