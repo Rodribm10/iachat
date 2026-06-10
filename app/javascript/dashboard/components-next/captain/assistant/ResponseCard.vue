@@ -10,6 +10,7 @@ import Button from 'dashboard/components-next/button/Button.vue';
 import Checkbox from 'dashboard/components-next/checkbox/Checkbox.vue';
 import Policy from 'dashboard/components/policy.vue';
 import Icon from 'dashboard/components-next/icon/Icon.vue';
+import { PORTAL_PERMISSIONS } from 'dashboard/constants/permissions';
 
 const props = defineProps({
   id: {
@@ -71,6 +72,7 @@ const emit = defineEmits(['action', 'navigate', 'select', 'hover']);
 const { t } = useI18n();
 
 const [showActionsDropdown, toggleDropdown] = useToggle();
+const responseManagePermissions = ['administrator', PORTAL_PERMISSIONS];
 
 const modelValue = computed({
   get: () => props.isSelected,
@@ -142,7 +144,7 @@ const handleDocumentableClick = () => {
       <div v-if="!compact && showMenu" class="flex items-center gap-2">
         <Policy
           v-on-clickaway="() => toggleDropdown(false)"
-          :permissions="['administrator']"
+          :permissions="responseManagePermissions"
           class="relative flex items-center group"
         >
           <Button
@@ -168,7 +170,7 @@ const handleDocumentableClick = () => {
       v-if="!compact"
       class="flex items-start justify-between flex-col-reverse md:flex-row gap-3"
     >
-      <Policy v-if="showActions" :permissions="['administrator']">
+      <Policy v-if="showActions" :permissions="responseManagePermissions">
         <div class="flex items-center gap-2 sm:gap-5 w-full">
           <Button
             v-if="status === 'pending'"

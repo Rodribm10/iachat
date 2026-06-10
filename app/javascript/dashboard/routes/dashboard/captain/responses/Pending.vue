@@ -7,6 +7,8 @@ import { useRouter, useRoute } from 'vue-router';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { debounce } from '@chatwoot/utils';
 import { useAccount } from 'dashboard/composables/useAccount';
+import { usePolicy } from 'dashboard/composables/usePolicy';
+import { PORTAL_PERMISSIONS } from 'dashboard/constants/permissions';
 
 import Button from 'dashboard/components-next/button/Button.vue';
 import Input from 'dashboard/components-next/input/Input.vue';
@@ -25,6 +27,7 @@ const router = useRouter();
 const route = useRoute();
 const store = useStore();
 const { isOnChatwootCloud } = useAccount();
+const { checkPermissions } = usePolicy();
 const uiFlags = useMapGetter('captainResponses/getUIFlags');
 const responseMeta = useMapGetter('captainResponses/getMeta');
 const responses = useMapGetter('captainResponses/getRecords');
@@ -40,6 +43,10 @@ const searchQuery = ref('');
 const { t } = useI18n();
 
 const createDialog = ref(null);
+const responseManagePermissions = ['administrator', PORTAL_PERMISSIONS];
+const canManageResponses = computed(() =>
+  checkPermissions(responseManagePermissions)
+);
 
 const backUrl = computed(() => ({
   name: 'captain_assistants_responses_index',
@@ -286,6 +293,7 @@ onMounted(() => {
 
     <template #subHeader>
       <BulkSelectBar
+        v-if="canManageResponses"
         v-model="bulkSelectedIds"
         :all-items="filteredResponses"
         :select-all-label="buildSelectedCountLabel"
@@ -338,9 +346,14 @@ onMounted(() => {
           :created-at="response.created_at"
           :updated-at="response.updated_at"
           :is-selected="bulkSelectedIds.has(response.id)"
-          :selectable="hoveredCard === response.id || bulkSelectedIds.size > 0"
+          :selectable="
+            canManageResponses &&
+            (hoveredCard === response.id || bulkSelectedIds.size > 0)
+          "
           :show-menu="false"
-          :show-actions="!bulkSelectedIds.has(response.id)"
+          :show-actions="
+            canManageResponses && !bulkSelectedIds.has(response.id)
+          "
           @action="handleAction"
           @navigate="handleNavigationAction"
           @select="handleCardSelect"

@@ -30,19 +30,16 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
         }
       end
 
-      it 'approves the responses and returns the updated records' do
+      it 'does not approve the responses if the user is an agent without knowledge base permission' do
         post "/api/v1/accounts/#{account.id}/captain/bulk_actions",
              params: valid_params,
              headers: agent.create_new_auth_token,
              as: :json
 
-        expect(response).to have_http_status(:ok)
-        expect(json_response).to be_an(Array)
-        expect(json_response.length).to eq(2)
+        expect(response).to have_http_status(:forbidden)
 
-        # Verify responses were approved
         pending_responses.each do |response|
-          expect(response.reload.status).to eq('approved')
+          expect(response.reload.status).to eq('pending')
         end
       end
     end
@@ -56,20 +53,18 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
         }
       end
 
-      it 'deletes the responses and returns an empty array' do
+      it 'does not delete the responses if the user is an agent without knowledge base permission' do
         expect do
           post "/api/v1/accounts/#{account.id}/captain/bulk_actions",
                params: delete_params,
                headers: agent.create_new_auth_token,
                as: :json
-        end.to change(Captain::AssistantResponse, :count).by(-2)
+        end.not_to change(Captain::AssistantResponse, :count)
 
-        expect(response).to have_http_status(:ok)
-        expect(json_response).to eq([])
+        expect(response).to have_http_status(:forbidden)
 
-        # Verify responses were deleted
         pending_responses.each do |response|
-          expect { response.reload }.to raise_error(ActiveRecord::RecordNotFound)
+          expect(response.reload.status).to eq('pending')
         end
       end
     end

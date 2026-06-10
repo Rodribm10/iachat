@@ -6,6 +6,7 @@ import Button from 'dashboard/components-next/button/Button.vue';
 import ResponseCard from 'dashboard/components-next/captain/assistant/ResponseCard.vue';
 import FeatureSpotlight from 'dashboard/components-next/feature-spotlight/FeatureSpotlight.vue';
 import { responsesList } from 'dashboard/components-next/captain/pageComponents/emptyStates/captainEmptyStateContent.js';
+import { PORTAL_PERMISSIONS } from 'dashboard/constants/permissions';
 
 import { computed } from 'vue';
 
@@ -28,6 +29,7 @@ const isPending = computed(() => props.variant === 'pending');
 
 const { isOnChatwootCloud } = useAccount();
 const { replaceInstallationName } = useBranding();
+const responseManagePermissions = ['administrator', PORTAL_PERMISSIONS];
 
 const onClick = () => {
   emit('click');
@@ -56,7 +58,7 @@ const onClearFilters = () => {
         : $t('CAPTAIN.RESPONSES.EMPTY_STATE.TITLE')
     "
     :subtitle="isApproved ? $t('CAPTAIN.RESPONSES.EMPTY_STATE.SUBTITLE') : ''"
-    :action-perms="['administrator']"
+    :action-perms="responseManagePermissions"
     :show-backdrop="isApproved"
   >
     <template v-if="isApproved" #empty-state-item>
