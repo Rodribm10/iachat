@@ -24,6 +24,11 @@ class Webhooks::InstagramEventsJob < MutexApplicationJob
   private
 
   def process_single_entry(entry)
+    if comment_event?(entry)
+      process_comments(entry)
+      return
+    end
+
     if test_event?(entry)
       process_test_event(entry)
       return
@@ -47,8 +52,22 @@ class Webhooks::InstagramEventsJob < MutexApplicationJob
     end
   end
 
+  def process_comments(entry)
+    comment_changes(entry).each do |change|
+      Instagram::CommentAutoReplyService.new(entry: entry, change: change).perform
+    end
+  end
+
   def agent_message_via_echo?(messaging)
     messaging[:message].present? && messaging[:message][:is_echo].present?
+  end
+
+  def comment_event?(entry)
+    comment_changes(entry).present?
+  end
+
+  def comment_changes(entry)
+    (entry[:changes] || []).select { |change| change[:field].to_s == 'comments' }
   end
 
   def test_event?(entry)

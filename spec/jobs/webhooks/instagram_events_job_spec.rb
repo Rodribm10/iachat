@@ -383,5 +383,46 @@ describe Webhooks::InstagramEventsJob do
         expect(instagram_inbox.messages.last.content_attributes['is_unsupported']).to be_nil
       end
     end
+
+    context 'when handling comment events for Instagram via Instagram login' do
+      let!(:instagram_channel) { create(:channel_instagram, account: account, instagram_id: '17841437085704434') }
+
+      let(:comment_event) do
+        [
+          {
+            id: instagram_channel.instagram_id,
+            time: 1_718_000_000,
+            changes: [
+              {
+                field: 'comments',
+                value: {
+                  id: '18102348287027064',
+                  text: 'quiz',
+                  media_id: '18065713253474097'
+                }
+              }
+            ]
+          }
+        ]
+      end
+
+      it 'routes comment changes to the deterministic comment auto-reply service' do
+        service = instance_double(Instagram::CommentAutoReplyService, perform: true)
+
+        expect(Instagram::CommentAutoReplyService).to receive(:new)
+          .with(entry: hash_including(id: instagram_channel.instagram_id), change: hash_including(field: 'comments'))
+          .and_return(service)
+
+        instagram_webhook.perform_now(comment_event)
+      end
+
+      it 'does not create a Direct conversation for a feed comment' do
+        allow(Instagram::CommentAutoReplyService).to receive(:new).and_return(instance_double(Instagram::CommentAutoReplyService, perform: true))
+
+        expect do
+          instagram_webhook.perform_now(comment_event)
+        end.not_to(change { instagram_channel.inbox.conversations.count })
+      end
+    end
   end
 end
