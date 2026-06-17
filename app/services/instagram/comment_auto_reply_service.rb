@@ -6,7 +6,7 @@ class Instagram::CommentAutoReplyService
 
   DEFAULT_KEYWORD = 'quiz'.freeze
   DEFAULT_PUBLIC_REPLY = 'Vou te mandar o link no DM.'.freeze
-  DEFAULT_PRIVATE_REPLY = 'Quer participar do nosso quiz para casais? Segue o link: https://quiz.hoteis1001noites.com.br'.freeze
+  DEFAULT_PRIVATE_REPLY = "Vi seu comentario no post. Quer participar do nosso quiz para casais?\nSegue o link:\nhttps://quiz.hoteis1001noites.com.br".freeze
 
   def initialize(entry:, change:)
     @entry = entry.with_indifferent_access

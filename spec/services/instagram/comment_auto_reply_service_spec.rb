@@ -30,7 +30,7 @@ RSpec.describe Instagram::CommentAutoReplyService do
       .with(
         body: {
           recipient: { comment_id: '18102348287027064' },
-          message: { text: 'Quer participar do nosso quiz para casais? Segue o link: https://quiz.hoteis1001noites.com.br' }
+          message: { text: "Vi seu comentario no post. Quer participar do nosso quiz para casais?\nSegue o link:\nhttps://quiz.hoteis1001noites.com.br" }
         }.to_json,
         query: { access_token: 'valid_instagram_token' }
       )
