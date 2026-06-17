@@ -423,6 +423,16 @@ describe Webhooks::InstagramEventsJob do
           instagram_webhook.perform_now(comment_event)
         end.not_to(change { instagram_channel.inbox.conversations.count })
       end
+
+      it 'does not route non-keyword comment changes to the test event handler' do
+        service = instance_double(Instagram::CommentAutoReplyService, perform: true)
+        comment_event.first[:changes].first[:value][:text] = '🙌'
+
+        expect(Instagram::CommentAutoReplyService).to receive(:new).and_return(service)
+        expect(Instagram::TestEventService).not_to receive(:new)
+
+        instagram_webhook.perform_now(comment_event)
+      end
     end
   end
 end
