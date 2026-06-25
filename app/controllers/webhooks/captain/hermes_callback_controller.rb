@@ -51,7 +51,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     content = extract_content
     return head :bad_request if content.blank?
 
-    conversation = recent_conversation_for(@inbox)
+    conversation = conversation_from_callback(@inbox) || recent_conversation_for(@inbox)
     return log_no_conversation_and_ack if conversation.blank?
 
     log_reply(conversation, content)
@@ -143,9 +143,33 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   end
 
   def mark_for_human_triage(conversation, reason: nil)
+    reason_label = "triagem_#{reason}" if reason.present?
     current = conversation.label_list
-    conversation.update_labels((current + %w[triagem_humana]).uniq)
+    labels = (current + %w[triagem_humana] + [reason_label]).compact.uniq
+    conversation.update!(status: :open) unless conversation.open?
+    conversation.update_labels(labels)
+    create_human_triage_note(conversation, reason: reason)
     Rails.logger.info("[Hermes::Callback] conv #{conversation.display_id} → triagem_humana (#{reason})")
+  end
+
+  def create_human_triage_note(conversation, reason: nil)
+    content = "🔔 Triagem humana ativa: assumir atendimento desta conversa. Motivo: #{reason || 'nao_classificado'}."
+    last_note = conversation.messages
+                            .where(message_type: :outgoing, private: true)
+                            .reorder(created_at: :desc)
+                            .limit(1)
+                            .first
+    return if last_note&.content.to_s.strip == content
+
+    conversation.messages.create!(
+      message_type: :outgoing,
+      account_id: conversation.account_id,
+      inbox_id: conversation.inbox_id,
+      sender: User.find_by(id: conversation.assignee_id),
+      content: content,
+      private: true,
+      content_attributes: { external_source: 'triage_handoff' }
+    )
   end
 
   def fetch_inbox
@@ -181,6 +205,28 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
          .where(status: %w[pending open])
          .reorder(updated_at: :desc)
          .first
+  end
+
+  # Prefer an explicit conversation identifier sent back by Hermes/Captain.
+  # The old fallback ("most recent conversation in the inbox") is unsafe when
+  # several WhatsApp customers talk to the same attendant at the same time: a
+  # delayed callback can be delivered into another customer's conversation.
+  def conversation_from_callback(inbox)
+    internal_id = params[:conversation_internal_id].presence || params.dig(:metadata, :conversation_internal_id).presence
+    display_id = params[:conversation_id].presence || params.dig(:metadata, :conversation_id).presence
+
+    if internal_id.present?
+      conversation = inbox.conversations.find_by(id: internal_id)
+      return conversation if conversation.present?
+
+      Rails.logger.warn("[Hermes::Callback] explicit conversation_internal_id=#{internal_id} not found in inbox #{inbox.id}")
+    end
+
+    return nil if display_id.blank?
+
+    conversation = inbox.conversations.find_by(display_id: display_id)
+    Rails.logger.warn("[Hermes::Callback] explicit conversation_id=#{display_id} not found in inbox #{inbox.id}") if conversation.blank?
+    conversation
   end
 
   def log_no_conversation_and_ack

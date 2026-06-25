@@ -34,14 +34,19 @@ module Captain::Conversation::ReactionPolicy
     /\bsee you\b/
   ].freeze
 
+  ALLOWED_REACTION_EMOJIS = %w[👍 🙏 👋 😊].freeze
+  DISALLOWED_REACTION_CONTEXT = /cpf|reserv|pix|valor|preço|preco|quanto|horario|horário|data|suite|suíte|disponivel|disponível|reclama|estorno|cancel|café|cafe|conta|divida|dívida|objeto|perdid|limpeza|manuten|recepcao|recepção|subir|levar|buscar/i
+
   private
 
   def should_send_reaction_for?(target_message)
     return false if @response['reaction_emoji'].blank?
     return false if target_message.blank?
+    return false unless ALLOWED_REACTION_EMOJIS.include?(@response['reaction_emoji'].to_s.strip)
+    return false if critical_reaction_context?(target_message.content)
     return true if greeting_farewell_or_gratitude?(target_message.content)
 
-    sampled_reaction_slot?(target_message)
+    false
   end
 
   def sampled_reaction_slot?(target_message)
@@ -57,6 +62,11 @@ module Captain::Conversation::ReactionPolicy
 
   def normalize_reaction_text(text)
     I18n.transliterate(text.to_s.downcase)
+  end
+
+  def critical_reaction_context?(text)
+    normalized = normalize_reaction_text(text)
+    DISALLOWED_REACTION_CONTEXT.match?(normalized)
   end
 
   def last_incoming_message
