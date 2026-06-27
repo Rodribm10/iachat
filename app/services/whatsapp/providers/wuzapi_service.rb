@@ -25,20 +25,10 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
     mime_type = attachment.file.content_type
     caption = content_with_signature || message.content
 
-    base64_data = attachment.file.blob.open { |tmp| Base64.strict_encode64(tmp.read) }
+    return send_image_attachment(user_token, phone_number, attachment, mime_type, caption) if mime_type.start_with?('image/')
+    return send_audio_attachment(user_token, phone_number, attachment) if wuzapi_audio_attachment?(attachment, mime_type)
 
-    if mime_type.start_with?('image/')
-      data_uri = "data:#{mime_type};base64,#{base64_data}"
-      client.send_image(user_token, phone_number, data_uri, caption)
-    elsif attachment.file_type == 'audio' || mime_type.start_with?('audio/')
-      data_uri = "data:#{audio_mime_type(mime_type)};base64,#{base64_data}"
-      client.send_audio(user_token, phone_number, data_uri, **audio_options(attachment, mime_type))
-    else
-      # Wuzapi `/chat/send/document` exige prefixo `application/octet-stream`
-      # no data URI; o tipo real é inferido pelo FileName.
-      data_uri = "data:application/octet-stream;base64,#{base64_data}"
-      client.send_file(user_token, phone_number, data_uri, attachment.file.filename.to_s)
-    end
+    send_file_attachment(user_token, phone_number, attachment)
   end
 
   def send_reaction_message(phone_number, message)
@@ -153,26 +143,73 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
     )
   end
 
-  def audio_mime_type(mime_type)
-    mime_type == 'audio/opus' ? 'audio/ogg' : mime_type
+  def send_image_attachment(user_token, phone_number, attachment, mime_type, caption)
+    data_uri = "data:#{mime_type};base64,#{attachment_base64(attachment)}"
+    client.send_image(user_token, phone_number, data_uri, caption)
   end
 
-  def audio_options(attachment, mime_type)
-    options = {
-      mimetype: audio_whatsapp_mime_type(mime_type),
-      # Wuzapi/whatsmeow sends PTT voice notes that can render on iOS as
-      # unavailable media. Send as regular audio until PTT is proven stable.
-      ptt: false
-    }
+  def send_audio_attachment(user_token, phone_number, attachment)
+    payload = wuzapi_audio_payload(attachment)
+    client.send_audio(user_token, phone_number, payload[:data_uri], **payload[:options])
+  end
+
+  def send_file_attachment(user_token, phone_number, attachment)
+    data_uri = "data:application/octet-stream;base64,#{attachment_base64(attachment)}"
+    client.send_file(user_token, phone_number, data_uri, attachment.file.filename.to_s)
+  end
+
+  def wuzapi_audio_attachment?(attachment, mime_type)
+    attachment.file_type == 'audio' || mime_type.start_with?('audio/')
+  end
+
+  def attachment_base64(attachment)
+    attachment.file.blob.open { |tmp| Base64.strict_encode64(tmp.read) }
+  end
+
+  def wuzapi_audio_payload(attachment)
+    data_uri = "data:audio/mpeg;base64,#{transcoded_audio_base64(attachment)}"
+    options = { mimetype: 'audio/mpeg', ptt: false }
     duration = audio_duration_seconds(attachment)
     options[:seconds] = duration if duration.present?
-    options
+
+    { data_uri: data_uri, options: options }
   end
 
-  def audio_whatsapp_mime_type(mime_type)
-    return 'audio/ogg; codecs=opus' if %w[audio/ogg audio/opus].include?(mime_type)
+  def transcoded_audio_base64(attachment)
+    input_file = nil
+    output_file = nil
+    input_file = download_audio_to_tempfile(attachment)
+    output_file = Tempfile.new(['wuzapi-audio', '.mp3'])
+    output_file.binmode
+    output_file.close
 
-    mime_type
+    transcode_audio_to_mp3(input_file.path, output_file.path)
+    Base64.strict_encode64(File.binread(output_file.path))
+  ensure
+    input_file&.close!
+    output_file&.close!
+  end
+
+  def download_audio_to_tempfile(attachment)
+    tempfile = Tempfile.new(['wuzapi-audio-source', File.extname(attachment.file.filename.to_s)])
+    tempfile.binmode
+    attachment.file.blob.open { |file| IO.copy_stream(file, tempfile) }
+    tempfile.close
+    tempfile
+  end
+
+  def transcode_audio_to_mp3(input_path, output_path)
+    movie = FFMPEG::Movie.new(input_path)
+    raise CustomExceptions::Audio::TranscodingError, 'Invalid or unreadable audio file' unless movie.valid?
+
+    movie.transcode(
+      output_path,
+      audio_codec: 'libmp3lame',
+      audio_bitrate: 96,
+      custom: %w[-vn -map_metadata -1 -ar 44100 -ac 1]
+    )
+  rescue FFMPEG::Error => e
+    raise CustomExceptions::Audio::TranscodingError, "FFmpeg transcoding failed: #{e.message}"
   end
 
   def audio_duration_seconds(attachment)

@@ -58,7 +58,16 @@ RSpec.describe Whatsapp::Providers::WuzapiService, '#send_interactive_message' d
                        conversation: conversation, content: 'Audio')
     end
 
-    it 'sends audio attachments through the Wuzapi audio endpoint' do
+    before do
+      mock_movie = instance_double(FFMPEG::Movie, valid?: true)
+      allow(mock_movie).to receive(:duration).and_return(4.0)
+      allow(mock_movie).to receive(:transcode) do |output_path, _options|
+        File.binwrite(output_path, 'fake_mp3_data')
+      end
+      allow(FFMPEG::Movie).to receive(:new).and_return(mock_movie)
+    end
+
+    it 'sends audio attachments through the Wuzapi audio endpoint as MP3' do
       attachment = message.attachments.new(account_id: message.account_id, file_type: :audio)
       attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'sample.ogg', content_type: 'audio/ogg')
       attachment.save!
@@ -67,8 +76,8 @@ RSpec.describe Whatsapp::Providers::WuzapiService, '#send_interactive_message' d
         .with(
           'tok',
           '5561999999999',
-          start_with('data:audio/ogg;base64,'),
-          hash_including(mimetype: 'audio/ogg; codecs=opus', ptt: false)
+          start_with('data:audio/mpeg;base64,'),
+          hash_including(mimetype: 'audio/mpeg', ptt: false, seconds: 4)
         )
         .and_return({ 'data' => { 'Id' => 'audio-1' } })
       expect(wuzapi_client).not_to receive(:send_file)
@@ -76,7 +85,7 @@ RSpec.describe Whatsapp::Providers::WuzapiService, '#send_interactive_message' d
       expect(service.send_message(phone, message)).to eq('WAID:audio-1')
     end
 
-    it 'normalizes audio/opus attachments to audio/ogg data URIs' do
+    it 'transcodes audio/opus attachments to MP3 for Wuzapi' do
       attachment = message.attachments.new(account_id: message.account_id, file_type: :audio)
       attachment.file.attach(io: Rails.root.join('spec/assets/sample.ogg').open, filename: 'sample.ogg', content_type: 'audio/opus')
       attachment.save!
@@ -85,8 +94,8 @@ RSpec.describe Whatsapp::Providers::WuzapiService, '#send_interactive_message' d
         .with(
           'tok',
           '5561999999999',
-          start_with('data:audio/ogg;base64,'),
-          hash_including(mimetype: 'audio/ogg; codecs=opus', ptt: false)
+          start_with('data:audio/mpeg;base64,'),
+          hash_including(mimetype: 'audio/mpeg', ptt: false, seconds: 4)
         )
         .and_return({ 'data' => { 'Id' => 'audio-2' } })
 
