@@ -32,7 +32,7 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
       client.send_image(user_token, phone_number, data_uri, caption)
     elsif attachment.file_type == 'audio' || mime_type.start_with?('audio/')
       data_uri = "data:#{audio_mime_type(mime_type)};base64,#{base64_data}"
-      client.send_audio(user_token, phone_number, data_uri)
+      client.send_audio(user_token, phone_number, data_uri, **audio_options(attachment, mime_type))
     else
       # Wuzapi `/chat/send/document` exige prefixo `application/octet-stream`
       # no data URI; o tipo real é inferido pelo FileName.
@@ -155,6 +155,35 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
 
   def audio_mime_type(mime_type)
     mime_type == 'audio/opus' ? 'audio/ogg' : mime_type
+  end
+
+  def audio_options(attachment, mime_type)
+    options = {
+      mimetype: audio_whatsapp_mime_type(mime_type),
+      ptt: attachment.meta&.dig('is_recorded_audio') != false
+    }
+    duration = audio_duration_seconds(attachment)
+    options[:seconds] = duration if duration.present?
+    options
+  end
+
+  def audio_whatsapp_mime_type(mime_type)
+    return 'audio/ogg; codecs=opus' if %w[audio/ogg audio/opus].include?(mime_type)
+
+    mime_type
+  end
+
+  def audio_duration_seconds(attachment)
+    duration = attachment.file.blob.metadata&.dig('duration')
+    return duration.ceil if duration.to_f.positive?
+
+    attachment.file.blob.open do |file|
+      movie = FFMPEG::Movie.new(file.path)
+      return movie.duration.ceil if movie.valid? && movie.duration.to_f.positive?
+    end
+  rescue StandardError => e
+    Rails.logger.warn "Wuzapi audio duration detection failed for attachment #{attachment.id}: #{e.message}"
+    nil
   end
 
   def normalize_phone(phone_number)

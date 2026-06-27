@@ -64,7 +64,12 @@ RSpec.describe Whatsapp::Providers::WuzapiService, '#send_interactive_message' d
       attachment.save!
 
       expect(wuzapi_client).to receive(:send_audio)
-        .with('tok', '5561999999999', start_with('data:audio/ogg;base64,'))
+        .with(
+          'tok',
+          '5561999999999',
+          start_with('data:audio/ogg;base64,'),
+          hash_including(mimetype: 'audio/ogg; codecs=opus', ptt: true)
+        )
         .and_return({ 'data' => { 'Id' => 'audio-1' } })
       expect(wuzapi_client).not_to receive(:send_file)
 
@@ -77,7 +82,12 @@ RSpec.describe Whatsapp::Providers::WuzapiService, '#send_interactive_message' d
       attachment.save!
 
       expect(wuzapi_client).to receive(:send_audio)
-        .with('tok', '5561999999999', start_with('data:audio/ogg;base64,'))
+        .with(
+          'tok',
+          '5561999999999',
+          start_with('data:audio/ogg;base64,'),
+          hash_including(mimetype: 'audio/ogg; codecs=opus', ptt: true)
+        )
         .and_return({ 'data' => { 'Id' => 'audio-2' } })
 
       expect(service.send_message(phone, message)).to eq('WAID:audio-2')

@@ -82,5 +82,27 @@ RSpec.describe Wuzapi::Client do
       expect(response).to be_a(Hash)
       expect(stub).to have_been_requested
     end
+
+    it 'POSTs audio metadata used by Wuzapi voice messages' do
+      audio_payload = 'data:audio/ogg;base64,abc123'
+      stub = stub_request(:post, "#{base_url}/chat/send/audio")
+             .with(
+               body: hash_including(
+                 Phone: phone,
+                 Audio: audio_payload,
+                 mimetype: 'audio/ogg; codecs=opus',
+                 Seconds: 4,
+                 ptt: true
+               )
+             )
+             .to_return(status: 200, body: { Id: 'msg-5' }.to_json, headers: { 'Content-Type' => 'application/json' })
+
+      response = client.send_audio(user_token, phone, audio_payload,
+                                   mimetype: 'audio/ogg; codecs=opus',
+                                   seconds: 4,
+                                   ptt: true)
+      expect(response).to be_a(Hash)
+      expect(stub).to have_been_requested
+    end
   end
 end

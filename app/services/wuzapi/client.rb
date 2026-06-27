@@ -76,12 +76,16 @@ class Wuzapi::Client # rubocop:disable Metrics/ClassLength
     )
   end
 
-  def send_audio(user_token, phone_number, base64_data)
+  def send_audio(user_token, phone_number, base64_data, mimetype: nil, seconds: nil, ptt: true, waveform: nil)
     # Wuzapi exige áudio Opus em data URI `audio/ogg`.
     payload = {
       'Phone' => phone_number,
       'Audio' => base64_data
     }
+    payload['mimetype'] = mimetype if mimetype.present?
+    payload['Seconds'] = seconds.to_i if seconds.to_i.positive?
+    payload['ptt'] = ptt unless ptt.nil?
+    payload['Waveform'] = waveform if waveform.present?
     request(
       :post,
       '/chat/send/audio',
