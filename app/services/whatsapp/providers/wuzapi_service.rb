@@ -160,7 +160,9 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
   def audio_options(attachment, mime_type)
     options = {
       mimetype: audio_whatsapp_mime_type(mime_type),
-      ptt: attachment.meta&.dig('is_recorded_audio') != false
+      # Wuzapi/whatsmeow sends PTT voice notes that can render on iOS as
+      # unavailable media. Send as regular audio until PTT is proven stable.
+      ptt: false
     }
     duration = audio_duration_seconds(attachment)
     options[:seconds] = duration if duration.present?

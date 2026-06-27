@@ -68,7 +68,7 @@ RSpec.describe Whatsapp::Providers::WuzapiService, '#send_interactive_message' d
           'tok',
           '5561999999999',
           start_with('data:audio/ogg;base64,'),
-          hash_including(mimetype: 'audio/ogg; codecs=opus', ptt: true)
+          hash_including(mimetype: 'audio/ogg; codecs=opus', ptt: false)
         )
         .and_return({ 'data' => { 'Id' => 'audio-1' } })
       expect(wuzapi_client).not_to receive(:send_file)
@@ -86,7 +86,7 @@ RSpec.describe Whatsapp::Providers::WuzapiService, '#send_interactive_message' d
           'tok',
           '5561999999999',
           start_with('data:audio/ogg;base64,'),
-          hash_including(mimetype: 'audio/ogg; codecs=opus', ptt: true)
+          hash_including(mimetype: 'audio/ogg; codecs=opus', ptt: false)
         )
         .and_return({ 'data' => { 'Id' => 'audio-2' } })
 
