@@ -13,7 +13,7 @@
 # de forma confiável, identificamos pela ÚLTIMA conversation pending da inbox
 # que recebeu mensagem nos últimos 5 minutos. Aceitável pra PoC com 1 conversa
 # de teste por vez. Pra produção, melhorar com Redis: delivery_id → conversation_id.
-class Webhooks::Captain::HermesCallbackController < ApplicationController
+class Webhooks::Captain::HermesCallbackController < ApplicationController # rubocop:disable Metrics/ClassLength
   RECENT_WINDOW = 5.minutes
 
   # "Um momento — vou verificar" é a frase-âncora de handoff intencional
@@ -211,7 +211,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   # The old fallback ("most recent conversation in the inbox") is unsafe when
   # several WhatsApp customers talk to the same attendant at the same time: a
   # delayed callback can be delivered into another customer's conversation.
-  def conversation_from_callback(inbox)
+  def conversation_from_callback(inbox) # rubocop:disable Metrics/AbcSize
     internal_id = params[:conversation_internal_id].presence || params.dig(:metadata, :conversation_internal_id).presence
     display_id = params[:conversation_id].presence || params.dig(:metadata, :conversation_id).presence
 

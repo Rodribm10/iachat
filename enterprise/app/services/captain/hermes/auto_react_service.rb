@@ -18,12 +18,14 @@
 # automação fraca e atrapalham atendimento.
 class Captain::Hermes::AutoReactService
   THANKS_REGEX = /\b(muito\s+)?(obrigad[oa]|brigad[oa]|valeu|vlw|thanks|agrade[cç]o|agradecid[oa]|gratid[aã]o)\b/i
+  # rubocop:disable Layout/LineLength
   CONFIRMATION_REGEX = /\A(ok|okay|fechado|perfeit[oa]|blz|beleza|combinado|certo|certinho|[oó]tim[oa]|legal|show|maravilha|tranquilo|t[aá]\s*bom|pode\s*ser|isso\s*mesmo)[\s.!,]*\z/i
   GREETING_REGEX = /\A(bom\s*dia|boa\s*tarde|boa\s*noite|oi|olá|ola|e\s*aí|hey|hi|hello)[\s.!,]*\z/i
   FAREWELL_REGEX = /\b(tchau|at[eé]\s*(mais|logo|breve|a\s+pr[oó]xima)|falou|flw|abra[cç]os?|bjs|beijos?|boa\s+noite|bom\s+descanso|at[eé]\s+amanh[aã]|at[eé]\s+depois)\b/i
   ENDING_CONTEXT_REGEX = /\b(encerr(ar|a|amos)|finaliz(ar|a|amos)|n[aã]o\s+preciso\s+mais|era\s+s[oó]\s+isso|s[oó]\s+isso|por\s+enquanto\s+[eé]\s+s[oó]|obrigad[oa]\s+pelo\s+atendimento)\b/i
   EMOJI_ONLY_REGEX = /\A[\p{Emoji_Presentation}\p{Emoji}\uFE0F\s]+[\s.!,]*\z/
   CRITICAL_CONTEXT_REGEX = /cpf|reserv|pix|valor|preço|preco|quanto|hor[áa]rio|dia\b|data\b|categori|suite|suíte|quart|chal[ée]|dispon[ií]vel|reclama|estorno|cancel|café|cafe|conta|d[ií]vida|objeto|perdid|limpeza|manuten|recep[cç][aã]o|subir|levar|buscar/i
+  # rubocop:enable Layout/LineLength
 
   def self.maybe_react!(message)
     new(message).maybe_react!

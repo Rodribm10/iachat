@@ -3,12 +3,28 @@ require 'rails_helper'
 RSpec.describe Captain::Hermes::AutoReactService do
   let(:account) { create(:account) }
   let(:inbox) { create(:inbox, account: account) }
-  let!(:assistant) { create(:captain_assistant, account: account) }
-  let!(:captain_inbox) { create(:captain_inbox, inbox: inbox, captain_assistant: assistant) }
+  let(:assistant) { create(:captain_assistant, account: account) }
   let(:conversation) { create(:conversation, inbox: inbox, account: account) }
 
+  before do
+    create(:captain_inbox, inbox: inbox, captain_assistant: assistant)
+  end
+
   def incoming(content)
-    create(:message, conversation: conversation, inbox: inbox, account: account, message_type: :incoming, content: content, source_id: SecureRandom.uuid)
+    create(:message, conversation: conversation, inbox: inbox, account: account,
+                     message_type: :incoming, content: content, source_id: SecureRandom.uuid)
+  end
+
+  def auto_react_count
+    conversation.messages.to_a.count { |message| auto_react?(message) }
+  end
+
+  def last_auto_react
+    conversation.messages.to_a.reverse.find { |message| auto_react?(message) }
+  end
+
+  def auto_react?(message)
+    message.content_attributes['external_source'] == 'hermes_auto_react'
   end
 
   it 'does not react with affectionate emoji to farewell' do
@@ -16,7 +32,7 @@ RSpec.describe Captain::Hermes::AutoReactService do
 
     described_class.maybe_react!(message)
 
-    reaction = conversation.messages.where("content_attributes ->> 'external_source' = ?", 'hermes_auto_react').last
+    reaction = last_auto_react
     expect(reaction&.content).to eq('🙏')
   end
 
@@ -25,7 +41,7 @@ RSpec.describe Captain::Hermes::AutoReactService do
 
     expect do
       described_class.maybe_react!(message)
-    end.not_to change { conversation.messages.where("content_attributes ->> 'external_source' = ?", 'hermes_auto_react').count }
+    end.not_to(change { auto_react_count })
   end
 
   it 'does not react to operational guest requests' do
@@ -33,7 +49,7 @@ RSpec.describe Captain::Hermes::AutoReactService do
 
     expect do
       described_class.maybe_react!(message)
-    end.not_to change { conversation.messages.where("content_attributes ->> 'external_source' = ?", 'hermes_auto_react').count }
+    end.not_to(change { auto_react_count })
   end
 
   it 'does not react to emoji-only customer message' do
@@ -41,7 +57,7 @@ RSpec.describe Captain::Hermes::AutoReactService do
 
     expect do
       described_class.maybe_react!(message)
-    end.not_to change { conversation.messages.where("content_attributes ->> 'external_source' = ?", 'hermes_auto_react').count }
+    end.not_to(change { auto_react_count })
   end
 
   it 'allows neutral confirmation reaction' do
@@ -49,7 +65,7 @@ RSpec.describe Captain::Hermes::AutoReactService do
 
     described_class.maybe_react!(message)
 
-    reaction = conversation.messages.where("content_attributes ->> 'external_source' = ?", 'hermes_auto_react').last
+    reaction = last_auto_react
     expect(reaction&.content).to eq('👍')
   end
 end

@@ -35,7 +35,9 @@ module Captain::Conversation::ReactionPolicy
   ].freeze
 
   ALLOWED_REACTION_EMOJIS = %w[👍 🙏 👋 😊].freeze
+  # rubocop:disable Layout/LineLength
   DISALLOWED_REACTION_CONTEXT = /cpf|reserv|pix|valor|preço|preco|quanto|horario|horário|data|suite|suíte|disponivel|disponível|reclama|estorno|cancel|café|cafe|conta|divida|dívida|objeto|perdid|limpeza|manuten|recepcao|recepção|subir|levar|buscar/i
+  # rubocop:enable Layout/LineLength
 
   private
 
