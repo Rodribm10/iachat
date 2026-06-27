@@ -64,4 +64,23 @@ RSpec.describe Wuzapi::Client do
       expect(stub).to have_been_requested
     end
   end
+
+  describe '#send_audio' do
+    it 'POSTs to /chat/send/audio with audio payload' do
+      audio_payload = 'data:audio/ogg;base64,abc123'
+      stub = stub_request(:post, "#{base_url}/chat/send/audio")
+             .with(
+               headers: { 'Token' => user_token },
+               body: hash_including(
+                 Phone: phone,
+                 Audio: audio_payload
+               )
+             )
+             .to_return(status: 200, body: { Id: 'msg-4' }.to_json, headers: { 'Content-Type' => 'application/json' })
+
+      response = client.send_audio(user_token, phone, audio_payload)
+      expect(response).to be_a(Hash)
+      expect(stub).to have_been_requested
+    end
+  end
 end

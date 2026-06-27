@@ -76,6 +76,22 @@ class Wuzapi::Client # rubocop:disable Metrics/ClassLength
     )
   end
 
+  def send_audio(user_token, phone_number, base64_data)
+    # Wuzapi exige áudio Opus em data URI `audio/ogg`.
+    payload = {
+      'Phone' => phone_number,
+      'Audio' => base64_data
+    }
+    request(
+      :post,
+      '/chat/send/audio',
+      payload,
+      user_auth_headers(user_token),
+      fallback_paths: ['/send/audio'],
+      allow_base_fallback: true
+    )
+  end
+
   def send_reaction(user_token, phone_number, message_id, emoji)
     payload = { 'Phone' => phone_number, 'Body' => emoji, 'Id' => message_id }
     request(

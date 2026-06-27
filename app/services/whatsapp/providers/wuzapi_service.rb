@@ -30,6 +30,9 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
     if mime_type.start_with?('image/')
       data_uri = "data:#{mime_type};base64,#{base64_data}"
       client.send_image(user_token, phone_number, data_uri, caption)
+    elsif attachment.file_type == 'audio' || mime_type.start_with?('audio/')
+      data_uri = "data:#{audio_mime_type(mime_type)};base64,#{base64_data}"
+      client.send_audio(user_token, phone_number, data_uri)
     else
       # Wuzapi `/chat/send/document` exige prefixo `application/octet-stream`
       # no data URI; o tipo real é inferido pelo FileName.
@@ -148,6 +151,10 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
       button_text: payload['button_text'].to_s,
       sections: payload['sections'] || []
     )
+  end
+
+  def audio_mime_type(mime_type)
+    mime_type == 'audio/opus' ? 'audio/ogg' : mime_type
   end
 
   def normalize_phone(phone_number)
