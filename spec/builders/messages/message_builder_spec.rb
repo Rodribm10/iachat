@@ -207,6 +207,23 @@ describe Messages::MessageBuilder do
           expect(message.attachments.first.meta).to include('is_recorded_audio' => true)
         end
 
+        it 'uploads the transcoded blob before the message is saved' do
+          mock_movie = instance_double(FFMPEG::Movie, valid?: true)
+          allow(FFMPEG::Movie).to receive(:new).and_return(mock_movie)
+          allow(mock_movie).to receive(:transcode) do |output_path, _options|
+            File.binwrite(output_path, 'fake_opus_data')
+          end
+
+          message = message_builder
+          attachment = message.attachments.first
+          blob = attachment.file.blob
+
+          expect(attachment.file.filename.to_s).to eq('sample.ogg')
+          expect(attachment.file.content_type).to eq('audio/ogg')
+          expect(blob.service.exist?(blob.key)).to be(true)
+          blob.open { |file| expect(file.read).to eq('fake_opus_data') }
+        end
+
         it 'does not transcode non-audio attachments' do
           allow(Audio::TranscodeService).to receive(:new)
           params[:attachments] = [Rack::Test::UploadedFile.new('spec/assets/avatar.png', 'image/png')]

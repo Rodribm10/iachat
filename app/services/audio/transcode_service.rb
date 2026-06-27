@@ -67,11 +67,12 @@ class Audio::TranscodeService
   def replace_attachment_file(output_file, format_config)
     filename = "#{File.basename(@attachment.file.filename.to_s, '.*')}.#{format_config[:extension]}"
     File.open(output_file.path, 'rb') do |file|
-      @attachment.file.attach(
+      blob = ActiveStorage::Blob.create_and_upload!(
         io: file,
         filename: filename,
         content_type: format_config[:content_type]
       )
+      @attachment.file.attach(blob)
     end
     @attachment.file_type = :audio
   end
