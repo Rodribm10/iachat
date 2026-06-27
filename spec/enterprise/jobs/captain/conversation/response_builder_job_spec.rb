@@ -282,10 +282,36 @@ RSpec.describe Captain::Conversation::ResponseBuilderJob, type: :job do
       expect(job.send(:should_send_reaction_for?, message)).to be(false)
     end
 
-    it 'allows reaction for regular messages inside the 35% sample' do
+    it 'blocks reaction for regular messages even inside the old sample window' do
       message = create_incoming_until_slot(sample_target: true)
 
-      expect(job.send(:should_send_reaction_for?, message)).to be(true)
+      expect(job.send(:should_send_reaction_for?, message)).to be(false)
+    end
+
+    it 'blocks affectionate or commercial emojis from the LLM response' do
+      job.instance_variable_set(:@response, { 'reaction_emoji' => '❤️' })
+      message = create(
+        :message,
+        conversation: conversation,
+        inbox: inbox,
+        message_type: :incoming,
+        content: 'Obrigado pelo atendimento'
+      )
+
+      expect(job.send(:should_send_reaction_for?, message)).to be(false)
+    end
+
+    it 'blocks neutral reaction in critical reservation context' do
+      job.instance_variable_set(:@response, { 'reaction_emoji' => '👍' })
+      message = create(
+        :message,
+        conversation: conversation,
+        inbox: inbox,
+        message_type: :incoming,
+        content: 'Qual valor da suíte com hidro hoje?'
+      )
+
+      expect(job.send(:should_send_reaction_for?, message)).to be(false)
     end
   end
 
