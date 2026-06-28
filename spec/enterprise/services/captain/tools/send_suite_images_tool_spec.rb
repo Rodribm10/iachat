@@ -58,6 +58,7 @@ RSpec.describe Captain::Tools::SendSuiteImagesTool, type: :model do
 
     expect(result[:success]).to be(true)
     expect(result[:sent_count]).to eq(2)
+    expect(conversation.reload.label_list).to include('ia_foto_enviada')
 
     created_messages = conversation.messages.outgoing.where(sender: assistant).order(created_at: :desc).limit(2)
     expect(created_messages.all? { |message| message.attachments.any? }).to be(true)

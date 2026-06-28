@@ -2,6 +2,7 @@
 class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
   DEFAULT_LIMIT = 3
   MAX_LIMIT = 5
+  PHOTO_SENT_LABEL = 'ia_foto_enviada'.freeze
 
   def name
     'send_suite_images'
@@ -60,6 +61,10 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
     return no_images_response(actual_params) if selected_items.blank?
 
     sent_count = send_images(selected_items)
+    return error_response('Encontrei fotos na galeria, mas não consegui enviar nenhuma imagem.') if sent_count.zero?
+
+    add_photo_sent_label
+
     success_payload(selected_items, sent_count, actual_params)
   rescue StandardError => e
     Rails.logger.error("[SendSuiteImagesTool] Falha ao enviar fotos: #{e.class} - #{normalize_text(e.message)}")
@@ -210,6 +215,17 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
                                    }).perform
       true
     end
+  end
+
+  def add_photo_sent_label
+    Label.find_or_create_by!(account: @conversation.account, title: PHOTO_SENT_LABEL) do |label|
+      label.color = '#38bdf8'
+      label.description = 'Aplicada automaticamente quando a IA envia fotos de suíte com sucesso.'
+      label.show_on_sidebar = false
+    end
+    return if @conversation.label_list.include?(PHOTO_SENT_LABEL)
+
+    @conversation.add_labels(PHOTO_SENT_LABEL)
   end
 
   def normalize_limit(value)
