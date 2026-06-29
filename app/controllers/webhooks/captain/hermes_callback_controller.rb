@@ -13,7 +13,7 @@
 # de forma confiável, identificamos pela ÚLTIMA conversation pending da inbox
 # que recebeu mensagem nos últimos 5 minutos. Aceitável pra PoC com 1 conversa
 # de teste por vez. Pra produção, melhorar com Redis: delivery_id → conversation_id.
-class Webhooks::Captain::HermesCallbackController < ApplicationController # rubocop:disable Metrics/ClassLength
+class Webhooks::Captain::HermesCallbackController < ApplicationController
   RECENT_WINDOW = 5.minutes
 
   # "Um momento — vou verificar" é a frase-âncora de handoff intencional
@@ -72,7 +72,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
   # pergunta reformulada) e escala.
   def detect_handoff_or_loop(conversation, content)
     if handoff_response?(content)
-      mark_for_human_triage(conversation, reason: 'handoff_intencional')
+      mark_for_human_triage(conversation, reason: 'sem_resposta_segura')
     elsif looped_response?(conversation, content)
       mark_for_human_triage(conversation, reason: 'loop_detectado')
     end
@@ -145,31 +145,12 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController # rubo
   def mark_for_human_triage(conversation, reason: nil)
     reason_label = "triagem_#{reason}" if reason.present?
     current = conversation.label_list
+    already_triaged = current.include?('triagem_humana')
     labels = (current + %w[triagem_humana] + [reason_label]).compact.uniq
     conversation.update!(status: :open) unless conversation.open?
     conversation.update_labels(labels)
-    create_human_triage_note(conversation, reason: reason)
+    Captain::Hermes::HumanTriageNoteService.new(conversation: conversation, reason: reason).perform unless already_triaged
     Rails.logger.info("[Hermes::Callback] conv #{conversation.display_id} → triagem_humana (#{reason})")
-  end
-
-  def create_human_triage_note(conversation, reason: nil)
-    content = "🔔 Triagem humana ativa: assumir atendimento desta conversa. Motivo: #{reason || 'nao_classificado'}."
-    last_note = conversation.messages
-                            .where(message_type: :outgoing, private: true)
-                            .reorder(created_at: :desc)
-                            .limit(1)
-                            .first
-    return if last_note&.content.to_s.strip == content
-
-    conversation.messages.create!(
-      message_type: :outgoing,
-      account_id: conversation.account_id,
-      inbox_id: conversation.inbox_id,
-      sender: User.find_by(id: conversation.assignee_id),
-      content: content,
-      private: true,
-      content_attributes: { external_source: 'triage_handoff' }
-    )
   end
 
   def fetch_inbox
