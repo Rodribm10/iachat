@@ -57,6 +57,9 @@ Rails.application.routes.draw do
           resources :agents, only: [:index, :create, :update, :destroy] do
             post :bulk_create, on: :collection
           end
+          namespace :sinal do
+            get 'agents/:id/access_token', to: 'agent_tokens#show'
+          end
           namespace :captain do
             resources :hermes_builder, only: [:index, :create] do
               collection do
