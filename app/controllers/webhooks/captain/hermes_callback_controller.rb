@@ -72,7 +72,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   # pergunta reformulada) e escala.
   def detect_handoff_or_loop(conversation, content)
     if handoff_response?(content)
-      mark_for_human_triage(conversation, reason: 'handoff_intencional')
+      mark_for_human_triage(conversation, reason: 'sem_resposta_segura')
     elsif looped_response?(conversation, content)
       mark_for_human_triage(conversation, reason: 'loop_detectado')
     end
@@ -144,7 +144,10 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
 
   def mark_for_human_triage(conversation, reason: nil)
     current = conversation.label_list
+    already_triaged = current.include?('triagem_humana')
+
     conversation.update_labels((current + %w[triagem_humana]).uniq)
+    Captain::Hermes::HumanTriageNoteService.new(conversation: conversation, reason: reason).perform unless already_triaged
     Rails.logger.info("[Hermes::Callback] conv #{conversation.display_id} → triagem_humana (#{reason})")
   end
 
