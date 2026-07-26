@@ -36,6 +36,8 @@ class Captain::Hermes::HumanTriageNoteService
       'a IA não tinha resposta segura para a última pergunta e pediu verificação humana'
     when 'loop_detectado'
       'a IA entrou em repetição ou não conseguiu avançar no atendimento'
+    when 'erro_tecnico'
+      'a IA falhou por erro técnico (o cliente não recebeu nada e está esperando)'
     else
       'a IA pediu verificação humana'
     end
