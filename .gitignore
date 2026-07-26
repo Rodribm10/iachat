@@ -136,3 +136,6 @@ docs/acessos*.md
 **/acessos_vps*
 **/*_secrets.md
 **/*.credentials
+
+# Gabaritos de calibração do juiz de FAQ (contêm conversas reais de clientes)
+gabarito*.json

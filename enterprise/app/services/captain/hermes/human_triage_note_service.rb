@@ -1,7 +1,11 @@
 class Captain::Hermes::HumanTriageNoteService
   MAX_LAST_MESSAGE_LENGTH = 180
+  DEFAULT_SOURCE = 'hermes_human_triage'.freeze
 
-  pattr_initialize [:conversation!, :reason]
+  # `source` distingue o motor que pediu a triagem (Hermes ou Captain interno).
+  # O `triage_reason` gravado aqui é o que o ciclo de aprendizado usa para saber
+  # que a resposta humana seguinte nasceu de um gap real da IA.
+  pattr_initialize [:conversation!, :reason, :source]
 
   def perform
     conversation.messages.create!(
@@ -12,7 +16,7 @@ class Captain::Hermes::HumanTriageNoteService
       sender: conversation.inbox.captain_assistant,
       content: note_content,
       content_attributes: {
-        external_source: 'hermes_human_triage',
+        external_source: source.presence || DEFAULT_SOURCE,
         triage_reason: reason
       }
     )

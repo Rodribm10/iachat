@@ -167,3 +167,15 @@ captain_contact_memory_hard_delete_job:
   cron: '30 3 * * *'
   class: 'Captain::ContactMemories::HardDeleteExpiredJob'
   queue: scheduled_jobs
+
+# daily at 04:30 UTC (01:30 BRT) - promotes learned FAQs that survived the 30-day quarantine
+captain_assistant_response_probation_job:
+  cron: '30 4 * * *'
+  class: 'Captain::AssistantResponses::ProbationJob'
+  queue: scheduled_jobs
+
+# Monday at 11:30 UTC (08:30 BRT) - weekly learning cycle digest, delivered after the CEO Digest
+captain_learning_digest_job:
+  cron: '30 11 * * 1'
+  class: 'Captain::AssistantResponses::LearningDigestJob'
+  queue: scheduled_jobs

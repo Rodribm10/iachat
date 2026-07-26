@@ -340,7 +340,7 @@ class Captain::Assistant::AgentRunnerService
 
   def faq_fallback_answer(query, response_text: nil)
     faq_query_candidates(query, response_text: response_text).each do |candidate|
-      responses = @assistant.responses.approved.search(candidate).to_a
+      responses = @assistant.responses.retrievable.search(candidate).to_a
       Rails.logger.info "[Captain V2] FAQ guardrail fallback results=#{responses.size} query=#{candidate.inspect}"
       return responses.first&.answer if responses.present?
     end
