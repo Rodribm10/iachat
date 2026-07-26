@@ -652,6 +652,7 @@ Rails.application.routes.draw do
   post 'webhooks/captain/hermes_callback', to: 'webhooks/captain/hermes_callback#process_payload'
   post 'webhooks/captain/builder_callback', to: 'webhooks/captain/hermes_builder_callback#process_payload'
   post 'webhooks/captain/mcp', to: 'webhooks/captain/mcp#process_payload'
+  get 'webhooks/captain/health', to: 'webhooks/captain/health#show'
 
   namespace :twitter do
     resource :callback, only: [:show]
