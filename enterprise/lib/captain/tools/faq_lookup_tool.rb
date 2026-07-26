@@ -6,8 +6,8 @@ class Captain::Tools::FaqLookupTool < Captain::Tools::BasePublicTool
     Rails.logger.info "[Captain][FaqLookupTool] Starting search with query: '#{query}'"
     log_tool_usage('searching', { query: query })
 
-    # Use existing vector search on approved responses
-    responses = @assistant.responses.approved.search(query).to_a
+    # Vector search on live knowledge: approved + trial (quarantine) responses
+    responses = @assistant.responses.retrievable.search(query).to_a
     Rails.logger.info "[Captain][FaqLookupTool] Query returned #{responses.size} results."
 
     if responses.empty?

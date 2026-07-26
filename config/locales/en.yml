@@ -361,6 +361,10 @@ en:
       completed_tool_call: 'Completed %{function_name} tool call'
       invalid_tool_call: 'Invalid tool call'
       tool_not_available: 'Tool not available'
+    learning_digest:
+      header: "**Learning cycle — %{period_start} to %{period_end}**"
+      assistant_line: "**%{name}**: %{learned} learned, %{trial} in quarantine, %{promoted} promoted, %{retired} retired, %{pending} awaiting review"
+      footer: "%{count} answers were rejected by the judge and need a human decision."
     documents:
       limit_exceeded: 'Document limit exceeded'
       pdf_format_error: 'must be a PDF file'

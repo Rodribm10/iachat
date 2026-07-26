@@ -130,6 +130,148 @@ RSpec.describe Captain::Llm::ConversationFaqService do
     end
   end
 
+  describe 'human triage guard' do
+    let(:agent) { create(:user, account: conversation.account) }
+
+    before do
+      allow(embedding_service).to receive(:get_embedding).and_return([0.1, 0.2, 0.3])
+      allow(captain_assistant.responses).to receive(:nearest_neighbors).and_return([])
+    end
+
+    def create_triage_note(at:)
+      conversation.messages.create!(
+        message_type: :outgoing, private: true, created_at: at,
+        account_id: conversation.account_id, inbox_id: conversation.inbox_id,
+        content: 'Triagem humana ativa', content_attributes: { triage_reason: 'sem_resposta_segura' }
+      )
+    end
+
+    def create_agent_reply(at:)
+      conversation.messages.create!(
+        message_type: :outgoing, private: false, created_at: at, sender: agent,
+        account_id: conversation.account_id, inbox_id: conversation.inbox_id,
+        content: 'Aceitamos sim, pode trazer.'
+      )
+    end
+
+    context 'when the conversation went to triage and nobody answered' do
+      before { create_triage_note(at: 1.hour.ago) }
+
+      it 'learns nothing — silence is not validated knowledge' do
+        expect { service.generate_and_deduplicate }.not_to change(captain_assistant.responses, :count)
+      end
+
+      it 'ignores an agent reply that happened before the triage' do
+        create_agent_reply(at: 3.hours.ago)
+
+        expect { service.generate_and_deduplicate }.not_to change(captain_assistant.responses, :count)
+      end
+    end
+
+    context 'when a human answered after the triage' do
+      before do
+        create_triage_note(at: 2.hours.ago)
+        create_agent_reply(at: 1.hour.ago)
+      end
+
+      it 'learns from the conversation' do
+        expect { service.generate_and_deduplicate }.to change(captain_assistant.responses, :count).by(2)
+      end
+
+      it 'records the triage reason on the learned FAQ' do
+        service.generate_and_deduplicate
+
+        expect(captain_assistant.responses.pluck(:triage_reason).uniq).to eq(['sem_resposta_segura'])
+      end
+
+      it 'tags the source as human validated' do
+        service.generate_and_deduplicate
+
+        expect(captain_assistant.responses.pluck(:source).uniq).to eq(['human_validated'])
+      end
+    end
+  end
+
+  describe 'automatic judging' do
+    let(:judge) { instance_double(Captain::Llm::FaqJudgeService) }
+
+    before do
+      allow(embedding_service).to receive(:get_embedding).and_return([0.1, 0.2, 0.3])
+      allow(captain_assistant.responses).to receive(:nearest_neighbors).and_return([])
+      captain_assistant.update!(config: captain_assistant.config.merge('feature_faq_auto_judge' => true))
+      allow(Captain::Llm::FaqJudgeService).to receive(:new).and_return(judge)
+    end
+
+    context 'when the judge approves' do
+      before do
+        allow(judge).to receive(:call).and_return(
+          { approved: true, question: 'P revisada', answer: 'R revisada', raw: { 'fidelidade' => { 'aprovado' => true } } }
+        )
+      end
+
+      it 'puts the FAQ in quarantine instead of the approval queue' do
+        service.generate_and_deduplicate
+
+        expect(captain_assistant.responses.pluck(:status).uniq).to eq(['trial'])
+      end
+
+      it 'sets the quarantine deadline' do
+        service.generate_and_deduplicate
+
+        expect(captain_assistant.responses.first.trial_until).to be_within(1.minute).of(30.days.from_now)
+      end
+
+      it 'saves the revised wording and the verdict' do
+        service.generate_and_deduplicate
+        response = captain_assistant.responses.first
+
+        expect(response.question).to eq('P revisada')
+        expect(response.answer).to eq('R revisada')
+        expect(response.judge_verdict).to be_present
+      end
+    end
+
+    context 'when the judge rejects' do
+      before do
+        allow(judge).to receive(:call).and_return(
+          { approved: false, question: 'P', answer: 'R', raw: { 'generalizavel' => { 'aprovado' => false } } }
+        )
+      end
+
+      it 'leaves the FAQ pending for a human decision' do
+        service.generate_and_deduplicate
+
+        expect(captain_assistant.responses.pluck(:status).uniq).to eq(['pending'])
+      end
+
+      it 'keeps the rejection reasoning for the exception queue' do
+        service.generate_and_deduplicate
+
+        expect(captain_assistant.responses.first.judge_verdict).to be_present
+      end
+
+      it 'does not expose the FAQ to the assistant' do
+        service.generate_and_deduplicate
+
+        expect(captain_assistant.responses.retrievable).to be_empty
+      end
+    end
+
+    context 'when the feature flag is off' do
+      before do
+        captain_assistant.update!(config: captain_assistant.config.merge('feature_faq_auto_judge' => false))
+      end
+
+      it 'preserves the legacy behaviour and never calls the judge' do
+        expect(Captain::Llm::FaqJudgeService).not_to receive(:new)
+
+        service.generate_and_deduplicate
+
+        expect(captain_assistant.responses.pluck(:status).uniq).to eq(['pending'])
+      end
+    end
+  end
+
   describe 'language handling' do
     context 'when conversation has different language' do
       let(:account) { create(:account, locale: 'fr') }

@@ -146,10 +146,10 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
       end
 
       it 'replaces uncertain response with faq answer when faq tool was not called' do
-        approved_scope = double('approved_scope')
+        retrievable_scope = double('retrievable_scope')
         faq_response = double('faq_response', answer: 'A senha do Wi-Fi é 1001prime.')
-        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
-        allow(approved_scope).to receive(:search).with('Preciso da senha da internet').and_return([faq_response])
+        allow(assistant).to receive(:responses).and_return(double(retrievable: retrievable_scope))
+        allow(retrievable_scope).to receive(:search).with('Preciso da senha da internet').and_return([faq_response])
 
         result = service.generate_response(message_history: message_history)
 
@@ -158,9 +158,9 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
       end
 
       it 'returns faq-not-found message when search has no match' do
-        approved_scope = double('approved_scope')
-        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
-        allow(approved_scope).to receive(:search).and_return([])
+        retrievable_scope = double('retrievable_scope')
+        allow(assistant).to receive(:responses).and_return(double(retrievable: retrievable_scope))
+        allow(retrievable_scope).to receive(:search).and_return([])
 
         result = service.generate_response(message_history: message_history)
 
@@ -187,10 +187,10 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
           ]
         )
 
-        approved_scope = double('approved_scope')
+        retrievable_scope = double('retrievable_scope')
         faq_response = double('faq_response', answer: 'O valor da suíte Aluba é R$ 5,00 para qualquer duração.')
-        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
-        allow(approved_scope).to receive(:search) do |query|
+        allow(assistant).to receive(:responses).and_return(double(retrievable: retrievable_scope))
+        allow(retrievable_scope).to receive(:search) do |query|
           if query.include?('valor da suíte Aluba')
             [faq_response]
           else
@@ -215,9 +215,9 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
             }
           ]
         )
-        approved_scope = double('approved_scope')
-        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
-        expect(approved_scope).not_to receive(:search)
+        retrievable_scope = double('retrievable_scope')
+        allow(assistant).to receive(:responses).and_return(double(retrievable: retrievable_scope))
+        expect(retrievable_scope).not_to receive(:search)
 
         result = service.generate_response(message_history: message_history)
 
@@ -238,10 +238,10 @@ RSpec.describe Captain::Assistant::AgentRunnerService do
             { role: :assistant, content: 'Não tenho acesso a essa informação no momento.' }
           ]
         )
-        approved_scope = double('approved_scope')
+        retrievable_scope = double('retrievable_scope')
         faq_response = double('faq_response', answer: 'A senha do Wi-Fi é 1001prime.')
-        allow(assistant).to receive(:responses).and_return(double(approved: approved_scope))
-        allow(approved_scope).to receive(:search).with('Preciso da senha da internet').and_return([faq_response])
+        allow(assistant).to receive(:responses).and_return(double(retrievable: retrievable_scope))
+        allow(retrievable_scope).to receive(:search).with('Preciso da senha da internet').and_return([faq_response])
 
         result = service.generate_response(message_history: message_history)
 

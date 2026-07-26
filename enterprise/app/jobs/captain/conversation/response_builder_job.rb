@@ -239,6 +239,7 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     when 'handoff'
       I18n.with_locale(@assistant.account.locale) do
         create_handoff_message
+        record_triage_reason
         @conversation.bot_handoff!
         send_out_of_office_message_if_applicable
       end
@@ -257,6 +258,19 @@ class Captain::Conversation::ResponseBuilderJob < ApplicationJob
     create_outgoing_message(
       @assistant.config['handoff_message'].presence || I18n.t('conversations.captain.handoff')
     )
+  end
+
+  # Registra por que a IA saiu de cena. Sem isso, o ciclo de aprendizado não
+  # consegue distinguir uma resposta humana que preenche um gap real da IA de
+  # uma conversa humana qualquer.
+  def record_triage_reason
+    Captain::Hermes::HumanTriageNoteService.new(
+      conversation: @conversation,
+      reason: 'sem_resposta_segura',
+      source: 'captain_handoff'
+    ).perform
+  rescue StandardError => e
+    Rails.logger.warn("[Captain] failed to record triage reason: #{e.message}")
   end
 
   def create_messages
