@@ -52,10 +52,14 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
   # last_real_outgoing virava a MAIS ANTIGA, agrupando msgs de turns
   # passados (caso real: Hermes recebia "wifi+pet" colado mesmo em turns
   # separados — visto em conv 6064 em 2026-05-02).
+  def reaction_sql
+    @reaction_sql ||= Message.content_attribute_sql('is_reaction')
+  end
+
   def combined_incoming_content(conversation, anchor_message)
     last_real_outgoing = conversation.messages
                                      .where(message_type: :outgoing)
-                                     .where("(content_attributes ->> 'is_reaction') IS NULL OR (content_attributes ->> 'is_reaction') != 'true'")
+                                     .where("#{reaction_sql} IS NULL OR #{reaction_sql} != 'true'")
                                      .reorder(created_at: :desc)
                                      .first
 

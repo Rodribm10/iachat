@@ -65,8 +65,8 @@ class Captain::Hermes::AutoReactService
   def already_reacted?
     @conversation.messages
                  .where(message_type: :outgoing)
-                 .where("content_attributes ->> 'external_source' = ?", 'hermes_auto_react')
-                 .exists?(["(content_attributes ->> 'in_reply_to')::int = ?", @message.id])
+                 .where("#{Message.content_attribute_sql('external_source')} = ?", 'hermes_auto_react')
+                 .exists?(["(#{Message.content_attribute_sql('in_reply_to')})::int = ?", @message.id])
   end
 
   def decide_emoji
