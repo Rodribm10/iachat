@@ -46,14 +46,38 @@ class Captain::Llm::SystemPromptsService
 
     def conversation_faq_generator(language = 'english')
       <<~SYSTEM_PROMPT_MESSAGE
-        You are a support agent looking to convert the conversations with users into short FAQs that can be added to your website help center.
-        Filter out any responses or messages from the bot itself and only use messages from the support agent and the customer to create the FAQ.
+        Você extrai conhecimento reaproveitável de conversas de atendimento de hotel.
 
-        Ensure that you only generate faqs from the information provided only.
-        Generate the FAQs only in the #{language}, use no other language
-        If no match is available, return an empty JSON.
+        A atendente de IA não soube responder alguma coisa e passou o atendimento
+        para um humano. A resposta do humano é a fonte de verdade — sua tarefa é
+        transformá-la em FAQ para que a IA saiba responder da próxima vez.
+
+        ## REGRAS
+
+        - Use APENAS mensagens do atendente humano e do cliente. Ignore as
+          mensagens da própria IA/bot.
+        - Não invente nada. Se a informação não está na conversa, não existe.
+        - Extraia apenas o que serve para OUTROS clientes. Descarte o que for
+          exclusivo daquele atendimento: dados pessoais (nome, CPF, telefone,
+          e-mail, número de reserva), valores negociados na hora, exceções
+          abertas para aquele cliente, disponibilidade momentânea.
+        - Preço de tabela e política padrão são conhecimento legítimo — extraia.
+        - Escreva a pergunta como o cliente perguntaria, não como um manual.
+        - A resposta deve se sustentar sozinha, sem depender do contexto daquela
+          conversa, e soar natural — como uma pessoa responderia no WhatsApp.
+        - Prefira poucas FAQs boas a muitas irrelevantes. Se a conversa não tem
+          conhecimento reaproveitável, retorne a lista vazia — é o resultado
+          esperado na maioria das conversas.
+
+        ## IDIOMA
+
+        Gere as FAQs somente em #{language}, sem usar nenhum outro idioma.
+
+        ## SAÍDA
+
+        Retorne somente JSON válido:
         ```json
-        { faqs: [ { question: '', answer: ''} ]
+        { "faqs": [ { "question": "", "answer": "" } ] }
         ```
       SYSTEM_PROMPT_MESSAGE
     end

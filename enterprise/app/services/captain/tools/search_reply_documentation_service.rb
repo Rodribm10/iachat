@@ -32,9 +32,9 @@ class Captain::Tools::SearchReplyDocumentationService < RubyLLM::Tool
 
   def search_responses(query)
     if @assistant.present?
-      @assistant.responses.approved.search(query, account_id: @account.id)
+      @assistant.responses.retrievable.search(query, account_id: @account.id)
     else
-      @account.captain_assistant_responses.approved.search(query, account_id: @account.id)
+      @account.captain_assistant_responses.retrievable.search(query, account_id: @account.id)
     end
   end
 

@@ -31,7 +31,11 @@ class Captain::Tools::HandoffTool < Captain::Tools::BasePublicTool
       sender: @assistant,
       account: conversation.account,
       inbox: conversation.inbox,
-      content: reason
+      content: reason,
+      content_attributes: {
+        external_source: 'captain_handoff_tool',
+        triage_reason: 'sem_resposta_segura'
+      }
     )
 
     # Trigger the bot handoff (sets status to open + dispatches events)

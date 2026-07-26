@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_05_02_160000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_24_120000) do
   # These extensions should be enabled to support this database
   enable_extension "pg_stat_statements"
   enable_extension "pg_trgm"
@@ -315,11 +315,20 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_02_160000) do
     t.datetime "updated_at", null: false
     t.integer "status", default: 1, null: false
     t.string "documentable_type"
+    t.datetime "trial_until"
+    t.string "source"
+    t.string "triage_reason"
+    t.jsonb "judge_verdict", default: {}
+    t.datetime "promoted_at"
+    t.datetime "retired_at"
+    t.string "retired_reason"
     t.index ["account_id"], name: "index_captain_assistant_responses_on_account_id"
     t.index ["assistant_id"], name: "index_captain_assistant_responses_on_assistant_id"
     t.index ["documentable_id", "documentable_type"], name: "idx_cap_asst_resp_on_documentable"
     t.index ["embedding"], name: "vector_idx_knowledge_entries_embedding", using: :ivfflat
+    t.index ["source"], name: "idx_cap_asst_resp_on_source"
     t.index ["status"], name: "index_captain_assistant_responses_on_status"
+    t.index ["trial_until"], name: "idx_cap_asst_resp_on_trial_until", where: "(trial_until IS NOT NULL)"
   end
 
   create_table "captain_assistants", force: :cascade do |t|
@@ -676,8 +685,12 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_02_160000) do
     t.jsonb "raw_webhook_payload"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "provider", default: "inter", null: false
+    t.jsonb "manual_proof_payload"
+    t.string "manual_review_reason"
     t.index ["e2eid"], name: "idx_cp_charges_e2eid"
     t.index ["e2eid"], name: "index_captain_pix_charges_on_e2eid"
+    t.index ["provider"], name: "index_captain_pix_charges_on_provider"
     t.index ["reservation_id"], name: "index_captain_pix_charges_on_reservation_id"
     t.index ["txid"], name: "idx_cp_charges_txid", unique: true
     t.index ["txid"], name: "index_captain_pix_charges_on_txid"
@@ -1002,10 +1015,16 @@ ActiveRecord::Schema[7.1].define(version: 2026_05_02_160000) do
     t.uuid "supabase_marca_id"
     t.decimal "extra_person_fee", precision: 10, scale: 2, default: "0.0", null: false
     t.string "currency", default: "BRL", null: false
+    t.string "pix_mode", default: "inter_dynamic", null: false
+    t.string "manual_pix_key"
+    t.string "manual_pix_key_type"
+    t.string "manual_pix_owner_name"
+    t.string "manual_pix_bank_name"
     t.index ["account_id"], name: "index_captain_units_on_account_id"
     t.index ["captain_brand_id"], name: "index_captain_units_on_captain_brand_id"
     t.index ["concierge_inbox_id"], name: "index_captain_units_on_concierge_inbox_id"
     t.index ["inbox_id"], name: "index_captain_units_on_inbox_id"
+    t.index ["pix_mode"], name: "index_captain_units_on_pix_mode"
     t.index ["supabase_unit_id"], name: "index_captain_units_on_supabase_unit_id", unique: true, where: "(supabase_unit_id IS NOT NULL)"
   end
 

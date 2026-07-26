@@ -1,6 +1,7 @@
 class Captain::Llm::ConversationFaqService < Llm::BaseAiService
   include Integrations::LlmInstrumentation
   DISTANCE_THRESHOLD = 0.3
+  MAX_JUDGE_NEIGHBOURS = 5
 
   def initialize(assistant, conversation)
     super()
@@ -13,6 +14,7 @@ class Captain::Llm::ConversationFaqService < Llm::BaseAiService
   # Skips processing if there was no human interaction
   def generate_and_deduplicate
     return [] if no_human_interaction?
+    return [] unless human_answered_after_handoff?
 
     new_faqs = generate
     return [] if new_faqs.empty?
@@ -30,6 +32,40 @@ class Captain::Llm::ConversationFaqService < Llm::BaseAiService
     conversation.first_reply_created_at.nil?
   end
 
+  # A resposta humana só é conhecimento validado quando veio DEPOIS da triagem.
+  # Conversa que foi para triagem, ninguém assumiu e morreu por inatividade
+  # (auto-resolve) não tem resposta boa para aprender — apenas o silêncio.
+  # Sem triagem registrada, mantém o comportamento histórico: basta ter havido
+  # resposta de um agente humano em algum momento.
+  def human_answered_after_handoff?
+    return true if triage_note.blank?
+
+    conversation.messages
+                .where(message_type: :outgoing, private: false, sender_type: 'User')
+                .exists?(created_at: triage_note.created_at..)
+  end
+
+  # `messages.content_attributes` é coluna `json` com `store` do Rails: o valor
+  # é gravado duplamente codificado (string JSON dentro do JSON), então o
+  # operador `->>` do Postgres nunca encontra a chave. O filtro tem que ser em
+  # Ruby — as notas privadas de uma conversa são poucas.
+  def triage_note
+    return @triage_note if defined?(@triage_note)
+
+    @triage_note = conversation.messages
+                               .where(private: true)
+                               .order(created_at: :asc)
+                               .find { |message| message.content_attributes.to_h['triage_reason'].present? }
+  end
+
+  def triage_reason
+    triage_note&.content_attributes&.dig('triage_reason')
+  end
+
+  def auto_judge_enabled?
+    assistant.config['feature_faq_auto_judge'].present?
+  end
+
   def find_and_separate_duplicates(faqs)
     duplicate_faqs = []
     unique_faqs = []
@@ -42,7 +78,7 @@ class Captain::Llm::ConversationFaqService < Llm::BaseAiService
       if similar_faqs.any?
         duplicate_faqs << { faq: faq, similar_faqs: similar_faqs }
       else
-        unique_faqs << faq
+        unique_faqs << { faq: faq, neighbours: find_retrievable_neighbours(embedding) }
       end
     end
 
@@ -57,15 +93,58 @@ class Captain::Llm::ConversationFaqService < Llm::BaseAiService
     similar_faqs.select { |record| record.neighbor_distance < DISTANCE_THRESHOLD }
   end
 
-  def save_new_faqs(faqs)
-    faqs.map do |faq|
-      assistant.responses.create!(
-        question: faq['question'],
-        answer: faq['answer'],
-        status: 'pending',
-        documentable: conversation
-      )
+  # Conhecimento vivo mais próximo da candidata — é contra ele que o juiz
+  # checa contradição. Diferente do dedup, aqui não há corte de distância:
+  # queremos o vizinho "parecido mas diferente", que é justamente onde mora
+  # a contradição.
+  def find_retrievable_neighbours(embedding)
+    assistant.responses
+             .retrievable
+             .nearest_neighbors(:embedding, embedding, distance: 'cosine')
+             .limit(MAX_JUDGE_NEIGHBOURS)
+             .to_a
+  rescue StandardError => e
+    Rails.logger.warn("[Captain::ConversationFaq] neighbour lookup failed: #{e.message}")
+    []
+  end
+
+  def save_new_faqs(entries)
+    entries.map { |entry| persist_faq(entry[:faq], entry[:neighbours]) }
+  end
+
+  def persist_faq(faq, neighbours)
+    return create_response(faq['question'], faq['answer'], status: 'pending') unless auto_judge_enabled?
+
+    verdict = judge(faq, neighbours)
+
+    if verdict[:approved]
+      create_response(verdict[:question], verdict[:answer], status: 'trial', verdict: verdict[:raw])
+    else
+      create_response(faq['question'], faq['answer'], status: 'pending', verdict: verdict[:raw])
     end
+  end
+
+  def judge(faq, neighbours)
+    Captain::Llm::FaqJudgeService.new(
+      assistant: assistant,
+      question: faq['question'],
+      answer: faq['answer'],
+      conversation: conversation,
+      neighbours: neighbours
+    ).call
+  end
+
+  def create_response(question, answer, status:, verdict: {})
+    assistant.responses.create!(
+      question: question,
+      answer: answer,
+      status: status,
+      documentable: conversation,
+      source: 'human_validated',
+      triage_reason: triage_reason,
+      judge_verdict: verdict.presence || {},
+      trial_until: status == 'trial' ? Captain::AssistantResponse::TRIAL_PERIOD.from_now : nil
+    )
   end
 
   def log_duplicate_faqs(duplicate_faqs)

@@ -332,6 +332,10 @@ pt_BR:
       completed_tool_call: 'Uso da ferramenta %{function_name} concluída'
       invalid_tool_call: 'Ferramenta inválida'
       tool_not_available: 'Ferramenta indisponível'
+    learning_digest:
+      header: "**Ciclo de aprendizado — %{period_start} a %{period_end}**"
+      assistant_line: "**%{name}**: %{learned} aprendidas, %{trial} em quarentena, %{promoted} promovidas, %{retired} aposentadas, %{pending} aguardando revisão"
+      footer: "%{count} respostas foram reprovadas pelo juiz e precisam de decisão humana."
     documents:
       limit_exceeded: 'Limite de documento excedido'
       pdf_format_error: 'Deve ser um arquivo PDF'
