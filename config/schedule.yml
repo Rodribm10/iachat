@@ -99,6 +99,13 @@ captain_proactive_pix_polling_job:
   class: 'Captain::Payments::ProactivePixPollingSchedulerJob'
   queue: scheduled_jobs
 
+# executed daily at 12:15 UTC (09:15 BRT)
+# checks Banco Inter mTLS certificate expiration and sends alert when needed
+captain_inter_certificados_alert_job:
+  cron: '15 12 * * *'
+  class: 'Captain::Inter::CertificadosAlertJob'
+  queue: scheduled_jobs
+
 # executed every 30 minutes for assignment_v2
 periodic_assignment_job:
   cron: '*/30 * * * *'
