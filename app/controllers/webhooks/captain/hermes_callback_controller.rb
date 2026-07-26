@@ -13,6 +13,7 @@
 # de forma confiável, identificamos pela ÚLTIMA conversation pending da inbox
 # que recebeu mensagem nos últimos 5 minutos. Aceitável pra PoC com 1 conversa
 # de teste por vez. Pra produção, melhorar com Redis: delivery_id → conversation_id.
+# rubocop:disable Metrics/ClassLength
 class Webhooks::Captain::HermesCallbackController < ApplicationController
   RECENT_WINDOW = 5.minutes
 
@@ -43,6 +44,22 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     perfeito otimo certinho confirma confirme
   ].freeze
 
+  # Quando o Hermes falha (token expirado, provider fora do ar), ele às vezes
+  # devolve o PRÓPRIO erro técnico no lugar da resposta. Sem esta trava isso vai
+  # para o cliente: em 25/07/2026 clientes do Instagram receberam — e leram —
+  # mensagens como "HTTP 401: Provided authentication token is expired" e
+  # "❌ Non-retryable error". Erro técnico nunca é resposta: vira nota privada
+  # e triagem humana, para uma pessoa assumir a conversa.
+  ERROR_PAYLOAD_PATTERNS = [
+    /\bHTTP\s+[45]\d{2}\b/i,
+    /authentication\s+failed/i,
+    /non-retryable\s+error/i,
+    /token\s+(is\s+)?expired/i,
+    /switching\s+to\s+fallback\s+provider/i,
+    /\bTraceback\b/i,
+    /\b(StandardError|NameError|TypeError|NoMethodError|Errno::)\b/
+  ].freeze
+
   skip_before_action :verify_authenticity_token, raise: false
   before_action :verify_signature
   before_action :fetch_inbox
@@ -55,6 +72,8 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     return log_no_conversation_and_ack if conversation.blank?
 
     log_reply(conversation, content)
+    return handle_error_payload(conversation, content) if error_payload?(content)
+
     detect_handoff_or_loop(conversation, content)
     deliver_outgoing(conversation, content)
     head :ok
@@ -65,6 +84,34 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   end
 
   private
+
+  def error_payload?(content)
+    return false if content.blank?
+
+    ERROR_PAYLOAD_PATTERNS.any? { |re| content.match?(re) }
+  end
+
+  # O erro fica registrado como nota interna (visível só para a equipe) e a
+  # conversa vai para triagem humana. O cliente não recebe nada — do ponto de
+  # vista dele a IA ficou em silêncio, e uma pessoa assume.
+  def handle_error_payload(conversation, content)
+    Rails.logger.error(
+      "[Hermes::Callback] payload de erro barrado na conv #{conversation.display_id}: #{content.to_s.squish[0, 200]}"
+    )
+
+    conversation.messages.create!(
+      message_type: :outgoing,
+      private: true,
+      account_id: conversation.account_id,
+      inbox_id: conversation.inbox_id,
+      sender: conversation.inbox.captain_assistant,
+      content: "⚠️ A IA falhou e devolveu um erro técnico em vez de resposta. O cliente NÃO recebeu isto:\n\n#{content}",
+      content_attributes: { external_source: 'hermes_error_blocked' }
+    )
+
+    mark_for_human_triage(conversation, reason: 'erro_tecnico')
+    head :ok
+  end
 
   # Hermes mandou frase-âncora de handoff: entrega ao cliente normalmente,
   # mas marca conv pra triagem humana — próximas msgs não disparam Hermes
@@ -251,3 +298,4 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     )
   end
 end
+# rubocop:enable Metrics/ClassLength

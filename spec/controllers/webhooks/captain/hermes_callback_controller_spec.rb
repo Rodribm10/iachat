@@ -57,4 +57,51 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
       end.not_to(change { conversation.messages.where(private: true).count })
     end
   end
+
+  # Em 25/07/2026 clientes do Instagram receberam — e leram — mensagens como
+  # "HTTP 401: Provided authentication token is expired". Erro técnico do Hermes
+  # nunca pode virar resposta ao cliente.
+  describe 'quando o Hermes devolve erro tecnico no lugar da resposta' do
+    erros = [
+      'HTTP 401: Provided authentication token is expired. Please try signing in again.',
+      '❌ Non-retryable error (HTTP 401): HTTP 401: token expired',
+      '🔐 Authentication failed and could not be refreshed — switching to fallback provider...',
+      "Traceback (most recent call last):\n  File \"gateway.py\"",
+      'NoMethodError: undefined method for nil'
+    ]
+
+    erros.each do |erro|
+      it "nao entrega ao cliente: #{erro.to_s[0, 42]}" do
+        expect(Captain::Hermes::DelayedReplyJob).not_to receive(:perform_later)
+
+        post '/webhooks/captain/hermes_callback', params: { inbox_id: inbox.id, content: erro }
+
+        expect(response).to have_http_status(:ok)
+        expect(conversation.reload.messages.where(private: false, message_type: :outgoing)).to be_empty
+      end
+    end
+
+    it 'registra o erro como nota interna e manda para triagem humana' do
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'HTTP 401: Provided authentication token is expired.' }
+
+      expect(conversation.reload.label_list).to include('triagem_humana')
+
+      nota = conversation.messages.where(private: true).find do |m|
+        m.content_attributes.to_h['external_source'] == 'hermes_error_blocked'
+      end
+      expect(nota).to be_present
+      expect(nota.content).to include('O cliente NÃO recebeu isto')
+      expect(nota.content).to include('HTTP 401')
+    end
+
+    it 'entrega normalmente uma resposta legitima que apenas menciona a palavra erro' do
+      expect(Captain::Hermes::DelayedReplyJob).to receive(:perform_later)
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'Peço desculpas pelo erro na reserva anterior, já corrigimos!' }
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
 end
