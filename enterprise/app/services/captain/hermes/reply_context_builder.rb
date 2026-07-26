@@ -84,11 +84,23 @@ class Captain::Hermes::ReplyContextBuilder
       external_id: quoted_message.source_id,
       message_type: quoted_message.message_type,
       sender_label: sender_label,
-      sender_name: quoted_message.sender&.available_name,
+      sender_name: sender_name,
       content: quoted_message_content,
       attachment_summary: attachment_summary,
       created_at: quoted_message.created_at&.iso8601
     }.compact
+  end
+
+  # `available_name` só existe em User, AgentBot e Captain::Assistant — Contact
+  # não tem. Como o cliente citando a PRÓPRIA mensagem é o caso mais comum no
+  # WhatsApp, `sender&.available_name` levantava NoMethodError e derrubava o
+  # OutgoingJob inteiro: a mensagem nunca chegava ao Hermes e o cliente ficava
+  # sem resposta. Foram 83 ocorrências até 26/07/2026.
+  def sender_name
+    sender = quoted_message.sender
+    return nil if sender.blank?
+
+    sender.try(:available_name).presence || sender.try(:name).presence
   end
 
   def sender_label
