@@ -147,7 +147,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   def looped_response?(conversation, content)
     prev = conversation.messages
                        .where(message_type: :outgoing)
-                       .where("content_attributes ->> 'external_source' = ?", 'hermes_callback')
+                       .where("#{Message.content_attribute_sql('external_source')} = ?", 'hermes_callback')
                        .reorder(created_at: :desc)
                        .limit(1)
                        .pick(:content)

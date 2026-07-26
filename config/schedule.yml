@@ -120,11 +120,12 @@ remove_orphan_conversations_job:
   queue: housekeeping
 
 # executed every 5 minutes
-# scans reservations and sends configured notification templates (pre/post arrival)
-captain_notification_scanner_job:
-  cron: '*/5 * * * *'
-  class: 'Captain::Notifications::NotificationScannerJob'
-  queue: scheduled_jobs
+# NOTA (2026-07-26): a entrada `captain_notification_scanner_job` foi removida.
+# Ela chamava `Captain::Notifications::NotificationScannerJob` a cada 5 minutos,
+# mas essa classe não existe no repositório — o job morria em toda execução e
+# acumulou 8.243 jobs mortos no Sidekiq, entupindo o DeadSet e escondendo os
+# erros que importavam. Se a funcionalidade (avisos pré/pós check-in) for
+# retomada, reponha o cron JUNTO com a classe.
 
 # executed every hour
 # keeps landing page promotions and Captain knowledge in sync (including expired promotions cleanup)

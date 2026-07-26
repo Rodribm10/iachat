@@ -127,6 +127,22 @@ class Message < ApplicationRecord
 
   store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
 
+  # Expressão SQL para ler uma chave de `content_attributes`.
+  #
+  # A coluna é `json` E o `store` acima usa `coder: JSON`, então o valor é
+  # gravado DUPLAMENTE CODIFICADO — uma string JSON dentro do JSON. Por isso
+  # `content_attributes ->> 'chave'` nunca encontra nada: em 26/07/2026 as
+  # 61.879 linhas de produção eram string, nenhuma era objeto. Consultas
+  # escritas do jeito ingênuo falham em silêncio, retornando zero linhas.
+  #
+  # Esta expressão decodifica antes de ler e funciona nos DOIS formatos, então
+  # continua correta se um dia a dupla codificação for corrigida na raiz.
+  def self.content_attribute_sql(key)
+    raise ArgumentError, "chave inválida para content_attributes: #{key.inspect}" unless key.to_s.match?(/\A\w+\z/)
+
+    "(content_attributes #>> '{}')::jsonb ->> '#{key}'"
+  end
+
   scope :created_since, ->(datetime) { where('created_at > ?', datetime) }
   scope :chat, -> { where.not(message_type: :activity).where(private: false) }
   scope :non_activity_messages, -> { where.not(message_type: :activity).reorder('created_at desc') }
