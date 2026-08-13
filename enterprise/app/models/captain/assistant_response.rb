@@ -54,7 +54,14 @@ class Captain::AssistantResponse < ApplicationRecord
   # Conhecimento vivo: o que as atendentes podem recuperar numa busca.
   # `trial` está em quarentena mas responde ao cliente; `pending` aguarda
   # decisão e `retired` foi aposentado — nenhum dos dois pode ser recuperado.
-  scope :retrievable, -> { where(status: %i[approved trial]) }
+  #
+  # Sem embedding a busca vetorial NUNCA encontra a resposta. Mantê-la aqui
+  # dava um número mentiroso: "está no ar" quando na prática é invisível.
+  # O embedding é gerado em background logo após o create, então esta exclusão
+  # cobre dois casos: a janela normal de poucos segundos e — o que importa — a
+  # FAQ que ficou órfã porque o serviço de embeddings estava fora do ar.
+  scope :retrievable, -> { where(status: %i[approved trial]).where.not(embedding: nil) }
+  scope :sem_embedding, -> { where(status: %i[approved trial], embedding: nil) }
   scope :trial_expired, -> { trial.where(trial_until: ..Time.current) }
 
   enum status: { pending: 0, approved: 1, trial: 2, retired: 3 }

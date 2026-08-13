@@ -28,7 +28,7 @@ class Captain::Health::ConexoesService
   end
 
   def call
-    conexoes = [codex, aprendizado_captain, hermes_agents, certificados_inter]
+    conexoes = [codex, embeddings, aprendizado_captain, hermes_agents, certificados_inter]
 
     {
       referencia: @referencia.iso8601,
@@ -66,6 +66,37 @@ class Captain::Health::ConexoesService
     indisponivel('codex', 'IA do Captain (Codex OAuth)', e)
   end
 
+  # --- 1b. Embeddings (o elo que quebrou em silêncio) ------------------------
+  # Em 05/08/2026 a cota do provedor de embeddings estourou e o ciclo de
+  # aprendizado morreu por 8 dias. O sensor via o sintoma ("nada aprendido")
+  # mas chutava a causa errada — dizia que era credencial da IA, quando a IA
+  # estava perfeita e quem tinha caído era o embedding.
+  #
+  # Por isso aqui é teste FUNCIONAL: gera um embedding de verdade. Sai por
+  # fração de centavo a cada verificação e é o único jeito de distinguir
+  # "modelo errado", "cota estourada" e "credencial inválida" — três causas
+  # com o mesmo sintoma.
+  def embeddings
+    vetor = Captain::Llm::EmbeddingService.new.get_embedding('verificação de saúde das conexões')
+    orfas = Captain::AssistantResponse.sem_embedding.count
+
+    if vetor.blank?
+      conexao('embeddings', 'Embeddings (busca semântica)', 'critico',
+              'O serviço devolveu vetor vazio — nenhuma FAQ nova entra na busca')
+    elsif orfas.positive?
+      conexao('embeddings', 'Embeddings (busca semântica)', 'alerta',
+              "Funcionando (#{vetor.size} dimensões), mas #{orfas} FAQ(s) ficaram sem embedding e estão invisíveis na busca",
+              acao: 'reprocessar: Captain::AssistantResponse.sem_embedding.each(&:touch)')
+    else
+      conexao('embeddings', 'Embeddings (busca semântica)', 'ok',
+              "Gerando vetores de #{vetor.size} dimensões, nenhuma FAQ órfã")
+    end
+  rescue StandardError => e
+    conexao('embeddings', 'Embeddings (busca semântica)', 'critico',
+            "Falhou: #{e.message.to_s.squish[0, 150]}",
+            acao: 'sem embedding o ciclo de aprendizado para por inteiro — conferir cota e credencial do provedor')
+  end
+
   # --- 2. O aprendizado está de fato acontecendo? (resultado) -----------------
   # Este é o cheque que teria pego a falha de cinco semanas.
   def aprendizado_captain
@@ -78,9 +109,8 @@ class Captain::Health::ConexoesService
               'Sem conversas com resposta humana na janela — nada a concluir')
     elsif aprendidas.zero?
       conexao('aprendizado', 'Captura de conhecimento', 'critico',
-              "Nada aprendido apesar de #{materia_prima} conversas elegíveis. " \
-              'A geração de FAQ está quebrada (credencial de IA é a causa mais comum).',
-              acao: 'rails captain:conexoes para ver qual conexão caiu')
+              "Nada aprendido apesar de #{materia_prima} conversas elegíveis — a geração de FAQ está quebrada.",
+              acao: 'olhe as outras linhas: a causa costuma ser IA do Captain ou Embeddings')
     else
       conexao('aprendizado', 'Captura de conhecimento', 'ok',
               "#{aprendidas} FAQs aprendidas de #{materia_prima} conversas elegíveis")
