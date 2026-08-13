@@ -27,6 +27,16 @@ RSpec.describe Captain::AssistantResponse do
     it 'returns live knowledge only: approved and trial' do
       expect(described_class.retrievable).to contain_exactly(approved, trial)
     end
+
+    # Sem embedding a busca vetorial nunca encontra a resposta. Contá-la como
+    # recuperável dava um número mentiroso — foi o que aconteceu quando o
+    # provedor de embeddings caiu e uma FAQ ficou órfã, invisível mas "no ar".
+    it 'exclui o que está sem embedding, porque a busca nunca encontraria' do
+      orfa = create(:captain_assistant_response, assistant: assistant, status: 'approved', embedding: nil)
+
+      expect(described_class.retrievable).not_to include(orfa)
+      expect(described_class.sem_embedding).to include(orfa)
+    end
   end
 
   describe '.trial_expired' do
