@@ -23,8 +23,20 @@ class Whatsapp::IncomingMessageWuzapiService < Whatsapp::IncomingMessageBaseServ
     return true unless [:text, :image, :audio, :video, :document, :sticker].include?(@parser.message_type)
     return true if @parser.group_message?
     return true if @parser.sender_phone_number.blank? && !@parser.from_me?
+    return true if empty_text_message?
 
     false
+  end
+
+  # Texto sem texto não é mensagem de gente: é evento de protocolo que o WuzAPI
+  # rotulou como Info.Type = "text". Salvar isso cria mensagem com content nil e
+  # a IA responde no vazio.
+  def empty_text_message?
+    return false unless @parser.message_type == :text
+    return false if @parser.text_content.present?
+
+    Rails.logger.info "WuzAPI: Ignoring empty text message (ID: WAID:#{@parser.external_id})"
+    true
   end
 
   def duplicate?
