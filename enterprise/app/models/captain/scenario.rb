@@ -24,7 +24,6 @@
 #
 class Captain::Scenario < ApplicationRecord
   include Concerns::CaptainToolsHelpers
-  include Concerns::Agentable
 
   DEFAULT_TOOL_IDS = %w[faq_lookup].freeze
 
@@ -46,43 +45,13 @@ class Captain::Scenario < ApplicationRecord
 
   before_save :resolve_tool_references
 
-  def prompt_context
-    {
-      title: title,
-      instructions: resolved_instructions,
-      tools: resolved_tools,
-      assistant_name: assistant.name.downcase.gsub(/\s+/, '_'),
-      current_date: Time.current.in_time_zone('Brasilia').strftime('%d/%m/%Y'),
-      current_time: Time.current.in_time_zone('Brasilia').strftime('%H:%M'),
-      current_timezone: 'Horário de Brasília (BRT/BRST)',
-      response_guidelines: response_guidelines || [],
-      guardrails: guardrails || []
-    }
-  end
-
   private
-
-  def agent_name
-    "#{title} Agent".parameterize(separator: '_')
-  end
 
   # Scenarios can use a different model than the orchestrator (Assistant).
   # Rationale: orchestrator does simple routing (cheap model suffices),
   # scenarios handle complex flows (tool calling, strict rules) and benefit
   # from a stronger model. Falls back to the global CAPTAIN_OPEN_AI_MODEL
   # (used by the orchestrator) when SCENARIO-specific override is unset.
-  def agent_model
-    # Em modo Codex OAuth, ignora CAPTAIN_OPEN_AI_MODEL_SCENARIO (pode ter modelo
-    # legado como gpt-4o que o Codex rejeita) e usa o modelo padrão do provider.
-    return Captain::Llm::ProviderConfig.model if Captain::Llm::ProviderConfig.codex_oauth?
-
-    scenario_model = InstallationConfig.find_by(name: 'CAPTAIN_OPEN_AI_MODEL_SCENARIO')&.value.presence
-    scenario_model || super
-  end
-
-  def agent_tools
-    resolved_tools.map { |tool| resolve_tool_instance(tool) }
-  end
 
   def resolved_instructions
     instruction.gsub(TOOL_REFERENCE_REGEX, '`\1` tool')

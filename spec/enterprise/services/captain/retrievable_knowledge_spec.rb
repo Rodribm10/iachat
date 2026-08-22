@@ -87,21 +87,11 @@ RSpec.describe 'Retrievable knowledge across every Captain lookup path' do
     it_behaves_like 'serves live knowledge only'
   end
 
-  describe 'FAQ guardrail fallback in the agent runner' do
-    let(:runner) { Captain::Assistant::AgentRunnerService.new(assistant: assistant) }
-
-    it 'can answer from knowledge still in quarantine' do
-      answer = runner.send(:faq_fallback_answer, 'pet')
-
-      expect([approved.answer, trial.answer]).to include(answer)
-    end
-
-    it 'never answers with rejected or retired knowledge' do
-      answer = runner.send(:faq_fallback_answer, 'pet')
-
-      expect(answer).not_to eq('Reprovada pelo juiz.')
-      expect(answer).not_to eq('Conhecimento aposentado.')
-    end
-  end
+  # O bloco 'FAQ guardrail fallback in the agent runner' saiu em 22/08/2026
+  # junto com Captain::Assistant::AgentRunnerService — o motor interno do
+  # Captain foi desligado e o Hermes virou o único caminho de resposta. A
+  # garantia de que conhecimento reprovado/aposentado não é servido continua
+  # coberta pelos exemplos 'serves live knowledge only' acima, que testam a
+  # fonte e não o consumidor.
 end
 # rubocop:enable RSpec/DescribeClass

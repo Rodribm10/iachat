@@ -1,6 +1,4 @@
 module Enterprise::MessageTemplates::HookExecutionService
-  MAX_ATTACHMENT_WAIT_SECONDS = 4
-
   def trigger_templates
     super
     return unless should_process_captain_response?
@@ -29,10 +27,18 @@ module Enterprise::MessageTemplates::HookExecutionService
 
   private
 
+  # O motor interno do Captain saiu em 22/08/2026 — o Hermes é o único caminho
+  # de resposta. Se um assistant não estiver configurado pra Hermes, a conversa
+  # vai pra humano em vez de ficar em silêncio: o cliente esperando sem ninguém
+  # do outro lado é o pior desfecho possível.
   def schedule_captain_response
     return schedule_hermes_response if Captain::Hermes.enabled_for?(conversation.inbox)
 
-    schedule_internal_response
+    Rails.logger.warn(
+      "[Captain] conv #{conversation.display_id}: assistant sem engine Hermes — " \
+      'transferindo para humano'
+    )
+    perform_handoff
   end
 
   def schedule_hermes_response
@@ -68,33 +74,6 @@ module Enterprise::MessageTemplates::HookExecutionService
     Rails.logger.info("[Captain::Hermes::Debounce] cancelled #{cancelled} pending OutgoingJob for conv #{conv_id}") if cancelled.positive?
   rescue StandardError => e
     Rails.logger.warn("[Captain::Hermes::Debounce] failed to cancel pending: #{e.class} - #{e.message}")
-  end
-
-  def schedule_internal_response
-    job_args = [conversation, conversation.inbox.captain_assistant, message]
-    base_wait = conversation.inbox.typing_delay.to_i.seconds
-
-    if message.attachments.blank?
-      total_wait = base_wait
-      if total_wait.positive?
-        Captain::Conversation::ResponseBuilderJob.set(wait: total_wait).perform_later(*job_args)
-      else
-        Captain::Conversation::ResponseBuilderJob.perform_later(*job_args)
-      end
-    else
-      attachment_wait = calculate_attachment_wait_time
-      total_wait = base_wait + attachment_wait
-      Captain::Conversation::ResponseBuilderJob.set(wait: total_wait).perform_later(*job_args)
-    end
-  end
-
-  def calculate_attachment_wait_time
-    attachment_count = message.attachments.size
-    base_wait = 1.second
-
-    # Wait longer for more attachments or larger files
-    additional_wait = [attachment_count * 1, MAX_ATTACHMENT_WAIT_SECONDS].min.seconds
-    base_wait + additional_wait
   end
 
   def should_process_captain_response?
