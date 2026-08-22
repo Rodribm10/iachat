@@ -239,6 +239,8 @@
           "360_DIALOG": "360Dialog",
           "WUZAPI": "Wuzapi",
           "WUZAPI_DESC": "Connect your Wuzapi instance",
+          "GOWA": "GOWA",
+          "GOWA_DESC": "Connect a number through Go WhatsApp Web Multidevice",
           "EVOLUTION": "Evolution Go",
           "EVOLUTION_DESC": "WhatsApp channel for customer service"
         },
@@ -256,6 +258,27 @@
           "AUTO_CREATE_USER": {
             "LABEL": "Auto-create Wuzapi User"
           }
+        },
+        "GOWA": {
+          "BASE_URL": {
+            "LABEL": "GOWA URL",
+            "PLACEHOLDER": "https://gowa.yourdomain.com"
+          },
+          "USERNAME": {
+            "LABEL": "GOWA username",
+            "PLACEHOLDER": "Basic-auth username"
+          },
+          "PASSWORD": {
+            "LABEL": "GOWA password",
+            "PLACEHOLDER": "Basic-auth password"
+          },
+          "PHONE_NUMBER": {
+            "LABEL": "Number to connect",
+            "PLACEHOLDER": "e.g. +5561999999999",
+            "HELP_TEXT": "Enter the number before scanning the QR Code so this inbox can be identified."
+          },
+          "SUBMIT_BUTTON": "Create inbox and open connection",
+          "ERROR_MESSAGE": "We could not prepare the GOWA connection. Check the URL and credentials."
         },
         "EVOLUTION": {
           "TITLE": "Evolution Go Configuration",
@@ -676,6 +699,18 @@
         "LOADING_QR": "Loading QR Code...",
         "CONNECT": "Connect WhatsApp",
         "CONNECT_DESC": "Click below to start the connection process"
+      },
+      "GOWA": {
+        "CONNECTED": "GOWA connected",
+        "CONNECTED_DESC": "Your GOWA inbox is connected and ready to send and receive messages.",
+        "DISCONNECT": "Disconnect",
+        "DISCONNECT_SUCCESS": "Disconnected successfully",
+        "DISCONNECT_ERROR": "Error disconnecting",
+        "CONNECT": "Connect WhatsApp",
+        "CONNECT_DESC": "Click to generate the connection QR Code.",
+        "CONNECT_ERROR": "We could not generate the QR Code. Check the GOWA credentials.",
+        "SCAN_QR": "Scan the QR Code with the WhatsApp account you want to connect.",
+        "QR_ALT": "WhatsApp connection QR Code"
       },
       "EVOLUTION": {
         "CONNECTED": "Evolution Go Connected",
