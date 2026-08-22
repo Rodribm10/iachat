@@ -403,16 +403,6 @@ const menuItems = computed(() => {
           to: accountScopedRoute('captain_settings_gallery'),
         },
         {
-          name: 'Lifecycle',
-          label: t('SIDEBAR.CAPTAIN_LIFECYCLE'),
-          activeOn: [
-            'captain_lifecycle_rules',
-            'captain_lifecycle_settings',
-            'captain_lifecycle_history',
-          ],
-          to: accountScopedRoute('captain_lifecycle_rules'),
-        },
-        {
           name: 'Reservations',
           label: t('SIDEBAR.CAPTAIN_RESERVATIONS'),
           activeOn: ['captain_reservations_index'],

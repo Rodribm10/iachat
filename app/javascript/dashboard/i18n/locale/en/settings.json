@@ -361,7 +361,6 @@
     "CAPTAIN_ROLETA": "Roulette — Redeem",
     "CAPTAIN_HERMES_BUILDER": "Builder (Hermes)",
     "CAPTAIN_FUNNEL": "Conversion Funnel",
-    "CAPTAIN_LIFECYCLE": "Customer Journey",
     "CAPTAIN_REPORTS": "AI Reports",
     "HOME": "Home",
     "AGENTS": "Agents",
@@ -441,7 +440,12 @@
       "ADD_UNIT": "Add Unit",
       "LIST": {
         "LOADING": "Loading Pix units...",
-        "TABLE_HEADER": ["Pix Key", "Account", "Certificates", "Actions"],
+        "TABLE_HEADER": [
+          "Pix Key",
+          "Account",
+          "Certificates",
+          "Actions"
+        ],
         "CERT": "Cert",
         "KEY": "Key",
         "SEPARATOR": "|",
@@ -451,7 +455,10 @@
       "DELETE": {
         "TITLE": "Delete Pix Unit",
         "DESC": "Are you sure you want to delete this Pix unit?",
-        "CONFIRM": { "YES": "Delete", "NO": "Cancel" },
+        "CONFIRM": {
+          "YES": "Delete",
+          "NO": "Cancel"
+        },
         "API": {
           "SUCCESS_MESSAGE": "Unit deleted successfully.",
           "ERROR_MESSAGE": "There was an error deleting the unit."
