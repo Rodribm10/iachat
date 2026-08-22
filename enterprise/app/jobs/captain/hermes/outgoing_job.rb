@@ -1,9 +1,9 @@
 # Dispara o webhook do Hermes Agent assincronamente quando uma mensagem
 # do cliente chega numa inbox marcada como Hermes-enabled.
 #
-# Acionado pelo Enterprise::MessageTemplates::HookExecutionService no lugar do
-# Captain::Conversation::ResponseBuilderJob padrão, quando
-# Captain::Hermes.enabled_for?(inbox) retorna true.
+# Acionado pelo Enterprise::MessageTemplates::HookExecutionService quando
+# Captain::Hermes.enabled_for?(inbox) retorna true — que desde 22/08/2026 é o
+# único caminho de resposta: o motor interno do Captain foi desligado.
 class Captain::Hermes::OutgoingJob < ApplicationJob
   queue_as :default
 

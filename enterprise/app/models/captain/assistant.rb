@@ -39,7 +39,6 @@
 class Captain::Assistant < ApplicationRecord
   include Avatarable
   include Concerns::CaptainToolsHelpers
-  include Concerns::Agentable
 
   self.table_name = 'captain_assistants'
 
@@ -127,38 +126,6 @@ class Captain::Assistant < ApplicationRecord
   end
 
   private
-
-  def agent_name
-    name.parameterize(separator: '_')
-  end
-
-  def agent_tools
-    [
-      self.class.resolve_tool_class('faq_lookup').new(self),
-      self.class.resolve_tool_class('handoff').new(self)
-    ]
-  end
-
-  def prompt_context
-    {
-      name: name,
-      description: description,
-      product_name: config['product_name'] || 'this product',
-      current_date: Time.current.in_time_zone('Brasilia').strftime('%d/%m/%Y'),
-      current_time: Time.current.in_time_zone('Brasilia').strftime('%H:%M'),
-      current_timezone: 'Horário de Brasília (BRT/BRST)',
-      scenarios: scenarios.enabled.map do |scenario|
-        {
-          title: scenario.title,
-          key: scenario.title.parameterize.underscore,
-          description: scenario.description,
-          trigger_keywords: scenario.trigger_keywords
-        }
-      end,
-      response_guidelines: response_guidelines || [],
-      guardrails: guardrails || []
-    }
-  end
 
   def default_avatar_url
     "#{ENV.fetch('FRONTEND_URL', nil)}/assets/images/dashboard/captain/logo.svg"
