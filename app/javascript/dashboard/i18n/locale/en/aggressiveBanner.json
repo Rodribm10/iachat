@@ -1,15 +1,18 @@
 {
   "AGGRESSIVE_CONVERSATION_BANNER": {
-    "HEADLINE_REOPENED": "🚨 Conversation reopened — reply now",
-    "HEADLINE_5": "⏰ {minutes} min without reply",
-    "HEADLINE_15": "⚠️ {minutes} MIN WITHOUT REPLY — respond!",
-    "HEADLINE_28": "🚨 {minutes} MIN WITHOUT REPLY — conversation will auto-close!",
-    "HEADLINE_MULTIPLE": "🚨 {count} conversations awaiting reply",
-    "EXPLANATION": "This alert only clears when you REPLY to the conversation. Clicking × hides temporarily — it comes back if you do not reply.",
-    "KIND_REOPENED": "just reopened",
-    "KIND_WAITING": "{minutes} min without reply",
+    "HEADLINE_ONE": "{name} has been waiting {time}",
+    "HEADLINE_MANY": "{count} conversations waiting — the oldest for {time}",
+    "HEADLINE_REOPENED_ONE": "{name} reopened the conversation",
+    "OPEN_ONE": "Open",
+    "OPEN_OLDEST": "Open the oldest",
+    "EXPAND": "show all",
+    "COLLAPSE": "hide list",
+    "EXPLANATION": "This notice only clears once the conversation is answered. The ✕ hides it for now — it comes back if there is still no reply.",
+    "KIND_REOPENED": "reopened",
+    "NOW": "just now",
     "HIDE_ONE": "Hide",
-    "HIDE_ONE_TITLE": "Hide temporarily — comes back if you do not reply",
-    "HIDE_ICON": "×"
+    "HIDE_ONE_TITLE": "Hides temporarily — comes back if unanswered",
+    "HIDE_ICON": "✕",
+    "HELP_ICON": "?"
   }
 }

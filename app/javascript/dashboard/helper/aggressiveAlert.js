@@ -2,7 +2,29 @@ import { emitter } from 'shared/helpers/mitt';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
 
 const ALERT_AUDIO_PATH = '/audio/dashboard/bell.mp3';
+// Formata a espera para exibição: "12 min", "2h", "4h30", "3d".
+// Fica aqui (e não no componente) para poder ser testada isoladamente — foi
+// justamente o cálculo do tempo que estava errado: o banner mostrava o valor
+// do limiar (5/15/28) em vez da espera real, então uma conversa de 6 horas
+// aparecia como "28 min".
+export const formatWaited = (ms, { nowLabel = 'agora' } = {}) => {
+  const totalMin = Math.floor(Math.max(0, Number(ms) || 0) / 60000);
+  if (!totalMin) return nowLabel;
+  if (totalMin < 60) return `${totalMin} min`;
+
+  const hours = Math.floor(totalMin / 60);
+  if (hours < 24) {
+    const rest = totalMin % 60;
+    return rest ? `${hours}h${String(rest).padStart(2, '0')}` : `${hours}h`;
+  }
+  return `${Math.floor(hours / 24)}d`;
+};
+
 const VIBRATION_PATTERN = [500, 200, 500, 200, 500];
+
+// Intervalo entre toques enquanto houver alerta vermelho. Antes o som ficava
+// em loop contínuo; espaçar mantém a insistência sem virar tortura.
+const RED_CHIME_INTERVAL_MS = 5 * 60 * 1000;
 const TITLE_FLASH_INTERVAL_MS = 1000;
 const NOTIFICATION_TAG = 'chatwoot-aggressive-alert';
 
@@ -47,6 +69,7 @@ const vibrateDevice = () => {
 class AggressiveAlertManager {
   constructor() {
     this.audio = null;
+    this.redChimeTimer = null;
     this.titleInterval = null;
     this.originalTitle = typeof document !== 'undefined' ? document.title : '';
     // Map<conversationId, { level, kind, contactName, inboxName, minutes, triggeredAt, temporarilyHidden }>
@@ -58,38 +81,66 @@ class AggressiveAlertManager {
     this.audio = new Audio(ALERT_AUDIO_PATH);
   }
 
-  // Som em loop infinito (usado pro nível RED — urgência máxima)
-  playLoopSound() {
+  // O som existe pra chamar quem NÃO está olhando. Se a aba está em foco, o
+  // visual já resolve — e sino tocando por cima de quem já está trabalhando é
+  // o caminho mais curto pra pessoa mutar a aba e perder o alerta pra sempre.
+  // eslint-disable-next-line class-methods-use-this
+  tabIsFocused() {
+    if (typeof document === 'undefined') return false;
+    if (document.visibilityState && document.visibilityState !== 'visible') {
+      return false;
+    }
+    return typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+  }
+
+  // Um toque, nunca em loop. Ignorado com a aba em foco.
+  playChime() {
+    if (this.tabIsFocused()) return;
     this.ensureAudio();
-    this.audio.loop = true;
+    this.audio.loop = false;
+    try {
+      this.audio.currentTime = 0;
+    } catch (e) {
+      // alguns browsers recusam seek antes do primeiro play
+    }
     const playPromise = this.audio.play();
     if (playPromise && typeof playPromise.catch === 'function') {
       playPromise.catch(() => {
-        // Autoplay bloqueado pelo browser — banner visual permanece.
+        // Autoplay bloqueado pelo browser — o aviso visual permanece.
       });
     }
   }
 
-  // Som 1x (usado pro ORANGE — chama atenção mas não satura)
-  playOnceSound() {
-    // Se já está tocando em loop pra outro alerta, não interfere.
-    if (this.hasLoopSound()) return;
-    this.ensureAudio();
-    this.audio.loop = false;
-    const playPromise = this.audio.play();
-    if (playPromise && typeof playPromise.catch === 'function') {
-      playPromise.catch(() => {});
-    }
+  // Enquanto houver alerta vermelho visível, repete o toque a cada
+  // RED_CHIME_INTERVAL_MS — mas só com a aba fora de foco. Antes disso era
+  // `audio.loop = true`, som contínuo mesmo com a pessoa olhando a tela.
+  startRedChimeCycle() {
+    if (this.redChimeTimer) return;
+    this.playChime();
+    this.redChimeTimer = setInterval(() => {
+      if (!this.hasRedAlert()) {
+        this.stopRedChimeCycle();
+        return;
+      }
+      this.playChime();
+    }, RED_CHIME_INTERVAL_MS);
   }
 
-  hasLoopSound() {
-    // Loop está ativo se algum alerta no map tem level === RED e não está hidden.
+  stopRedChimeCycle() {
+    if (!this.redChimeTimer) return;
+    clearInterval(this.redChimeTimer);
+    this.redChimeTimer = null;
+  }
+
+  hasRedAlert() {
+    // Existe alerta vermelho visível?
     return Array.from(this.activeConversations.values()).some(
       entry => entry.level === LEVEL.RED && !entry.temporarilyHidden
     );
   }
 
   stopSound() {
+    this.stopRedChimeCycle();
     if (!this.audio) return;
     this.audio.pause();
     this.audio.currentTime = 0;
@@ -143,11 +194,10 @@ class AggressiveAlertManager {
 
   // Re-avalia som + título após mudanças no map (trigger/dismiss/hide).
   refreshOutputs() {
-    const hasLoop = this.hasLoopSound();
     const shouldFlash = this.shouldFlashTitle();
 
-    if (hasLoop) {
-      this.playLoopSound();
+    if (this.hasRedAlert()) {
+      this.startRedChimeCycle();
     } else {
       this.stopSound();
     }
@@ -167,7 +217,9 @@ class AggressiveAlertManager {
    * @param {string} opts.kind - 'reopened' | 'inactivity'
    * @param {string} [opts.contactName]
    * @param {string} [opts.inboxName]
-   * @param {number} [opts.minutes] - só pra inactivity (5/15/28)
+   * @param {number} [opts.lastClientAt] - timestamp (ms) da última mensagem do
+   *   cliente. Guardamos o instante, não a duração: o tempo de espera é
+   *   calculado na hora de exibir, então continua correndo.
    */
   trigger({
     conversationId,
@@ -175,7 +227,7 @@ class AggressiveAlertManager {
     kind = 'reopened',
     contactName,
     inboxName,
-    minutes,
+    lastClientAt,
   }) {
     if (!conversationId) return;
     const existing = this.activeConversations.get(conversationId);
@@ -191,7 +243,7 @@ class AggressiveAlertManager {
           ...existing,
           level: incomingSev > currentSev ? level : existing.level,
           kind: incomingSev > currentSev ? kind : existing.kind,
-          minutes: incomingSev > currentSev ? minutes : existing.minutes,
+          lastClientAt: lastClientAt || existing.lastClientAt,
           contactName: contactName || existing.contactName,
           inboxName: inboxName || existing.inboxName,
           temporarilyHidden: false,
@@ -204,17 +256,18 @@ class AggressiveAlertManager {
         kind,
         contactName: contactName || '—',
         inboxName: inboxName || '',
-        minutes: minutes || null,
+        lastClientAt: lastClientAt || null,
         triggeredAt: Date.now(),
         temporarilyHidden: false,
       });
     }
 
-    // Som por nível
+    // Som por nível — sempre um toque, nunca contínuo, e só com a aba fora
+    // de foco (ver tabIsFocused).
     if (level === LEVEL.RED) {
-      this.playLoopSound();
+      this.startRedChimeCycle();
     } else if (level === LEVEL.ORANGE) {
-      this.playOnceSound();
+      this.playChime();
     }
     // YELLOW: sem som
 

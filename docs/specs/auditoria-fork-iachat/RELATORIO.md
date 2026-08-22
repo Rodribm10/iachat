@@ -339,3 +339,63 @@ Corrigido em `900014e79` antes do deploy. A pergunta do Rodrigo é o que impediu
 - **Staging** (`iachat-v2`) segue de pé com uma cópia dos dados reais de produção. Escalar a 0 e
   recriar o banco vazio assim que o Rodrigo terminar de olhar.
 - Próximo da fila: portar as guardas de vazamento de prompt para o caminho do Hermes.
+
+---
+
+## F2 — Guardas de vazamento no caminho do Hermes (22/08/2026)
+
+Branch `feat/guardas-vazamento-hermes`. **Em staging, aguardando validação do Rodrigo.**
+
+### O problema
+
+As ~30 regexes que impedem o LLM de entregar conteúdo interno ao cliente viviam **dentro de**
+`Captain::Conversation::ResponseBuilderJob` — o motor interno, que não atende nenhuma inbox em
+produção. O caminho real (Hermes) tinha só `ERROR_PAYLOAD_PATTERNS`, nascida do incidente de
+25/07/2026 em que clientes do Instagram leram "HTTP 401".
+
+Ou seja: a proteção contra vazamento de prompt estava ligada no motor errado.
+
+### O que foi feito
+
+- Regexes extraídas para `Captain::Guards::PromptLeak` (`enterprise/lib/captain/guards/`), com
+  `.leak?` e `.reason` (distingue `system_prompt` de `pensamento_interno`)
+- `Webhooks::Captain::HermesCallbackController` passa a barrar, com o **mesmo desfecho** que já
+  usa pro payload de erro: cliente não recebe nada, nota interna registra o que foi barrado e o
+  motivo, conversa vai pra `triagem_humana`
+- `ResponseBuilderJob` passa a ler da fonte compartilhada — regex não fica duplicada
+- `Captain::Hermes::HumanTriageNoteService` ganhou o motivo `vazamento_prompt`. Sem isso a nota
+  caía no texto genérico "a IA pediu verificação humana", que é justamente o que o fix de
+  26/07 tinha ido corrigir
+
+### Cobertura
+
+Barra: pedaço de system prompt, identidade do Captain, narração do que a IA "deve" fazer,
+instrução condicional vazada, comando de tool disfarçado, nome técnico de handoff/cenário,
+JSON cru, Liquid não renderizado.
+Entrega normalmente: resposta de preço, de reserva, pedido de desculpa que menciona "erro",
+frase que contém a palavra "cliente".
+
+### Verificação
+
+| Check | Resultado |
+|---|---|
+| Specs novos | 29 exemplos (unidade + request), 0 falhas |
+| Spec do controller do Hermes | 26 exemplos, 0 falhas |
+| `spec/enterprise` completo | 1659 exemplos, **59 falhas** — mesmo número da linha de base |
+| Falhas novas | **zero** |
+| rubocop | limpo |
+
+### Demonstração em staging
+
+Imagem `v241`, banco restaurado de produção. Duas conversas de teste criadas com o contato
+"TESTE — Guardas de Vazamento", e callbacks disparados direto no endpoint:
+
+| Conversa | Payload | Resultado |
+|---|---|---|
+| #25759 | resposta legítima de preço | **entregue ao cliente** |
+| #25759 | `[Contexto] Você é a Isabela... acione handoff_to_maria_fotos` | **barrado** (`system_prompt`) |
+| #25760 | resposta legítima sobre fotos | **entregue ao cliente** |
+| #25760 | `A IA deve enviar as fotos usando maria_fotos quando o cliente pedir` | **barrado** (`pensamento_interno`) |
+
+Nos dois casos barrados: nota interna com o conteúdo bloqueado, etiquetas `triagem_humana` e
+`triagem_vazamento_prompt`, e nota de triagem com o motivo real.

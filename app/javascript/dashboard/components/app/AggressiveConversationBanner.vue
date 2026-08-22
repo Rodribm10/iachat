@@ -2,8 +2,15 @@
 import { mapGetters } from 'vuex';
 import { emitter } from 'shared/helpers/mitt';
 import { BUS_EVENTS } from 'shared/constants/busEvents';
-import aggressiveAlert from 'dashboard/helper/aggressiveAlert';
+import aggressiveAlert, {
+  formatWaited,
+} from 'dashboard/helper/aggressiveAlert';
 import inactivityAlertTracker from 'dashboard/helper/inactivityAlertTracker';
+
+// Recalcula o tempo exibido a cada 30s. O alerta guarda o INSTANTE da última
+// mensagem do cliente, não a duração — então o contador precisa avançar
+// sozinho em vez de congelar no valor do limiar que disparou.
+const RETICK_MS = 30_000;
 
 export default {
   name: 'AggressiveConversationBanner',
@@ -11,6 +18,9 @@ export default {
     return {
       alerts: [],
       maxLevel: null,
+      now: Date.now(),
+      expanded: false,
+      retickTimer: null,
     };
   },
   computed: {
@@ -32,53 +42,61 @@ export default {
     hasAlerts() {
       return this.alerts.length > 0;
     },
+    // Ordenado pela espera mais longa primeiro — quem esperou mais aparece antes.
+    sortedAlerts() {
+      return [...this.alerts].sort(
+        (a, b) => this.waitedMs(b) - this.waitedMs(a)
+      );
+    },
+    oldest() {
+      return this.sortedAlerts[0] || null;
+    },
     bannerClass() {
       return [
         'aggressive-banner',
         this.maxLevel ? `aggressive-banner--${this.maxLevel}` : '',
       ];
     },
-    bannerHeadline() {
+    // Uma linha só. O detalhe fica atrás do "ver todas".
+    headline() {
       const count = this.alerts.length;
-      if (count === 1) {
-        const a = this.alerts[0];
-        if (a.kind === 'reopened') {
+      const oldest = this.oldest;
+
+      if (count === 1 && oldest) {
+        if (oldest.kind === 'reopened') {
           return this.$t(
-            'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_REOPENED',
-            'Conversa reaberta — responda agora'
-          );
-        }
-        // inactivity — mostra tempo
-        if (a.minutes >= 28) {
-          return this.$t(
-            'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_28',
-            { minutes: a.minutes },
-            `🚨 ${a.minutes} MIN SEM RESPOSTA — conversa fecha em breve`
-          );
-        }
-        if (a.minutes >= 15) {
-          return this.$t(
-            'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_15',
-            { minutes: a.minutes },
-            `⚠️ ${a.minutes} MIN SEM RESPOSTA`
+            'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_REOPENED_ONE',
+            { name: oldest.contactName || '—' },
+            `${oldest.contactName || '—'} reabriu a conversa`
           );
         }
         return this.$t(
-          'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_5',
-          { minutes: a.minutes },
-          `⏰ ${a.minutes} min sem resposta`
+          'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_ONE',
+          { name: oldest.contactName || '—', time: this.waitedLabel(oldest) },
+          `${oldest.contactName || '—'} espera há ${this.waitedLabel(oldest)}`
         );
       }
+
       return this.$t(
-        'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_MULTIPLE',
-        { count },
-        `🚨 ${count} conversas aguardando resposta`
+        'AGGRESSIVE_CONVERSATION_BANNER.HEADLINE_MANY',
+        { count, time: oldest ? this.waitedLabel(oldest) : '' },
+        `${count} conversas esperando resposta — a mais antiga há ${
+          oldest ? this.waitedLabel(oldest) : ''
+        }`
       );
+    },
+    openLabel() {
+      return this.alerts.length === 1
+        ? this.$t('AGGRESSIVE_CONVERSATION_BANNER.OPEN_ONE', 'Abrir')
+        : this.$t(
+            'AGGRESSIVE_CONVERSATION_BANNER.OPEN_OLDEST',
+            'Abrir a mais antiga'
+          );
     },
     explanation() {
       return this.$t(
         'AGGRESSIVE_CONVERSATION_BANNER.EXPLANATION',
-        'Este alerta só some quando você RESPONDER a conversa. Clicar no × esconde temporariamente.'
+        'Este aviso só some quando a conversa for respondida. O × esconde por enquanto — volta se continuar sem resposta.'
       );
     },
   },
@@ -104,17 +122,39 @@ export default {
   mounted() {
     emitter.on(BUS_EVENTS.AGGRESSIVE_ALERT_TRIGGER, this.refreshAlerts);
     emitter.on(BUS_EVENTS.AGGRESSIVE_ALERT_DISMISS, this.refreshAlerts);
-    // Rehidrata se alertas foram disparados antes do componente montar
     this.refreshAlerts();
+    this.retickTimer = setInterval(() => {
+      this.now = Date.now();
+    }, RETICK_MS);
   },
   beforeUnmount() {
     emitter.off(BUS_EVENTS.AGGRESSIVE_ALERT_TRIGGER, this.refreshAlerts);
     emitter.off(BUS_EVENTS.AGGRESSIVE_ALERT_DISMISS, this.refreshAlerts);
+    if (this.retickTimer) clearInterval(this.retickTimer);
   },
   methods: {
     refreshAlerts() {
       this.alerts = aggressiveAlert.getActiveConversations();
       this.maxLevel = aggressiveAlert.getMaxLevel();
+      this.now = Date.now();
+    },
+    waitedMs(alert) {
+      if (!alert || !alert.lastClientAt) return 0;
+      return Math.max(0, this.now - alert.lastClientAt);
+    },
+    // Tempo REAL de espera. Antes mostrávamos o valor do limiar (5/15/28), o
+    // que fazia uma conversa de 6 horas aparecer como "28 min" e a equipe
+    // despriorizar justamente o caso mais grave.
+    waitedLabel(alert) {
+      return formatWaited(this.waitedMs(alert), {
+        nowLabel: this.$t('AGGRESSIVE_CONVERSATION_BANNER.NOW', 'agora'),
+      });
+    },
+    toggleExpanded() {
+      this.expanded = !this.expanded;
+    },
+    openOldest() {
+      if (this.oldest) this.openConversation(this.oldest);
     },
     openConversation(alert) {
       // Clica no item → abre conversa E esconde o alerta dela (mas se
@@ -135,42 +175,57 @@ export default {
     dismissOne(alert) {
       aggressiveAlert.dismiss(alert.id);
     },
-    alertItemClass(alert) {
-      return [
-        'aggressive-banner__item',
-        `aggressive-banner__item--${alert.level}`,
-      ];
+    itemClass(alert) {
+      return ['aggressive-banner__item', `is-${alert.level}`];
     },
-    alertContextLabel(alert) {
+    contextLabel(alert) {
       if (alert.kind === 'reopened') {
         return this.$t(
           'AGGRESSIVE_CONVERSATION_BANNER.KIND_REOPENED',
           'reabriu'
         );
       }
-      return this.$t(
-        'AGGRESSIVE_CONVERSATION_BANNER.KIND_WAITING',
-        { minutes: alert.minutes || '?' },
-        `${alert.minutes || '?'} min sem resposta`
-      );
+      return this.waitedLabel(alert);
     },
   },
 };
 </script>
 
 <template>
-  <div v-if="hasAlerts" :class="bannerClass" role="alert" aria-live="assertive">
-    <div class="aggressive-banner__headline">
-      {{ bannerHeadline }}
+  <div v-if="hasAlerts" :class="bannerClass" role="alert" aria-live="polite">
+    <div class="aggressive-banner__bar">
+      <span class="aggressive-banner__dot" aria-hidden="true" />
+
+      <span class="aggressive-banner__headline">{{ headline }}</span>
+
+      <button type="button" class="aggressive-banner__cta" @click="openOldest">
+        {{ openLabel }}
+      </button>
+
+      <button
+        v-if="alerts.length > 1"
+        type="button"
+        class="aggressive-banner__ghost"
+        :aria-expanded="expanded"
+        @click="toggleExpanded"
+      >
+        {{
+          expanded
+            ? $t('AGGRESSIVE_CONVERSATION_BANNER.COLLAPSE', 'ocultar lista')
+            : $t('AGGRESSIVE_CONVERSATION_BANNER.EXPAND', 'ver todas')
+        }}
+      </button>
+
+      <span class="aggressive-banner__help" :title="explanation">{{
+        $t('AGGRESSIVE_CONVERSATION_BANNER.HELP_ICON', '?')
+      }}</span>
     </div>
-    <div class="aggressive-banner__explanation">
-      {{ explanation }}
-    </div>
-    <ul class="aggressive-banner__list">
+
+    <ul v-if="expanded" class="aggressive-banner__list">
       <li
-        v-for="alert in alerts"
+        v-for="alert in sortedAlerts"
         :key="alert.id"
-        :class="alertItemClass(alert)"
+        :class="itemClass(alert)"
       >
         <button
           type="button"
@@ -181,11 +236,11 @@ export default {
             alert.contactName || '—'
           }}</span>
           <span v-if="alert.inboxName" class="aggressive-banner__inbox">
-            · {{ alert.inboxName }}
+            {{ alert.inboxName }}
           </span>
-          <span class="aggressive-banner__context">
-            · {{ alertContextLabel(alert) }}
-          </span>
+          <span class="aggressive-banner__context">{{
+            contextLabel(alert)
+          }}</span>
         </button>
         <button
           type="button"
@@ -201,7 +256,7 @@ export default {
           "
           @click="dismissOne(alert)"
         >
-          {{ $t('AGGRESSIVE_CONVERSATION_BANNER.HIDE_ICON', '×') }}
+          {{ $t('AGGRESSIVE_CONVERSATION_BANNER.HIDE_ICON', '✕') }}
         </button>
       </li>
     </ul>
@@ -209,132 +264,196 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@keyframes aggressive-pulse-yellow {
-  0%,
-  100% {
-    background-color: #eab308;
-  }
-  50% {
-    background-color: #fbbf24;
-  }
-}
-@keyframes aggressive-pulse-orange {
-  0%,
-  100% {
-    background-color: #c2410c;
-  }
-  50% {
-    background-color: #f97316;
-  }
-}
-@keyframes aggressive-pulse-red {
-  0%,
-  100% {
-    background-color: #991b1b;
-  }
-  50% {
-    background-color: #ef4444;
-  }
-}
-
+// Faixa de uma linha em vez de bloco de ~180px. O vermelho saturado fica
+// reservado ao ponto pulsante e ao item mais crítico da lista — assim ele
+// volta a significar alguma coisa em vez de ser o estado permanente da tela.
 .aggressive-banner {
   position: sticky;
   top: 0;
   z-index: 9999;
   width: 100%;
-  color: #ffffff;
-  padding: 14px 20px;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
-  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.4;
+  background: #2a1a17;
+  border-bottom: 1px solid #4a2620;
+  color: #f0c8be;
+
+  &--yellow {
+    background: #241f14;
+    border-bottom-color: #4a3d1c;
+    color: #e8d5a3;
+  }
+
+  &--orange {
+    background: #2a2015;
+    border-bottom-color: #543a1e;
+    color: #f0d0a8;
+  }
 }
 
-.aggressive-banner--yellow {
-  background-color: #eab308;
-  color: #1f2937;
+.aggressive-banner__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  flex-wrap: wrap;
 }
-.aggressive-banner--orange {
-  background-color: #c2410c;
-  animation: aggressive-pulse-orange 1.4s ease-in-out infinite;
+
+.aggressive-banner__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e0503c;
+  flex: none;
+  animation: aggressive-blink 1.8s ease-in-out infinite;
+
+  .aggressive-banner--yellow & {
+    background: #d9b036;
+  }
+  .aggressive-banner--orange & {
+    background: #e08a3c;
+  }
 }
-.aggressive-banner--red {
-  background-color: #991b1b;
-  animation: aggressive-pulse-red 0.9s ease-in-out infinite;
+
+@keyframes aggressive-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aggressive-banner__dot {
+    animation: none;
+  }
 }
 
 .aggressive-banner__headline {
-  font-size: 22px;
-  line-height: 1.2;
-  margin-bottom: 4px;
-  letter-spacing: 0.5px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  flex: 1;
+  min-width: 200px;
+  font-weight: 600;
+  color: #ffdcd3;
+
+  .aggressive-banner--yellow & {
+    color: #f5e6bd;
+  }
+  .aggressive-banner--orange & {
+    color: #f8e0c4;
+  }
 }
 
-.aggressive-banner__explanation {
-  font-size: 13px;
-  font-weight: 500;
-  opacity: 0.92;
-  margin-bottom: 10px;
+.aggressive-banner__cta {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid #6e3a31;
+  border-radius: 3px;
+  color: #ffdcd3;
+  background: transparent;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.aggressive-banner__ghost {
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.75;
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.aggressive-banner__help {
+  font-size: 11px;
+  opacity: 0.6;
+  cursor: help;
+  user-select: none;
 }
 
 .aggressive-banner__list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 16px 8px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .aggressive-banner__item {
   display: flex;
   align-items: center;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 6px;
-  overflow: hidden;
-  font-size: 14px;
-}
+  gap: 8px;
+  border-left: 3px solid transparent;
+  padding-left: 8px;
 
-.aggressive-banner__item--yellow {
-  background: rgba(0, 0, 0, 0.18);
+  &.is-red {
+    border-left-color: #e0503c;
+  }
+  &.is-orange {
+    border-left-color: #e08a3c;
+  }
+  &.is-yellow {
+    border-left-color: #d9b036;
+  }
 }
 
 .aggressive-banner__open {
-  background: transparent;
-  color: inherit;
-  border: none;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-weight: 600;
-  text-align: left;
+  flex: 1;
   display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.aggressive-banner__open:hover {
-  background: rgba(255, 255, 255, 0.15);
+  align-items: baseline;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  padding: 5px 0;
+  font-size: 12.5px;
+  cursor: pointer;
+
+  &:hover .aggressive-banner__contact {
+    text-decoration: underline;
+  }
 }
 
 .aggressive-banner__contact {
-  font-weight: 800;
+  font-weight: 600;
 }
-.aggressive-banner__inbox,
+
+.aggressive-banner__inbox {
+  opacity: 0.65;
+  font-size: 11.5px;
+}
+
 .aggressive-banner__context {
-  opacity: 0.9;
-  font-weight: 500;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  font-size: 11.5px;
 }
 
 .aggressive-banner__close {
   background: transparent;
-  color: inherit;
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.25);
-  padding: 8px 12px;
+  color: inherit;
+  opacity: 0.5;
   cursor: pointer;
-  font-size: 20px;
-  line-height: 1;
-  font-weight: 800;
-}
-.aggressive-banner__close:hover {
-  background: rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+  padding: 2px 4px;
+
+  &:hover {
+    opacity: 1;
+  }
 }
 </style>

@@ -139,7 +139,11 @@ class InactivityAlertTracker {
             kind: 'inactivity',
             contactName: entry.contactName,
             inboxName: entry.inboxName,
-            minutes: t.minutes,
+            // Timestamp da última mensagem do cliente, não o limiar. O tempo
+            // exibido é calculado na renderização, então continua correndo em
+            // vez de congelar em "28 min" para sempre — que era o que
+            // acontecia quando mandávamos `t.minutes` daqui.
+            lastClientAt: entry.lastClientAt,
           });
         });
       }
