@@ -296,3 +296,46 @@ terminar, o certo é escalar a stack de volta a 0 e recriar o banco vazio.
 Só falta a janela. Hoje é sábado 15:53 BRT — pico da operação. **Não subir agora.**
 Ordem em produção, quando for: merge pra `main` → CI builda → deploy do **código** → validar →
 só então rodar a **migration**.
+
+---
+
+## F1 em PRODUÇÃO — 22/08/2026, 16:15 BRT
+
+PR [#28](https://github.com/Rodribm10/iachat/pull/28) mergeado em `main` (`fdf1cb070`),
+imagem `ghcr.io/rodribm10/iachat:v237`. Stack `iachat`, de `v234` para `v237`.
+
+### Defeito pego antes de subir
+
+Ao listar "o que muda em produção" pro Rodrigo, apareceu que o **menu lateral ainda apontava
+para a rota `captain_lifecycle_rules`**, que eu havia deletado — item de menu levando a lugar
+nenhum. Escapou da minha varredura porque o próprio grep filtrava o padrão `lifecycle_`.
+Corrigido em `900014e79` antes do deploy. A pergunta do Rodrigo é o que impediu isso de ir ao ar.
+
+### Execução
+
+| Etapa | Horário (UTC) | Resultado |
+|---|---|---|
+| Deploy do código (app + sidekiq) | 19:09 | convergiu, sem erro de boot |
+| Mensagens saindo durante o deploy | 19:10 – 19:12 | 8 enviadas, fluxo não parou |
+| Migration | 19:15 | **0,14s** |
+| Mensagem real do bot pós-migration | 19:18:05 | ciclo completo confirmado |
+
+### Estado final de produção
+
+| | |
+|---|---|
+| Tabelas | 135 → **110** |
+| Conversas / contatos / mensagens | 23.743 / 15.880 / 318.679 |
+| Reservas / PIX / assistants | 354 / 213 / 18 |
+| Tools MCP expostas ao Hermes | **19** |
+| Assistants em Hermes | 13 |
+| Credencial Codex ativa | 1 |
+| Sidekiq | 0 enfileirados, 0 retry, **0 mortos na última hora** |
+| HTTPS | 200 |
+| Erros no log pós-migration | nenhum |
+
+### Pendências
+
+- **Staging** (`iachat-v2`) segue de pé com uma cópia dos dados reais de produção. Escalar a 0 e
+  recriar o banco vazio assim que o Rodrigo terminar de olhar.
+- Próximo da fila: portar as guardas de vazamento de prompt para o caminho do Hermes.
