@@ -2,6 +2,10 @@ import { frontendURL } from '../../../../helper/URLHelper';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 
 import ReportsWrapper from './components/ReportsWrapper.vue';
+// A tela de relatórios da IA nasceu dentro das Configurações do Capitão, o que
+// a deixava fora do menu Relatórios e dentro do shell errado. O componente
+// continua onde está; só a rota mudou de casa.
+const AiReports = () => import('../captain/reports/Index.vue');
 import Index from './Index.vue';
 
 import AgentReportsIndex from './AgentReportsIndex.vue';
@@ -168,6 +172,12 @@ export default {
           name: 'bot_reports',
           meta,
           component: BotReports,
+        },
+        {
+          path: 'ia',
+          name: 'ai_reports',
+          meta,
+          component: AiReports,
         },
         {
           path: 'directory_dashboard',

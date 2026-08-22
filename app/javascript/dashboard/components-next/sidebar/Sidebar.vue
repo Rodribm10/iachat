@@ -426,12 +426,6 @@ const menuItems = computed(() => {
           activeOn: ['captain_funnel_index'],
           to: accountScopedRoute('captain_funnel_index'),
         },
-        {
-          name: 'Reports',
-          label: t('SIDEBAR.CAPTAIN_REPORTS'),
-          activeOn: ['captain_settings_reports'],
-          to: accountScopedRoute('captain_settings_reports'),
-        },
       ],
     },
     {
@@ -545,6 +539,12 @@ const menuItems = computed(() => {
           name: 'Reports Bot',
           label: t('SIDEBAR.REPORTS_BOT'),
           to: accountScopedRoute('bot_reports'),
+        },
+        {
+          name: 'Reports AI',
+          label: t('SIDEBAR.CAPTAIN_REPORTS'),
+          activeOn: ['ai_reports'],
+          to: accountScopedRoute('ai_reports'),
         },
         {
           name: 'Reports Directory Dashboard',

@@ -7,7 +7,6 @@ import UnitsIndex from './units/Index.vue';
 import UnitEdit from './units/Edit.vue';
 import GalleryIndex from './gallery/Index.vue';
 import GalleryEdit from './gallery/Edit.vue';
-const ReportsIndex = () => import('./reports/Index.vue');
 
 export default {
   routes: [
@@ -67,14 +66,6 @@ export default {
           component: GalleryEdit,
           meta: {
             permissions: ['administrator', 'agent'],
-          },
-        },
-        {
-          path: 'reports',
-          name: 'captain_settings_reports',
-          component: ReportsIndex,
-          meta: {
-            permissions: ['administrator'],
           },
         },
       ],
