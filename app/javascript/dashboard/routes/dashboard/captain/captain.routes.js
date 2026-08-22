@@ -21,10 +21,6 @@ import ReservationsIndex from './reservations/Index.vue';
 import RoletaIndex from './roleta/Index.vue';
 import HermesBuilderIndex from './builder/Index.vue';
 import FunnelIndex from './funnel/Index.vue';
-import LifecycleIndex from './lifecycle/Index.vue';
-import LifecycleRules from './lifecycle/Rules.vue';
-import LifecycleSettings from './lifecycle/Settings.vue';
-import LifecycleHistory from './lifecycle/History.vue';
 
 const meta = {
   permissions: ['administrator', 'agent'],
@@ -174,31 +170,5 @@ export const routes = [
     component: FunnelIndex,
     name: 'captain_funnel_index',
     meta,
-  },
-  {
-    path: frontendURL('accounts/:accountId/captain/lifecycle'),
-    component: LifecycleIndex,
-    meta,
-    redirect: { name: 'captain_lifecycle_rules' },
-    children: [
-      {
-        path: 'rules',
-        component: LifecycleRules,
-        name: 'captain_lifecycle_rules',
-        meta,
-      },
-      {
-        path: 'settings',
-        component: LifecycleSettings,
-        name: 'captain_lifecycle_settings',
-        meta,
-      },
-      {
-        path: 'history',
-        component: LifecycleHistory,
-        name: 'captain_lifecycle_history',
-        meta,
-      },
-    ],
   },
 ];

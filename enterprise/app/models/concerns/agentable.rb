@@ -93,7 +93,7 @@ module Concerns::Agentable
                   .first
     return {} if reservation.blank?
 
-    Captain::Lifecycle::ContextBuilder.build(reservation).fetch('reservation', {})
+    Captain::Reservations::ContextBuilder.build(reservation)
   end
 
   def resolve_current_unit(conversation_data)

@@ -273,10 +273,4 @@ RSpec.describe Account do
       end
     end
   end
-
-  describe 'captain lifecycle associations' do
-    it { is_expected.to have_many(:captain_lifecycle_rules).class_name('Captain::Lifecycle::Rule') }
-    it { is_expected.to have_many(:captain_lifecycle_deliveries).class_name('Captain::Lifecycle::Delivery') }
-    it { is_expected.to have_one(:captain_lifecycle_config).class_name('Captain::Lifecycle::Config') }
-  end
 end
