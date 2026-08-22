@@ -140,11 +140,19 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
         expect(nota.content).to include('system_prompt')
       end
 
-      it 'manda a conversa para triagem humana' do
+      it 'manda a conversa para triagem humana com o motivo real' do
         post '/webhooks/captain/hermes_callback',
              params: { inbox_id: inbox.id, content: 'A IA deve verificar a agenda antes de confirmar.' }
 
-        expect(conversation.reload.label_list).to include('triagem_humana')
+        conversation.reload
+        expect(conversation.label_list).to include('triagem_humana')
+        expect(conversation.label_list).to include('triagem_vazamento_prompt')
+
+        nota = conversation.messages.where(private: true).find do |m|
+          m.content_attributes.to_h['external_source'] == 'hermes_human_triage'
+        end
+        expect(nota.content).to include('devolveu conteúdo interno em vez de resposta')
+        expect(nota.content_attributes.to_h['triage_reason']).to eq('vazamento_prompt')
       end
     end
 
