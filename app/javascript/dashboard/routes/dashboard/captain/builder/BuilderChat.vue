@@ -186,6 +186,12 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
 </template>
 
 <style scoped lang="scss">
+// Corrigido em 22/08/2026. O componente usava variáveis CSS que NÃO EXISTEM
+// nesta versão do Chatwoot (--color-background, --color-text-light,
+// --color-border, --color-woot-500): todas caíam no fallback claro. No tema
+// escuro isso dava fundo branco com texto herdando a cor clara do tema —
+// branco no branco, impossível de ler enquanto se digita. Agora usa a paleta
+// `n-` do dashboard, que já responde aos dois temas.
 .builder-wrapper {
   display: flex;
   flex-direction: column;
@@ -200,7 +206,7 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
   justify-content: space-between;
   align-items: flex-start;
   padding: 16px 20px;
-  background: var(--color-background-light, #f7f8fa);
+  @apply bg-n-alpha-2;
   border-radius: 12px;
 
   h2 {
@@ -211,7 +217,7 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
 
   p {
     margin: 0;
-    color: var(--color-text-light, #6b7280);
+    @apply text-n-slate-11;
     font-size: 13px;
   }
 }
@@ -220,9 +226,9 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  background: var(--color-background, #fff);
+  @apply bg-n-background;
   border-radius: 12px;
-  border: 1px solid var(--color-border, #e5e7eb);
+  @apply border border-n-weak;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -230,7 +236,7 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
 
 .empty-state {
   margin: auto;
-  color: var(--color-text-light, #9ca3af);
+  @apply text-n-slate-11;
   font-size: 14px;
   text-align: center;
   display: flex;
@@ -244,8 +250,7 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
 }
 
 .start-button {
-  background: var(--color-woot-500, #1f93ff);
-  color: #fff;
+  @apply bg-n-brand text-white;
   border: none;
   padding: 10px 24px;
   border-radius: 8px;
@@ -255,7 +260,7 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
   transition: background 0.15s;
 
   &:hover:not(:disabled) {
-    background: var(--color-woot-600, #1976d2);
+    opacity: 0.9;
   }
 
   &:disabled {
@@ -280,12 +285,11 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
   max-width: 70%;
   padding: 10px 14px;
   border-radius: 14px;
-  background: var(--color-background-light, #f3f4f6);
+  @apply bg-n-solid-2 text-n-slate-12;
   font-size: 14px;
 
   .msg--user & {
-    background: var(--color-woot-500, #1f93ff);
-    color: #fff;
+    @apply bg-n-brand text-white;
   }
 }
 
@@ -309,7 +313,7 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--color-text-light, #6b7280);
+    @apply bg-n-slate-10;
     animation: typing 1.4s infinite ease-in-out;
 
     &:nth-child(2) {
@@ -338,9 +342,15 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
   display: flex;
   gap: 8px;
   padding: 12px;
-  background: var(--color-background, #fff);
+  align-items: flex-end;
+  @apply bg-n-background;
   border-radius: 12px;
-  border: 1px solid var(--color-border, #e5e7eb);
+  @apply border border-n-weak;
+
+  // O textarea nao tem borda propria; sem isto nao ha sinal visivel de foco.
+  &:focus-within {
+    @apply border-n-brand;
+  }
 
   textarea {
     flex: 1;
@@ -349,13 +359,19 @@ watch(messages, () => nextTick().then(scrollToBottom), { deep: true });
     outline: none;
     font: inherit;
     background: transparent;
-    color: inherit;
+    // Era `color: inherit`: puxava a cor clara do tema escuro por cima do
+    // fundo branco do fallback. Texto branco em fundo branco.
+    @apply text-n-slate-12;
+
+    &::placeholder {
+      @apply text-n-slate-10;
+    }
   }
 }
 
 .session-debug {
   font-size: 11px;
-  color: var(--color-text-light, #9ca3af);
+  @apply text-n-slate-11;
   text-align: right;
   margin: 0;
 }

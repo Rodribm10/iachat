@@ -245,7 +245,7 @@ onMounted(() => {
 
 .verification-header {
   padding: 16px 20px;
-  background: var(--color-background-light, #f7f8fa);
+  @apply bg-n-alpha-2;
   border-radius: 12px;
 
   h2 {
@@ -256,7 +256,7 @@ onMounted(() => {
 
   p {
     margin: 0;
-    color: var(--color-text-light, #6b7280);
+    @apply text-n-slate-11;
     font-size: 13px;
     line-height: 1.5;
   }
@@ -271,13 +271,13 @@ onMounted(() => {
     flex: 1;
     padding: 10px 12px;
     border-radius: 8px;
-    border: 1px solid var(--color-border, #e5e7eb);
-    background: var(--color-background, #fff);
+    @apply border border-n-weak;
+    @apply bg-n-background;
     font-size: 14px;
     outline: none;
 
     &:focus {
-      border-color: var(--color-woot-500, #1f93ff);
+      border-@apply text-n-brand;
     }
   }
 }
@@ -287,9 +287,9 @@ onMounted(() => {
   gap: 16px;
   align-items: center;
   padding: 12px 16px;
-  background: var(--color-background, #fff);
+  @apply bg-n-background;
   border-radius: 8px;
-  border: 1px solid var(--color-border, #e5e7eb);
+  @apply border border-n-weak;
   font-size: 13px;
   flex-wrap: wrap;
 
@@ -308,7 +308,7 @@ onMounted(() => {
   }
 
   &__total {
-    color: var(--color-text-light, #6b7280);
+    @apply text-n-slate-11;
   }
 
   &__verdict {
@@ -331,8 +331,8 @@ onMounted(() => {
 }
 
 .check-group {
-  background: var(--color-background, #fff);
-  border: 1px solid var(--color-border, #e5e7eb);
+  @apply bg-n-background;
+  @apply border border-n-weak;
   border-radius: 12px;
   padding: 12px 16px;
 
@@ -340,7 +340,7 @@ onMounted(() => {
     margin: 0 0 8px;
     font-size: 13px;
     font-weight: 600;
-    color: var(--color-text-light, #6b7280);
+    @apply text-n-slate-11;
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
@@ -405,7 +405,7 @@ onMounted(() => {
 
 .check-item__detail {
   margin-top: 2px;
-  color: var(--color-text-light, #6b7280);
+  @apply text-n-slate-11;
   font-size: 12px;
   word-break: break-word;
 }
@@ -414,16 +414,16 @@ onMounted(() => {
   flex-shrink: 0;
   padding: 6px 12px;
   border-radius: 6px;
-  border: 1px solid var(--color-woot-500, #1f93ff);
-  background: var(--color-background, #fff);
-  color: var(--color-woot-500, #1f93ff);
+  @apply border border-n-brand;
+  @apply bg-n-background;
+  @apply text-n-brand;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
 
   &:hover:not(:disabled) {
-    background: var(--color-woot-500, #1f93ff);
+    @apply bg-n-brand;
     color: #fff;
   }
 
@@ -435,7 +435,7 @@ onMounted(() => {
 
 .empty-state {
   text-align: center;
-  color: var(--color-text-light, #9ca3af);
+  @apply text-n-slate-11;
   font-size: 14px;
   padding: 32px;
   margin: 0;
