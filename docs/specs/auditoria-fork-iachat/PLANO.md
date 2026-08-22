@@ -226,3 +226,41 @@ F0 triagem ──► F1 remoção ──► F2 módulos ──► F3 Captain sai
 
 Cada fase fecha com deploy em staging e verificação dos `CRITERIOS.md` daquela fase antes da
 próxima começar. F1, F2 e F3 vão pra produção separadamente — não empacotar.
+
+---
+
+## Decisões do Rodrigo — 22/08/2026 (plano CONGELADO a partir daqui)
+
+Tomadas depois do F0, com o dado da triagem na mesa.
+
+| Assunto | Decisão |
+|---|---|
+| Lifecycle / concierge | **Remover.** Nunca rodou (0 regras, 0 entregas). Se a academia precisar de lembrete, constrói limpo depois do sync. |
+| Memórias de contato | **Remover.** 0 registros, 4 crons à toa. |
+| Roleta | **Fica.** Está em uso; o estado vive no Supabase, não neste banco. Vira módulo ligável só pras contas de hotel no F6. |
+| Providers de WhatsApp | **Não mexer agora.** Revisar depois do sync, com o código do upstream dentro. |
+| Autorização em produção | **Aberta.** Deploy e migration liberados, incluindo o `DROP` das tabelas vazias, sem parar pra reconfirmar. Staging antes, sempre. |
+
+### Correção de premissa registrada
+
+O plano original justificava "limpeza antes do sync" com a ideia de chegar leve no merge.
+**Medido: falso.** Dos 154 arquivos em colisão fork × upstream, só 8 somem com a limpeza — o
+código morto do fork é fork-only e não conflita. A ordem limpeza-antes fica valendo por outro
+motivo: é o passo de menor risco e evita resolver conflito em código condenado. A exceção real
+é o motor interno do Captain (5 arquivos, ~1.158 linhas, fork +656 / upstream +355−254), esse
+sim vale matar antes do merge.
+
+### Ordem de execução final
+
+```
+F0  triagem                                    ✅ concluída
+F1  remover o morto + lifecycle + memórias     ← executando
+F2  portar guardas de vazamento pro Hermes     (antes de F3)
+F3  desligar o Captain interno
+F4  sync 4.11 → 4.17, em 6 degraus
+F5  reativações que a triagem aprovar
+F6  módulos no Super Admin (Featurable já vem pronto do sync)
+```
+
+Mudança em relação ao plano original: o backport do `Featurable` saiu — o sync entrega ele
+pronto. Por isso F6 desceu pra depois de F4.
