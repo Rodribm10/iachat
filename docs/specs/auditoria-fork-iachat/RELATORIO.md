@@ -82,3 +82,75 @@ A roleta não tem tabela neste banco — nem `roleta`, nem `draw`, nem coluna eq
 `captain_reservations`. O estado dela vive no **Supabase** (schema `reserva_hotel`, conforme
 `Captain::Roleta::OfferService::DEFAULT_SCHEMA`). Medir uso da roleta exige consultar o Supabase
 ou resposta direta do Rodrigo.
+
+---
+
+## F1 — Remoção do morto — 22/08/2026
+
+Branch `chore/enxugar-fork`, três commits.
+
+### O que saiu
+
+| Bloco | Detalhe |
+|---|---|
+| Subsistema Jasmine (RAG) | componentes nunca importados + cliente de API sem rota no backend |
+| Classes sem chamador | `Captain::Inter::WebhookSetupService`, `Captain::Notifications::SendNotificationService`, `Captain::ToolRegistryService`, `Captain::Tools::BaseService`, `Whatsapp::MessageDedupLock`, `Whatsapp::Providers::EvolutionApi::PayloadParser` |
+| Gravador sem leitor | `Captain::Reports::DailySnapshotJob` + `Captain::ReportSnapshot` |
+| Lifecycle / concierge | 74 arquivos: models, services, 6 guards, jobs, controllers, policies, views, store, rotas e telas |
+| Memórias de contato | 4 crons, 6 jobs, 4 services, model, policy, controller, tela, injetor de prompt |
+| Lixo de repositório | `chatwoot_zero/` (2 PNGs de uma cópia velha), `TestIndex.vue` |
+| Banco | migration derrubando **25 tabelas**, todas confirmadas vazias em produção |
+
+**Saldo: 129 arquivos alterados, −6.451 linhas.**
+
+### O que NÃO saiu, e por quê
+
+- **`Reports::ExecutiveController`** — a v1 da auditoria dizia "sem rota". Errado: está em
+  `config/routes.rb:120` e alimenta a tela de relatórios.
+- **Camada `Captain::Tools::*`** — resolvida dinamicamente por `config/agents/tools.yml`.
+  É a camada de tools do motor interno; sai junto com ele no F3.
+- **Chaves i18n `JASMINE.CONFIG/WUZAPI/EVOLUTION`** — a tela de configuração do Wuzapi ainda
+  usa, e são 10 canais vivos em produção. Removidas só `HEADER`, `KNOWLEDGE_BASE`,
+  `PLAYGROUND` e `INBOX_LIST`.
+- **Providers de WhatsApp** — decisão do Rodrigo: não mexer antes do sync.
+
+### Achado no meio do caminho
+
+O instalador do AIOS havia **sobrescrito o `.env.example` do Chatwoot inteiro** — de 372 linhas
+para 114 —, apagando `SECRET_KEY_BASE`, `REDIS_URL`, `POSTGRES_HOST`, `FRONTEND_URL` e o resto
+da configuração real. Quem fosse provisionar uma instância nova a partir desse arquivo não
+conseguiria. Restaurado do upstream e acrescido de uma seção com as variáveis próprias do fork;
+as credenciais de ferramenta de desenvolvimento foram para `.env.aios.example`.
+
+Também: `Captain::Lifecycle::ContextBuilder` tinha um consumidor fora do subsistema (`Agentable`,
+na interpolação de prompt). Virou `Captain::Reservations::ContextBuilder`, com o formato dos
+campos preservado tal e qual.
+
+### Verificação
+
+| Check | Resultado |
+|---|---|
+| `rails zeitwerk:check` | passa |
+| `db:migrate` → `db:rollback` → `db:migrate` | sem erro, migration reversível de verdade |
+| `rubocop` nos arquivos tocados | limpo |
+| `eslint` nos arquivos tocados | limpo |
+| RSpec `spec/enterprise` — **base** (`origin/main`) | 1822 exemplos, **87 falhas** |
+| RSpec `spec/enterprise` — **esta branch** | 1630 exemplos, **59 falhas** |
+| Falhas novas introduzidas | **zero** |
+
+A suíte do fork **já estava vermelha antes** — 87 falhas no `origin/main`, espalhadas por Stripe,
+SAML, Twilio, Cloudflare e specs desatualizados em relação ao próprio código do fork (ex.:
+`hook_execution_service_spec` espera `perform_later(conversation, assistant)` enquanto o código
+passa três argumentos há tempo). Isso é dívida a atacar, mas é anterior a esta limpeza.
+
+Duas falhas foram investigadas e descartadas como ruído de ambiente:
+- `account_saml_settings_spec` falha por causa do `FRONTEND_URL` apontando pra um túnel ngrok no
+  `.env` local; com `FRONTEND_URL=http://localhost:3000` passa.
+- `filterHelpers.spec.js` compara timestamps fixos de 2022 com datas relativas — teste que
+  apodrece com o tempo, em arquivo que esta branch não tocou.
+
+### Ordem de deploy (importante)
+
+O código novo não toca em nenhuma das 25 tabelas. Então: **subir o código primeiro, rodar a
+migration depois**. Nesse intervalo um rollback de imagem continua funcionando, porque a imagem
+antiga ainda encontra as tabelas onde espera.
