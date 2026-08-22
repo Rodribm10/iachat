@@ -34,11 +34,34 @@ module Enterprise::MessageTemplates::HookExecutionService
   def schedule_captain_response
     return schedule_hermes_response if Captain::Hermes.enabled_for?(conversation.inbox)
 
+    handoff_misconfigured_assistant
+  end
+
+  # Assistant sem Hermes configurado: transfere pra humano SEM falar com o
+  # cliente. O `perform_handoff` (usado quando a cota do Captain estoura) manda
+  # "Transferring to another agent for further assistance." — mensagem em
+  # inglês, que não serve pro cliente de motel brasileiro e ainda anuncia uma
+  # falha interna. Aqui o cliente não vê nada: a conversa sai de `pending`, uma
+  # nota interna explica o motivo, e uma pessoa assume.
+  def handoff_misconfigured_assistant
+    return unless conversation.pending?
+
     Rails.logger.warn(
       "[Captain] conv #{conversation.display_id}: assistant sem engine Hermes — " \
-      'transferindo para humano'
+      'transferindo para humano em silêncio'
     )
-    perform_handoff
+
+    conversation.messages.create!(
+      message_type: :outgoing,
+      private: true,
+      account_id: conversation.account_id,
+      inbox_id: conversation.inbox_id,
+      content: '⚠️ A IA não está configurada para o Hermes nesta inbox. ' \
+               'O cliente NÃO recebeu resposta automática — assumir o atendimento.',
+      content_attributes: { external_source: 'captain_assistant_misconfigured' }
+    )
+
+    conversation.bot_handoff!
   end
 
   def schedule_hermes_response
