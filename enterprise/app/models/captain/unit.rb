@@ -15,8 +15,13 @@
 #  inter_pix_key                  :string
 #  last_synced_at                 :datetime
 #  leader_whatsapp                :string
+#  manual_pix_bank_name           :string
+#  manual_pix_key                 :string
+#  manual_pix_key_type            :string
+#  manual_pix_owner_name          :string
 #  name                           :string           not null
 #  payment_receipt_review_enabled :boolean          default(FALSE), not null
+#  pix_mode                       :string           default("inter_dynamic"), not null
 #  plug_play_token                :string
 #  proactive_pix_polling_enabled  :boolean          default(FALSE), not null
 #  reservation_source_tag         :string
@@ -44,6 +49,7 @@
 #  index_captain_units_on_captain_brand_id    (captain_brand_id)
 #  index_captain_units_on_concierge_inbox_id  (concierge_inbox_id)
 #  index_captain_units_on_inbox_id            (inbox_id)
+#  index_captain_units_on_pix_mode            (pix_mode)
 #  index_captain_units_on_supabase_unit_id    (supabase_unit_id) UNIQUE WHERE (supabase_unit_id IS NOT NULL)
 #
 # Foreign Keys

@@ -27,13 +27,7 @@ module CaptainFeaturable
     }.with_indifferent_access
   end
 
-  def captain_contact_memory_extraction_enabled?
-    custom_attributes.fetch('captain_contact_memory_extraction_enabled', false) == true
-  end
 
-  def captain_contact_memory_recall_enabled?
-    custom_attributes.fetch('captain_contact_memory_recall_enabled', false) == true
-  end
 
   private
 

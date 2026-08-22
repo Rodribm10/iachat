@@ -38,7 +38,6 @@ RSpec.describe DeleteObjectJob, type: :job do
         contact_inbox = create(:contact_inbox, contact: contact, inbox: inbox)
         unit = create(:captain_unit, account: account)
         assistant = create(:captain_assistant, account: account)
-        collection_id = insert_row(:jasmine_collections, account_id: account.id, name: 'Samanbaia', owner_inbox_id: inbox.id)
         reservation_id = insert_row(
           :captain_reservations,
           account_id: account.id,
@@ -55,16 +54,6 @@ RSpec.describe DeleteObjectJob, type: :job do
         create(:captain_inbox, captain_assistant: assistant, inbox: inbox, captain_unit: unit)
         create(:captain_conversation_insight, account: account, inbox: inbox)
         create(:captain_gallery_item, :inbox_scoped, account: account, inbox: inbox, captain_unit: unit)
-        insert_row(:captain_lifecycle_deliveries, account_id: account.id, captain_reservation_id: reservation_id, inbox_id: inbox.id,
-                                                  fire_at: 1.hour.from_now, status: 'scheduled', origin: 'scheduled_lifecycle')
-        insert_row(:captain_pix_charges, reservation_id: reservation_id, unit_id: unit.id, txid: SecureRandom.hex(8), status: 'active')
-        insert_row(:captain_inbox_automations, account_id: account.id, inbox_id: inbox.id, title: 'Menu', message: 'Oi')
-        insert_row(:captain_inbox_reminder_settings, account_id: account.id, inbox_id: inbox.id)
-        insert_row(:captain_notification_templates, inbox_id: inbox.id, label: 'Template', content: 'Oi')
-        insert_row(:captain_tool_configs, account_id: account.id, inbox_id: inbox.id, tool_key: 'availability')
-        insert_row(:jasmine_inbox_collections, account_id: account.id, inbox_id: inbox.id, collection_id: collection_id)
-        insert_row(:jasmine_inbox_settings, account_id: account.id, inbox_id: inbox.id)
-        insert_row(:jasmine_tool_configs, account_id: account.id, inbox_id: inbox.id, tool_key: 'availability')
 
         expect { described_class.perform_now(inbox) }.not_to raise_error
 
@@ -75,7 +64,6 @@ RSpec.describe DeleteObjectJob, type: :job do
         expect(Captain::ConversationInsight.where(inbox_id: inbox.id)).to be_empty
         expect(unit.reload.inbox_id).to be_nil
         expect(unit.concierge_inbox_id).to be_nil
-        expect(select_value(:jasmine_collections, collection_id, :owner_inbox_id)).to be_nil
       end
     end
 

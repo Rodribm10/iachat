@@ -5,7 +5,6 @@ class CaptainListener < BaseListener
     conversation = extract_conversation_and_account(event)[0]
     return if conversation.blank?
 
-    Captain::ContactMemories::ExtractFromConversationJob.perform_later(conversation.id)
     # Recalcula indicadores de retenção (interações, recorrência, days_since)
     # agora que a conversa se encerrou e temos estado estável.
     Captain::Retention::RecalculateContactStatsJob.perform_later(conversation.contact_id) if conversation.contact_id.present?

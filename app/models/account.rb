@@ -98,9 +98,6 @@ class Account < ApplicationRecord
   has_many :api_channels, dependent: :destroy_async, class_name: '::Channel::Api'
   has_many :articles, dependent: :destroy_async, class_name: '::Article'
   has_many :captain_reservations, class_name: 'Captain::Reservation', dependent: :destroy
-  has_many :captain_lifecycle_rules, class_name: 'Captain::Lifecycle::Rule', dependent: :destroy
-  has_many :captain_lifecycle_deliveries, class_name: 'Captain::Lifecycle::Delivery', dependent: :destroy
-  has_one :captain_lifecycle_config, class_name: 'Captain::Lifecycle::Config', dependent: :destroy
   has_many :captain_units, class_name: 'Captain::Unit', dependent: :destroy
   has_many :captain_gallery_items, class_name: 'Captain::GalleryItem', dependent: :destroy
   has_many :assignment_policies, dependent: :destroy_async

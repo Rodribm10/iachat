@@ -93,7 +93,33 @@ module Concerns::Agentable
                   .first
     return {} if reservation.blank?
 
-    Captain::Lifecycle::ContextBuilder.build(reservation).fetch('reservation', {})
+    reservation_context(reservation)
+  end
+
+  # Inlinado de Captain::Lifecycle::ContextBuilder quando o subsistema de
+  # lifecycle foi removido (22/08/2026 — nunca teve regra nem entrega em
+  # produção). O formato dos campos foi preservado tal e qual.
+  def reservation_context(reservation)
+    {
+      'suite' => reservation.suite_identifier.to_s,
+      'unit_name' => reservation.unit&.name.to_s,
+      'check_in_at' => format_reservation_datetime(reservation.check_in_at),
+      'check_out_at' => format_reservation_datetime(reservation.check_out_at),
+      'amount' => format_reservation_money(reservation.total_amount),
+      'permanencia' => reservation.metadata.to_h['permanencia'].to_s
+    }
+  end
+
+  def format_reservation_datetime(value)
+    return '' unless value
+
+    value.in_time_zone('America/Sao_Paulo').strftime('%d/%m/%Y %H:%M')
+  end
+
+  def format_reservation_money(value)
+    ActiveSupport::NumberHelper.number_to_currency(
+      value.to_f, unit: 'R$ ', separator: ',', delimiter: '.'
+    )
   end
 
   def resolve_current_unit(conversation_data)

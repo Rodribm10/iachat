@@ -107,9 +107,6 @@ Rails.application.routes.draw do
               post :label_suggestion
               post :follow_up
             end
-            resources :lifecycle_rules
-            resource :lifecycle_config, only: [:show, :update], controller: 'lifecycle_configs'
-            resources :lifecycle_deliveries, only: [:index, :show]
             resources :units do
               member do
                 patch :concierge, action: :update_concierge
@@ -247,13 +244,6 @@ Rails.application.routes.draw do
               resources :labels, only: [:create, :index]
               resources :notes
               post :call, on: :member, to: 'calls#create' if ChatwootApp.enterprise?
-              if ChatwootApp.enterprise?
-                resources :memories, only: %i[index update destroy], controller: 'memories' do
-                  collection do
-                    delete :bulk_destroy, path: ''
-                  end
-                end
-              end
             end
           end
           resources :csat_survey_responses, only: [:index] do

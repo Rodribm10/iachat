@@ -2,23 +2,27 @@
 #
 # Table name: captain_pix_charges
 #
-#  id                  :bigint           not null, primary key
-#  e2eid               :string
-#  paid_at             :datetime
-#  pix_copia_e_cola    :text
-#  raw_webhook_payload :jsonb
-#  status              :string
-#  txid                :string
-#  created_at          :datetime         not null
-#  updated_at          :datetime         not null
-#  reservation_id      :bigint           not null
-#  unit_id             :bigint           not null
+#  id                   :bigint           not null, primary key
+#  e2eid                :string
+#  manual_proof_payload :jsonb
+#  manual_review_reason :string
+#  paid_at              :datetime
+#  pix_copia_e_cola     :text
+#  provider             :string           default("inter"), not null
+#  raw_webhook_payload  :jsonb
+#  status               :string
+#  txid                 :string
+#  created_at           :datetime         not null
+#  updated_at           :datetime         not null
+#  reservation_id       :bigint           not null
+#  unit_id              :bigint           not null
 #
 # Indexes
 #
 #  idx_cp_charges_e2eid                         (e2eid)
 #  idx_cp_charges_txid                          (txid) UNIQUE
 #  index_captain_pix_charges_on_e2eid           (e2eid)
+#  index_captain_pix_charges_on_provider        (provider)
 #  index_captain_pix_charges_on_reservation_id  (reservation_id)
 #  index_captain_pix_charges_on_txid            (txid)
 #  index_captain_pix_charges_on_unit_id         (unit_id)

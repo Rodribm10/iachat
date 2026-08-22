@@ -90,9 +90,6 @@ class Captain::Reservation < ApplicationRecord
   after_commit :sync_conversation_marker_snapshot
   after_create_commit :update_contact_reservation_metadata
   after_create_commit :post_internal_reservation_note
-  after_create_commit :schedule_lifecycle_rules
-  after_update_commit :handle_lifecycle_status_change, if: :saved_change_to_status?
-  after_update_commit :handle_lifecycle_checkin_change, if: :saved_change_to_check_in_at?
 
   def ui_status
     Captain::Reservations::MarkerBuilder.ui_status(status)
@@ -163,25 +160,8 @@ class Captain::Reservation < ApplicationRecord
   end
   # rubocop:enable Metrics/AbcSize,Metrics/MethodLength
 
-  def schedule_lifecycle_rules
-    Captain::Lifecycle::Scheduler.schedule_for(self)
-  rescue StandardError => e
-    Rails.logger.error("[Lifecycle] schedule_for failed for reservation #{id}: #{e.class} #{e.message}")
-  end
 
-  def handle_lifecycle_status_change
-    return unless %w[cancelled no_show].include?(status.to_s)
 
-    Captain::Lifecycle::Scheduler.cancel_pending(self)
-  rescue StandardError => e
-    Rails.logger.error("[Lifecycle] cancel_pending failed for reservation #{id}: #{e.class} #{e.message}")
-  end
-
-  def handle_lifecycle_checkin_change
-    Captain::Lifecycle::Scheduler.reschedule_for_checkin_change(self)
-  rescue StandardError => e
-    Rails.logger.error("[Lifecycle] reschedule failed for reservation #{id}: #{e.class} #{e.message}")
-  end
 
   # Atualiza campos visiveis no painel lateral do Chatwoot (custom_attributes)
   # pra que a recepcionista veja num relance:

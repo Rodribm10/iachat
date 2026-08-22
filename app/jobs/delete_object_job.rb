@@ -4,7 +4,6 @@ class DeleteObjectJob < ApplicationJob
   BATCH_SIZE = 5_000
   INBOX_DEPENDENT_TABLES = %i[
     captain_feedback_logs
-    captain_lifecycle_deliveries
     captain_reminders
     captain_reservations
     captain_gallery_items
@@ -15,14 +14,10 @@ class DeleteObjectJob < ApplicationJob
     captain_pricing_inboxes
     captain_tool_configs
     captain_unit_inboxes
-    jasmine_inbox_collections
-    jasmine_inbox_settings
-    jasmine_tool_configs
   ].freeze
   INBOX_NULLIFY_TARGETS = [
     [:captain_conversation_insights, :inbox_id],
     [:captain_pricings, :inbox_id],
-    [:jasmine_collections, :owner_inbox_id],
     [:captain_units, :inbox_id],
     [:captain_units, :concierge_inbox_id]
   ].freeze
@@ -78,7 +73,6 @@ class DeleteObjectJob < ApplicationJob
   end
 
   def purge_reservation_children(reservation_ids)
-    delete_where_in(:captain_lifecycle_deliveries, :captain_reservation_id, reservation_ids)
     delete_where_in(:captain_pix_charges, :reservation_id, reservation_ids)
   end
 

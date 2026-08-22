@@ -53,19 +53,5 @@ describe CaptainListener do
         listener.conversation_resolved(event)
       end
     end
-
-    context 'when conversation resolves' do
-      before do
-        assistant.config['feature_memory'] = false
-        assistant.config['feature_faq'] = false
-        assistant.save!
-      end
-
-      it 'enqueues contact memory extraction job' do
-        expect { listener.conversation_resolved(event) }
-          .to have_enqueued_job(Captain::ContactMemories::ExtractFromConversationJob)
-          .with(conversation.id)
-      end
-    end
   end
 end
