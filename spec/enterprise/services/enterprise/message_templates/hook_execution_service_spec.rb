@@ -5,7 +5,13 @@ RSpec.describe MessageTemplates::HookExecutionService do
   let(:inbox) { create(:inbox, account: account) }
   let(:contact) { create(:contact, account: account) }
   let(:conversation) { create(:conversation, inbox: inbox, account: account, contact: contact, status: :pending) }
-  let(:assistant) { create(:captain_assistant, account: account) }
+  # Depois de 22/08/2026 o Hermes é o único motor de resposta. Um assistant sem
+  # configuração de Hermes não atende — vai pra humano. Os exemplos abaixo usam
+  # um assistant Hermes de verdade para exercitar o caminho real.
+  let(:assistant) do
+    create(:captain_assistant, account: account, engine: 'hermes',
+                               hermes_profile_name: 'teste', hermes_webhook_base_url: 'http://hermes.local')
+  end
 
   before do
     create(:captain_inbox, captain_assistant: assistant, inbox: inbox)
@@ -22,7 +28,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       end
 
       it 'schedules captain response job for incoming messages on pending conversations' do
-        expect(Captain::Conversation::ResponseBuilderJob).to receive(:perform_later).with(conversation, assistant)
+        expect(Captain::Hermes::OutgoingJob).to receive(:perform_later)
 
         create(:message, conversation: conversation, message_type: :incoming)
       end
@@ -41,7 +47,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       end
 
       it 'schedules captain response job outside business hours (Captain always responds when configured)' do
-        expect(Captain::Conversation::ResponseBuilderJob).to receive(:perform_later).with(conversation, assistant)
+        expect(Captain::Hermes::OutgoingJob).to receive(:perform_later)
 
         create(:message, conversation: conversation, message_type: :incoming)
       end
@@ -74,7 +80,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       end
 
       it 'schedules captain response job regardless of time' do
-        expect(Captain::Conversation::ResponseBuilderJob).to receive(:perform_later).with(conversation, assistant)
+        expect(Captain::Hermes::OutgoingJob).to receive(:perform_later)
 
         create(:message, conversation: conversation, message_type: :incoming)
       end
@@ -102,13 +108,32 @@ RSpec.describe MessageTemplates::HookExecutionService do
     end
   end
 
+  context 'when assistant is not configured for Hermes' do
+    let(:assistant) { create(:captain_assistant, account: account, engine: 'captain_interno') }
+
+    it 'transfers to a human without sending anything to the customer' do
+      expect(Captain::Hermes::OutgoingJob).not_to receive(:perform_later)
+
+      create(:message, conversation: conversation, message_type: :incoming)
+      conversation.reload
+
+      expect(conversation.status).to eq('open')
+      # O cliente nao pode receber "Transferring to another agent..." em ingles.
+      expect(conversation.messages.where(private: false, message_type: :outgoing)).to be_empty
+
+      nota = conversation.messages.where(private: true).last
+      expect(nota.content).to include('não está configurada para o Hermes')
+      expect(nota.content_attributes.to_h['external_source']).to eq('captain_assistant_misconfigured')
+    end
+  end
+
   context 'when no captain assistant is configured' do
     before do
       CaptainInbox.where(inbox: inbox).destroy_all
     end
 
     it 'does not schedule captain response job' do
-      expect(Captain::Conversation::ResponseBuilderJob).not_to receive(:perform_later)
+      expect(Captain::Hermes::OutgoingJob).not_to receive(:perform_later)
 
       create(:message, conversation: conversation, message_type: :incoming)
     end
@@ -120,7 +145,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
     end
 
     it 'does not schedule captain response job' do
-      expect(Captain::Conversation::ResponseBuilderJob).not_to receive(:perform_later)
+      expect(Captain::Hermes::OutgoingJob).not_to receive(:perform_later)
 
       create(:message, conversation: conversation, message_type: :incoming)
     end
@@ -128,7 +153,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
 
   context 'when message is outgoing' do
     it 'does not schedule captain response job' do
-      expect(Captain::Conversation::ResponseBuilderJob).not_to receive(:perform_later)
+      expect(Captain::Hermes::OutgoingJob).not_to receive(:perform_later)
 
       create(:message, conversation: conversation, message_type: :outgoing)
     end
@@ -243,7 +268,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
     let(:campaign_conversation) { create(:conversation, inbox: inbox, account: account, contact: contact, status: :pending, campaign: campaign) }
 
     it 'schedules captain response job for incoming messages on pending campaign conversations' do
-      expect(Captain::Conversation::ResponseBuilderJob).to receive(:perform_later).with(campaign_conversation, assistant)
+      expect(Captain::Hermes::OutgoingJob).to receive(:perform_later)
 
       create(:message, conversation: campaign_conversation, message_type: :incoming)
     end
