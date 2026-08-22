@@ -73,6 +73,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
 
     log_reply(conversation, content)
     return handle_error_payload(conversation, content) if error_payload?(content)
+    return handle_prompt_leak(conversation, content) if Captain::Guards::PromptLeak.leak?(content)
 
     detect_handoff_or_loop(conversation, content)
     deliver_outgoing(conversation, content)
@@ -110,6 +111,34 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     )
 
     mark_for_human_triage(conversation, reason: 'erro_tecnico')
+    head :ok
+  end
+
+  # O LLM devolveu conteúdo interno em vez de resposta: pedaço do system prompt,
+  # narração do que o assistente "deve" fazer, nome técnico de tool, JSON cru ou
+  # Liquid não renderizado. Mesmo desfecho do payload de erro — o cliente não
+  # recebe nada, a equipe vê o que foi barrado numa nota interna, e uma pessoa
+  # assume a conversa.
+  def handle_prompt_leak(conversation, content)
+    reason = Captain::Guards::PromptLeak.reason(content)
+
+    Rails.logger.error(
+      "[Hermes::Callback] vazamento de prompt (#{reason}) barrado na conv " \
+      "#{conversation.display_id}: #{content.to_s.squish[0, 200]}"
+    )
+
+    conversation.messages.create!(
+      message_type: :outgoing,
+      private: true,
+      account_id: conversation.account_id,
+      inbox_id: conversation.inbox_id,
+      sender: conversation.inbox.captain_assistant,
+      content: "⚠️ A IA devolveu conteúdo interno em vez de resposta (#{reason}). " \
+               "O cliente NÃO recebeu isto:\n\n#{content}",
+      content_attributes: { external_source: 'hermes_prompt_leak_blocked' }
+    )
+
+    mark_for_human_triage(conversation, reason: 'vazamento_prompt')
     head :ok
   end
 
