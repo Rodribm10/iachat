@@ -399,3 +399,63 @@ Imagem `v241`, banco restaurado de produção. Duas conversas de teste criadas c
 
 Nos dois casos barrados: nota interna com o conteúdo bloqueado, etiquetas `triagem_humana` e
 `triagem_vazamento_prompt`, e nota de triagem com o motivo real.
+
+---
+
+## Construtor — diagnóstico do Hermes (22/08/2026, 23:50)
+
+O Rodrigo decidiu que o Construtor é o caminho único de mexer em prompt. Fui ligar e achei o
+seguinte.
+
+### Já existia tudo, menos o processo
+
+`/root/.hermes/profiles/construtor` está completo há meses: `SOUL.md` de 200 linhas com fluxo
+socrático, `config.yaml` (gpt-5.5 via Codex, fallback grok), skill `agent-builder`, e a
+subscription `construtor-admin` apontando o callback de volta pro Chatwoot. A porta declarada é
+**8646** — exatamente a que o `HermesBuilder::Dispatcher` procura por padrão. As duas pontas
+sempre combinaram.
+
+**O gateway nunca esteve de pé.** Por isso a tela girava pra sempre.
+
+### E não subiria mesmo se alguém tivesse tentado
+
+```
+[webhook] Dynamic route 'construtor-admin' skipped:
+INSECURE_NO_AUTH is only allowed on loopback hosts. Current host: '0.0.0.0'.
+```
+
+A subscription tinha `secret: INSECURE_NO_AUTH` — placeholder. É o único perfil assim; os 14 de
+atendente usam secret hex de verdade. Corrigido: gerei secrets reais, criei uma subscription
+`construtor-admin-staging` apontando pro staging (a de produção ficou intacta), e guardei ambos
+em `/root/.hermes/profiles/construtor/.secrets-construtor` (chmod 600).
+
+### O que ainda não funciona
+
+O gateway sobe, escuta na 8646, mas **não responde a nenhum HTTP** — nem `/health`. Os outros
+perfis respondem `{"status":"ok","platform":"webhook"}` na mesma rota.
+
+Suspeito principal: o `construtor` é o único perfil com o MCP **gbrain** configurado
+(`connect_timeout: 60`, `timeout: 120`), e ele falha na conexão a cada boot:
+
+```
+MCP server 'gbrain' failed initial connection after 3 attempts, parking
+```
+
+A isabela, que funciona, só tem o MCP `captain-tools`. Próximo passo é testar sem o gbrain.
+
+### Estado deixado
+
+- Gateway rodando via `/root/start-construtor.sh` (lançado com `setsid`, **morre em reboot**)
+- `webhook_subscriptions.json` com backup datado ao lado
+- Nada tocado nos 14 perfis de atendente nem no `cerebro_empresa`
+
+### Duas coisas estruturais que apareceram
+
+1. **Nenhum gateway de atendente tem systemd.** Todos foram subidos à mão por SSH — o pai dos
+   processos é `sshd: root@notty`. Morrem em reboot e ninguém é avisado. O watchdog existente
+   cuida só do gateway `default`, e ele existe justamente porque um gateway caiu e ficou 15 dias
+   morto em silêncio. O mesmo risco vale hoje para as 14 atendentes.
+2. **O desenho do Rodrigo exige mudança no Chatwoot.** Ele quer selecionar qual atendente editar
+   e mandar mensagem pro Construtor. Hoje o `HermesBuilder::Dispatcher` manda só
+   `{ message, hermes_session_id }` — sem dizer de qual assistant se trata. Falta passar o
+   `assistant_id` e a tela precisa de um seletor.
