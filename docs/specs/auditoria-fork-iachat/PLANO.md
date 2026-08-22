@@ -264,3 +264,26 @@ F6  módulos no Super Admin (Featurable já vem pronto do sync)
 
 Mudança em relação ao plano original: o backport do `Featurable` saiu — o sync entrega ele
 pronto. Por isso F6 desceu pra depois de F4.
+
+---
+
+## Regra de deploy — a partir de 22/08/2026
+
+Combinada depois do F1. Vale pra todas as fases seguintes.
+
+```
+branch → CI builda imagem → staging (iachat-v2) → Rodrigo testa e APROVA → produção (iachat)
+```
+
+- A stack `iachat-v2` fica **em repouso** (app/sidekiq/redis em 0, postgres em 1). Subir é
+  `docker service scale` + `--image` na tag nova.
+- **Mudança de schema:** restaurar dump de produção no `iachat_staging` **antes** de migrar.
+  Testar migration contra banco limpo não prova nada.
+- Esse dump deixa dado real de cliente no staging: **apagar banco e dump** assim que a validação
+  terminar, e devolver a stack ao repouso.
+- **Em produção:** código primeiro, migration depois. No intervalo, rollback de imagem funciona.
+- Tag da imagem = `github.run_number` do CI, nunca `:latest`.
+
+No F1 esse fluxo foi cumprido pela metade: a validação técnica em staging foi feita (migration
+contra dump real), mas o Rodrigo não chegou a testar antes de eu subir — ele mandou seguir direto.
+Deu certo, mas não vira precedente.
