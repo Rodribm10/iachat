@@ -154,3 +154,59 @@ Duas falhas foram investigadas e descartadas como ruído de ambiente:
 O código novo não toca em nenhuma das 25 tabelas. Então: **subir o código primeiro, rodar a
 migration depois**. Nesse intervalo um rollback de imagem continua funcionando, porque a imagem
 antiga ainda encontra as tabelas onde espera.
+
+---
+
+## Desvio do plano — F3 estava errado (22/08/2026)
+
+Pergunta do Rodrigo ("por que desligar o Captain interno? atrapalha alguma coisa?") levou a uma
+verificação que **derrubou uma premissa do plano congelado**. Registrando conforme o protocolo:
+paro, explico, peço re-aprovação.
+
+### O erro
+
+O F3.2 mandava remover, junto com o motor interno:
+
+```
+enterprise/app/services/captain/codex/{auth_service,client,translator}.rb
+enterprise/app/jobs/captain/codex/refresh_tokens_job.rb
+enterprise/app/models/captain/codex_credential.rb + tabela
+cron captain_codex_refresh_tokens_job
+```
+
+**Isso teria quebrado produção.** O Codex não é do motor interno — é o *backend de LLM do fork
+inteiro*. `Captain::Llm::ProviderConfig` e `lib/llm/config.rb` apontam o cliente OpenAI para o
+proxy interno (`/codex/v1/chat/completions`) quando `CAPTAIN_LLM_PROVIDER=openai_codex_oauth`.
+
+Consumidores vivos, todos no caminho do Hermes:
+
+| Consumidor | O que faz |
+|---|---|
+| `Captain::Llm::ContactNotesService` | transforma conversa resolvida em nota de CRM |
+| `Captain::Llm::EmbeddingService` | embeddings de FAQ e documento |
+| `Captain::Llm::FaqJudgeService` | juiz do ciclo de aprendizado |
+| `Captain::Llm::TranslateQueryService` | tradução de consulta |
+| `Captain::Health::ConexoesService` | sensor de saúde |
+
+Evidência em produção: o log do container mostra `POST /codex/v1/chat/completions` várias vezes
+por hora, vindo de `10.0.0.2`, com o prompt do note taker. E `captain_codex_credentials` tem a
+credencial 3 **ativa**, renovada em 15/08 — o cron de 30 minutos está fazendo o trabalho dele.
+
+### O que de fato está morto
+
+Só o **motor de resposta**: `Captain::Conversation::ResponseBuilderJob`,
+`Captain::Assistant::AgentRunnerService`, `Captain::Llm::AssistantChatService`, a camada
+`Captain::Tools::*` e o `config/agents/tools.yml`. Zero inboxes roteiam pra lá.
+
+### Risco concreto que motiva a remoção
+
+`captain_assistants.engine` tem **default `captain_interno`** (`db/schema.rb:337`). Um assistant
+criado agora nasce apontando pro motor morto. Como a inbox da academia (Zelo Health Club) ainda
+não tem assistant atrelado, esse é o próximo passo do Rodrigo — e ele cairia exatamente nessa
+armadilha.
+
+### Escopo corrigido, a aprovar
+
+- **Sai:** motor de resposta + `tools.yml` + `Captain::Tools::*` (menos `GeneratePixTool`).
+- **Fica:** todo o Codex — proxy, credencial, auth, translator e o cron de 30 minutos.
+- **Corrige:** default da coluna `engine` passa a ser `hermes`.
