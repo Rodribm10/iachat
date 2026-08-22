@@ -32,8 +32,25 @@ O que sustenta o Hermes é o **servidor MCP** (`enterprise/app/services/captain/
 registradas). O Captain interno arrasta junto o agent runner, o chat LLM, o cliente Codex
 (OAuth do ChatGPT Plus) e um cron de 30 em 30 minutos renovando token.
 
-**Pergunta que decide metade da faxina:** existe algum `Captain::Assistant` em produção com
-`engine = 'captain_interno'`? Se não, todo o segundo motor é removível.
+**Decidido:** o motor interno sai. O Hermes fica como único caminho de resposta.
+
+### Antes de desligar: as guardas de vazamento só existem no caminho interno
+
+`Captain::Conversation::ResponseBuilderJob` carrega ~30 regexes endurecidas ao longo do tempo
+(`SYSTEM_PROMPT_LEAK_PATTERNS` + `THOUGHT_LEAK_PATTERNS`) que bloqueiam o LLM devolver o system
+prompt, narrar instrução interna, vazar nome de tool (`handoff_to_`, `daniela_reservas`), JSON
+cru ou Liquid não renderizado — e forçam handoff humano quando detectam.
+
+O caminho do Hermes tem outras guardas: `ERROR_PAYLOAD_PATTERNS` (nasceu do incidente de
+25/07/2026, quando cliente do Instagram leu "HTTP 401"), detecção de loop por Jaccard e
+`HANDOFF_PATTERNS`. **Mas não tem as de vazamento de prompt/pensamento.**
+
+Isso é o exemplo mais claro de "morto mas útil": desligar o motor sem portar essas regexes
+para `Webhooks::Captain::HermesCallbackController` é abrir mão de proteção que já custou
+incidente. Portar é pré-requisito, não melhoria.
+
+`Captain::Conversation::ReactionPolicy` **não** precisa ser portada — o caminho do Hermes já
+tem `Captain::Hermes::AutoReactService`, que faz o mesmo de forma determinística e mais rápida.
 
 ## 2. Morto confirmado
 
@@ -50,21 +67,29 @@ Verificado no código: sem rota, sem chamador, sem import.
 
 ### Camada de tools legada do Captain (duplicada pelo MCP)
 
-Zero referências fora de si e dos specs:
+> **Correção (v2).** Na primeira versão eu disse "zero referências". Está errado.
+> Essas classes são resolvidas **dinamicamente** por
+> `enterprise/app/models/concerns/captain_tools_helpers.rb:47`, que lê
+> `config/agents/tools.yml` e faz `Captain::Tools::{PascalCase(id)}Tool`.
+> Todas as seis estão listadas no YAML. Ou seja: **não são código órfão — são a
+> camada de tools do motor interno.** Saem junto com o motor (passo 5), não antes.
+
+Duplicadas pelas equivalentes em `captain/mcp/tools/`, que é o que o Hermes usa:
 
 ```
-Captain::ToolRegistryService
-Captain::Tools::BaseService
-Captain::Tools::CheckPixPaymentTool
-Captain::Tools::CreateReservationIntentTool
-Captain::Tools::GenerateReservationLinkTool
-Captain::Tools::GenerateRoletaLinkTool
-Captain::Tools::GetReservaPrecoTool
-Captain::Tools::SendSuiteImagesTool
+Captain::ToolRegistryService              (esse sim: zero referências)
+Captain::Tools::BaseService               (esse sim: zero referências)
+Captain::Tools::CheckPixPaymentTool       ┐
+Captain::Tools::CreateReservationIntentTool │ alcançáveis via tools.yml
+Captain::Tools::GenerateReservationLinkTool │ morrem com o motor interno
+Captain::Tools::GenerateRoletaLinkTool     │
+Captain::Tools::GetReservaPrecoTool        │
+Captain::Tools::SendSuiteImagesTool       ┘
 ```
 
-Exceção: `Captain::Tools::GeneratePixTool` ainda é usada por
-`Public::Api::V1::Captain::PublicReservationsController` — essa fica.
+Exceção: `Captain::Tools::GeneratePixTool` também é usada por
+`Public::Api::V1::Captain::PublicReservationsController` (fluxo da landing page) —
+essa sobrevive ao desligamento do motor.
 
 ### 16 tabelas sem model e sem nenhuma citação em código
 
@@ -87,9 +112,10 @@ Antes do `drop_table`, checar se há linha em produção.
 
 ### Classes soltas sem ponto de entrada
 
+Cada uma re-verificada: aparece só no próprio arquivo, em `app/`, `enterprise/`,
+`lib/`, `config/` e `db/`.
+
 ```
-Api::V1::…::Reports::ExecutiveController         sem rota (113 linhas)
-Captain::Reports::DailySnapshotJob                sem cron, sem chamador
 Captain::Inter::WebhookSetupService               sem chamador
 Captain::Notifications::SendNotificationService   sem chamador
 Whatsapp::MessageDedupLock                        sem chamador
@@ -98,6 +124,16 @@ settings/captain/units/TestIndex.vue              órfão (29 linhas)
 chatwoot_zero/                                    2 PNGs de uma cópia velha
 ```
 
+> **Correção (v2).** `Api::V1::…::Reports::ExecutiveController` **não** está morto —
+> está roteado em `config/routes.rb:120` (`resource :executive` com `drilldown` e
+> `deliver`) e é o que alimenta a tela `settings/captain/reports`. A primeira versão
+> disse "sem rota" por causa de um erro no meu próprio grep. **Fica.**
+
+`Captain::Reports::DailySnapshotJob` saiu desta lista por outro motivo: ele não tem
+entrada no `schedule.yml` (embora o comentário dele diga que roda à meia-noite) **e**
+ninguém lê `Captain::ReportSnapshot`. Hoje é um gravador sem leitor e sem gatilho —
+decisão sobre ele na triagem (seção 3), não na remoção cega.
+
 ### Higiene: `.env.example`
 
 Credenciais de ferramenta de desenvolvimento documentadas como se fossem config do app:
@@ -105,9 +141,17 @@ Credenciais de ferramenta de desenvolvimento documentadas como se fossem config 
 `N8N_WEBHOOK_URL`, `AIOS_VERSION`, `CONTEXT7_API_KEY`, `EXA_API_KEY`, `DEEPSEEK_API_KEY`,
 `OPENROUTER_API_KEY`.
 
-## 3. Provavelmente morto — só o banco confirma
+## 3. Triagem — três destinos, não dois
 
-Está ligado e roda. A pergunta é se alguém usa.
+A pergunta não é "está vivo?". É **"vale a pena?"**. Cada subsistema cai em um de três destinos:
+
+- **VIVO** — está em uso, fica como está
+- **MORTO INÚTIL** — específico demais ou superado, sai
+- **PARADO MAS ÚTIL** — não roda (ou roda e ninguém olha), mas o conceito serve o negócio,
+  inclusive fora de hotelaria. **Conserta e liga**, não apaga.
+
+O terceiro destino é o que a primeira versão desta auditoria não tinha, e é onde está o
+dinheiro: código já escrito, já testado, parado por falta de um cron, de uma rota ou de uma tela.
 
 | Subsistema | O que roda hoje | Como confirmar |
 |---|---|---|
@@ -119,6 +163,23 @@ Está ligado e roda. A pergunta é se alguém usa.
 | Landing hosts + lead clicks | cron horário sincronizando promoções | landing host cadastrado e ativo? |
 | Memórias de contato | 4 crons + embeddings + hard delete LGPD | entram no prompt do Hermes? |
 | Providers de WhatsApp | 7 no enum: `default`, `whatsapp_cloud`, `wuzapi`, `baileys`, `zapi`, `evolution`, `gowa` | quais têm inbox viva? |
+
+### Palpite prévio de destino (a confirmar com o banco)
+
+Escrito antes das consultas, de propósito — pra ficar registrado onde eu errei quando o dado chegar.
+
+| Subsistema | Palpite | Por quê |
+|---|---|---|
+| Lifecycle / concierge | **parado mas útil** | mensagem programada com guards de quiet hours, opt-out e teto por reserva é infra genérica. Numa academia vira lembrete de aula e aviso de renovação. Trocar "reserva" pelo evento certo e liga. |
+| Retenção / churn outreach | **parado mas útil** | "cliente recorrente sumiu há 60 dias" é o caso de uso mais forte de academia que existe. Já calcula stats, já tem janela comercial e dia útil. |
+| CEO Digest + insights | **parado mas útil** | o service roda, o controller existe e está roteado, a tela existe. Se ninguém lê o Mattermost, o problema é canal de entrega, não o relatório. |
+| Memórias de contato | **confirmar primeiro** | 4 crons + embeddings custam caro. Se não entra no prompt do Hermes hoje, ou liga direito ou desliga inteiro — meio-termo é só custo. |
+| `Captain::Health::ConexoesService` | **parado mas útil** | já existe e é exposto por endpoint. Falta tela. É o que evita descobrir agente mudo pelo cliente reclamando. |
+| Roleta | **morto inútil** (provável) | promoção de motel, sem leitura em outro ramo. Se o draw parou, sai. |
+| `DailySnapshotJob` + `captain_report_snapshots` | **morto inútil** | grava e ninguém lê, e nem cron tem. Só vira útil se houver tela de série histórica — que não existe. |
+| Landing hosts + lead clicks | **confirmar primeiro** | cron de hora em hora. Se tem host ativo é vivo; se não, sai junto com `LeadClick` e `TrackingController`. |
+| `captain_prompt_*` (6 tabelas) | **ideia boa, código não existe** | versionar e auditar prompt é útil de verdade, mas não sobrou Ruby nenhum. Isso é feature nova, não reativação: as tabelas saem agora. |
+| Onboarding (`lib/fazer`) | **parado mas útil** | tem spec escrito, está na branch `wip/2026-08-22-snapshot`. É o que faz o próximo cliente custar uma tarde. |
 
 ## 4. Acoplamento com hotel
 
@@ -141,8 +202,37 @@ O problema é **vocabulário** — o domínio virou nome de classe, tabela, tool
 
 **Ponto mais concreto:** `Captain::Mcp::ToolRegistry::TOOLS` é uma lista fixa e global — toda
 tool fica visível pra todo profile do Hermes. A academia vai receber `check_suite_availability`
-no `tools/list` dela. Filtrar o registry por conta (ou por capability declarada na unidade) é a
-mudança de maior retorno pra abrir o app pra outro ramo.
+no `tools/list` dela.
+
+### O interruptor por projeto já existe no Chatwoot — e o fork nunca usou
+
+O Chatwoot tem exatamente o mecanismo que você quer: `config/features.yml` declara cada módulo,
+o concern `Featurable` guarda os bits em `accounts.feature_flags`, `account.feature_enabled?('x')`
+consulta, e o **Super Admin já renderiza as caixinhas de liga/desliga por conta** em
+`app/views/super_admin/accounts/show.html.erb`.
+
+O fork adicionou **zero** feature flags. Roleta, lifecycle, units, gallery, reservas, PIX Inter,
+landing hosts, retenção — tudo entrou sem interruptor. É por isso que hoje não dá pra abrir uma
+conta de outro ramo sem levar o hotel junto.
+
+**Só que tem um bloqueio concreto:** o mecanismo está **lotado**.
+
+```
+accounts.feature_flags       → bigint = 63 bits utilizáveis
+config/features.yml (fork)   → 63 features
+```
+
+Não cabe nem mais uma. E o arquivo é posicional ("DO NOT change the order of features EVER").
+
+O upstream já resolveu isso — na versão 4.17.0 o `Featurable` suporta várias colunas
+(`feature_flags_ext_1`, `MAX_FEATURES_PER_COLUMN = 63`, com a chave `column:` por feature).
+Então o caminho é **backport dessa mudança do upstream** (1 migration + o concern), e aí cada
+módulo do fork vira uma feature normal na coluna de extensão, com a tela de admin de graça e
+sem brigar com a ordenação do upstream no próximo sync.
+
+Com isso no lugar, o resto encaixa: `ToolRegistry` filtra tool por feature da conta, os crons
+pulam conta sem a feature, e o menu do dashboard esconde o que não se aplica. Módulo novo que
+você criar entra desligado por padrão e não vaza pra empresa nenhuma.
 
 ## 5. Dívida estrutural: 1.102 commits atrás
 
@@ -163,20 +253,23 @@ rejeitada. Cada mês parado aumenta o custo do merge.
 
 ## 6. Ordem de execução
 
-1. **Confirmar o que está vivo em produção** — consultas no banco respondendo a tabela da seção 3.
-   Sem isso, toda remoção é aposta.
-2. **Remover o morto confirmado** — Jasmine, tools legadas, classes órfãs, `chatwoot_zero/`,
-   limpeza do `.env.example`, migration derrubando as 16 tabelas órfãs.
-3. **Escopar o registry MCP por conta** — tool declara vertical/capability; registry filtra pelo
-   contexto. Pré-requisito real da academia e encolhe o prompt de cada agente.
-4. **Abrir a conta da academia** — conta, unidade, assistant com `engine='hermes'`, subscription
-   própria. O Construtor (`HermesBuilder`) já existe pra criar agente por conversa; usar como
-   caminho oficial em vez de seed de prompt na mão.
-5. **Desligar o Captain interno**, se o passo 1 confirmar — sai agent runner, chat LLM, cliente
-   Codex e cron de 30 min. Um único caminho de resposta no sistema.
-6. **Encarar o sync com o upstream** — com o fork enxuto o merge fica viável. Decidir antes o que
-   abandonar da implementação própria em favor do que o upstream já resolveu (o ciclo de FAQ é o
-   candidato óbvio).
+Detalhada, com critérios de aceitação, em **`docs/specs/auditoria-fork-iachat/`**
+(`PLANO.md`, `CRITERIOS.md`, `RELATORIO.md`).
+
+Resumo das cinco frentes, nesta ordem:
+
+1. **Triagem** — consultas de leitura em produção classificando cada subsistema em
+   VIVO / MORTO INÚTIL / PARADO MAS ÚTIL.
+2. **Remoção do morto confirmado** — Jasmine, classes órfãs, 16 tabelas, `chatwoot_zero/`,
+   limpeza do `.env.example`.
+3. **Módulos por projeto** — backport do `Featurable` multi-coluna do upstream e transformação
+   de cada módulo do fork em feature ligável no Super Admin, desligada por padrão.
+4. **Desligamento do Captain interno** — portar as guardas de vazamento primeiro; depois sai o
+   agent runner, o chat LLM, o cliente Codex, o cron de 30 min, o `tools.yml` e a camada
+   `Captain::Tools::*` (menos `GeneratePixTool`).
+5. **Sync com o upstream** — 4.11.0 → 4.17.0.
+
+A conta da academia **já está aberta** — o que falta pra ela é o passo 3.
 
 ## 7. Melhorias que a estrutura já pede
 
@@ -203,3 +296,23 @@ rejeitada. Cada mês parado aumenta o custo do merge.
 - Tooling local (`.agents/`, `.windsurf/`, `scripts/ralph/`, `skills-lock.json`) movido para
   `.git/info/exclude` — fica no disco, some do `git status`
 - `origin` corrigido para `https://github.com/Rodribm10/iachat.git` (casing)
+
+## Histórico de revisões
+
+**v2 — 22/08/2026.** Revisão após leitura mais funda do código e direção nova do Rodrigo.
+
+Corrigido:
+
+- `Reports::ExecutiveController` estava marcado como "sem rota". **Errado** — está em
+  `config/routes.rb:120`. O erro foi meu, num grep com escape quebrado.
+- A camada `Captain::Tools::*` estava marcada como "zero referências". **Errado** — é resolvida
+  dinamicamente por `config/agents/tools.yml`. Morre com o motor interno, não antes.
+
+Acrescentado:
+
+- Guardas de vazamento de prompt existem só no caminho interno; portar é pré-requisito do
+  desligamento do Captain.
+- `config/features.yml` está em 63/63 bits — o mecanismo de liga/desliga por conta existe, mas
+  está lotado; o upstream já tem a solução multi-coluna.
+- Triagem passou a ter três destinos (VIVO / MORTO INÚTIL / PARADO MAS ÚTIL) em vez de dois.
+- A conta da academia já foi aberta; deixou de ser passo do plano.
