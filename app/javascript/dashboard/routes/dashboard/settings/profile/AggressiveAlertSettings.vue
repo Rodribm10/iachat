@@ -173,7 +173,7 @@ const isInboxSelected = inboxId =>
 }
 
 .description {
-  color: var(--color-text-light, #6b7280);
+  @apply text-n-slate-11;
   font-size: 13px;
   line-height: 1.5;
   margin: 0;
@@ -221,13 +221,13 @@ const isInboxSelected = inboxId =>
 
 .hint {
   font-size: 12px;
-  color: var(--color-text-light, #6b7280);
+  @apply text-n-slate-11;
   margin: 0;
 }
 
 .empty {
   font-size: 12px;
-  color: var(--color-text-light, #9ca3af);
+  @apply text-n-slate-11;
   font-style: italic;
 }
 </style>
