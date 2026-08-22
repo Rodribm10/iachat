@@ -256,3 +256,7 @@ painel só serve pro caminho antigo.
 
 Recomendação: **B**. O default da coluna é irrelevante enquanto nenhum assistant interno
 conseguir ser atrelado a uma inbox — que é o dano real. E não mexe no fluxo de criação.
+
+**Decisão do Rodrigo (22/08/2026): opção C.** Nada em código. Ele cria a atendente da academia
+pelo Construtor, que já preenche `hermes_profile_name` e `hermes_webhook_base_url` corretamente.
+O formulário do painel fica como está.
