@@ -1,15 +1,18 @@
 {
   "AGGRESSIVE_CONVERSATION_BANNER": {
-    "HEADLINE_REOPENED": "🚨 Conversa reaberta — responda agora",
-    "HEADLINE_5": "⏰ {minutes} min sem resposta",
-    "HEADLINE_15": "⚠️ {minutes} MIN SEM RESPOSTA — responda!",
-    "HEADLINE_28": "🚨 {minutes} MIN SEM RESPOSTA — conversa vai fechar!",
-    "HEADLINE_MULTIPLE": "🚨 {count} conversas aguardando resposta",
-    "EXPLANATION": "Este alerta só some quando você RESPONDER a conversa. Clicar no × esconde temporariamente — volta se não responder.",
-    "KIND_REOPENED": "reabriu agora",
-    "KIND_WAITING": "{minutes} min sem resposta",
+    "HEADLINE_ONE": "{name} espera há {time}",
+    "HEADLINE_MANY": "{count} conversas esperando resposta — a mais antiga há {time}",
+    "HEADLINE_REOPENED_ONE": "{name} reabriu a conversa",
+    "OPEN_ONE": "Abrir",
+    "OPEN_OLDEST": "Abrir a mais antiga",
+    "EXPAND": "ver todas",
+    "COLLAPSE": "ocultar lista",
+    "EXPLANATION": "Este aviso só some quando a conversa for respondida. O ✕ esconde por enquanto — volta se continuar sem resposta.",
+    "KIND_REOPENED": "reabriu",
+    "NOW": "agora",
     "HIDE_ONE": "Esconder",
     "HIDE_ONE_TITLE": "Esconde temporariamente — volta se não responder",
-    "HIDE_ICON": "×"
+    "HIDE_ICON": "✕",
+    "HELP_ICON": "?"
   }
 }
