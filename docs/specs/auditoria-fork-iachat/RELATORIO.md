@@ -260,3 +260,39 @@ conseguir ser atrelado a uma inbox — que é o dano real. E não mexe no fluxo 
 **Decisão do Rodrigo (22/08/2026): opção C.** Nada em código. Ele cria a atendente da academia
 pelo Construtor, que já preenche `hermes_profile_name` e `hermes_webhook_base_url` corretamente.
 O formulário do painel fica como está.
+
+---
+
+## F1 em staging — validado (22/08/2026, 15:53 BRT)
+
+Stack `iachat-v2` (já existia, estava escalada a 0), imagem `ghcr.io/rodribm10/iachat:v235`,
+DNS `iachatv2.hoteis1001noites.com.br`, banco `iachat_staging` isolado.
+
+O teste que importava não era "sobe num banco limpo" — era **rodar a migration contra o schema e
+o dado reais de produção**. Por isso restaurei um dump do prod (420 MB, `pg_dump` somente
+leitura) no staging antes de migrar.
+
+### Resultado
+
+| Verificação | Resultado |
+|---|---|
+| Migration contra dado real de produção | rodou em **0,13s**, sem erro |
+| Tabelas | 135 → **110** (as 25 saíram) |
+| Conversas / contatos / mensagens | 23.738 / 15.878 / 318.658 — **intactos** |
+| Reservas / cobranças PIX / assistants | 354 / 213 / 18 — **intactos** |
+| Erro no boot do app | **nenhum** |
+| HTTPS | **200** |
+| `tools/list` do MCP (superfície do Hermes) | **19 tools**, todas presentes |
+| Credencial Codex ativa | **1** — o que eu quase deletei continua de pé |
+
+### Atenção
+
+O `iachat_staging` agora contém **uma cópia dos dados reais de clientes** (contatos, telefones,
+conversas). Está na mesma VPS, em banco isolado, atrás do mesmo Traefik. Quando a validação
+terminar, o certo é escalar a stack de volta a 0 e recriar o banco vazio.
+
+### Pendente pra produção
+
+Só falta a janela. Hoje é sábado 15:53 BRT — pico da operação. **Não subir agora.**
+Ordem em produção, quando for: merge pra `main` → CI builda → deploy do **código** → validar →
+só então rodar a **migration**.
