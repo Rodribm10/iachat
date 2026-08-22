@@ -111,12 +111,19 @@ RSpec.describe MessageTemplates::HookExecutionService do
   context 'when assistant is not configured for Hermes' do
     let(:assistant) { create(:captain_assistant, account: account, engine: 'captain_interno') }
 
-    it 'transfers to a human instead of leaving the customer in silence' do
+    it 'transfers to a human without sending anything to the customer' do
       expect(Captain::Hermes::OutgoingJob).not_to receive(:perform_later)
 
       create(:message, conversation: conversation, message_type: :incoming)
+      conversation.reload
 
-      expect(conversation.reload.status).to eq('open')
+      expect(conversation.status).to eq('open')
+      # O cliente nao pode receber "Transferring to another agent..." em ingles.
+      expect(conversation.messages.where(private: false, message_type: :outgoing)).to be_empty
+
+      nota = conversation.messages.where(private: true).last
+      expect(nota.content).to include('não está configurada para o Hermes')
+      expect(nota.content_attributes.to_h['external_source']).to eq('captain_assistant_misconfigured')
     end
   end
 
