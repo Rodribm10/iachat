@@ -277,7 +277,7 @@ onMounted(() => {
     outline: none;
 
     &:focus {
-      border-@apply text-n-brand;
+      @apply border-n-brand;
     }
   }
 }
