@@ -112,8 +112,6 @@ RSpec.describe CaptainFeaturable do
     end
   end
 
-
-
   describe 'integration with existing captain_preferences' do
     it 'enabled? methods use the same logic as captain_preferences[:features]' do
       account.update!(captain_features: { 'editor' => true, 'copilot' => true })

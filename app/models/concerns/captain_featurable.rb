@@ -27,8 +27,6 @@ module CaptainFeaturable
     }.with_indifferent_access
   end
 
-
-
   private
 
   def captain_models_with_defaults

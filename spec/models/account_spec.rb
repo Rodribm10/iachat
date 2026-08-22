@@ -273,5 +273,4 @@ RSpec.describe Account do
       end
     end
   end
-
 end

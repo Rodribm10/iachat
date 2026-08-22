@@ -160,9 +160,6 @@ class Captain::Reservation < ApplicationRecord
   end
   # rubocop:enable Metrics/AbcSize,Metrics/MethodLength
 
-
-
-
   # Atualiza campos visiveis no painel lateral do Chatwoot (custom_attributes)
   # pra que a recepcionista veja num relance:
   #   ultima_suite, ultima_permanencia, ultima_reserva_em, total_reservas
