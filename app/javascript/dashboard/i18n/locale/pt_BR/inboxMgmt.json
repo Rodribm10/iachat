@@ -242,6 +242,8 @@
           "360_DIALOG": "360Dialog",
           "WUZAPI": "Wuzapi",
           "WUZAPI_DESC": "Conecte sua instância Wuzapi",
+          "GOWA": "GOWA",
+          "GOWA_DESC": "Conecte um número pelo Go WhatsApp Web Multidevice",
           "BAILEYS": "Baileys",
           "BAILEYS_DESC": "Conectar via API não-oficial Baileys",
           "ZAPI": "Z-API",
@@ -264,6 +266,27 @@
           "AUTO_CREATE_USER": {
             "LABEL": "Criar usuário Wuzapi automaticamente"
           }
+        },
+        "GOWA": {
+          "BASE_URL": {
+            "LABEL": "URL do GOWA",
+            "PLACEHOLDER": "https://gowa.seudominio.com"
+          },
+          "USERNAME": {
+            "LABEL": "Usuário do GOWA",
+            "PLACEHOLDER": "Usuário do acesso básico"
+          },
+          "PASSWORD": {
+            "LABEL": "Senha do GOWA",
+            "PLACEHOLDER": "Senha do acesso básico"
+          },
+          "PHONE_NUMBER": {
+            "LABEL": "Número que será conectado",
+            "PLACEHOLDER": "Ex.: +5561999999999",
+            "HELP_TEXT": "Informe o número antes de escanear o QR Code para identificar esta caixa de entrada."
+          },
+          "SUBMIT_BUTTON": "Criar caixa e abrir conexão",
+          "ERROR_MESSAGE": "Não foi possível preparar a conexão GOWA. Verifique a URL e as credenciais."
         },
         "EVOLUTION": {
           "TITLE": "Configuração Evolution Go",
@@ -707,6 +730,18 @@
         "LOADING_QR": "Carregando QR Code...",
         "CONNECT": "Conectar WhatsApp",
         "CONNECT_DESC": "Clique abaixo para iniciar o processo de conexão"
+      },
+      "GOWA": {
+        "CONNECTED": "GOWA conectado",
+        "CONNECTED_DESC": "Sua caixa de entrada GOWA está conectada e pronta para enviar e receber mensagens.",
+        "DISCONNECT": "Desconectar",
+        "DISCONNECT_SUCCESS": "Desconectado com sucesso",
+        "DISCONNECT_ERROR": "Erro ao desconectar",
+        "CONNECT": "Conectar WhatsApp",
+        "CONNECT_DESC": "Clique para gerar o QR Code de conexão.",
+        "CONNECT_ERROR": "Não foi possível gerar o QR Code. Verifique as credenciais do GOWA.",
+        "SCAN_QR": "Escaneie o QR Code com o WhatsApp que será conectado.",
+        "QR_ALT": "QR Code de conexão do WhatsApp"
       },
       "EVOLUTION": {
         "CONNECTED": "Evolution Go Conectado",

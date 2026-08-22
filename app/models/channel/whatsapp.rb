@@ -5,6 +5,10 @@
 #  id                             :bigint           not null, primary key
 #  evolution_api_token            :string
 #  evolution_api_token_iv         :string
+#  gowa_password                  :string
+#  gowa_password_iv               :string
+#  gowa_username                  :string
+#  gowa_username_iv               :string
 #  message_templates              :jsonb
 #  message_templates_last_updated :datetime
 #  phone_number                   :string           not null
@@ -32,18 +36,20 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   self.table_name = 'channel_whatsapp'
   attr_accessor :inbox_name_for_provisioning
 
-  EDITABLE_ATTRS = [:phone_number, :provider, :wuzapi_user_token, :wuzapi_admin_token, :evolution_api_token, :inbox_name_for_provisioning,
+  EDITABLE_ATTRS = [:phone_number, :provider, :wuzapi_user_token, :wuzapi_admin_token, :evolution_api_token, :gowa_username, :gowa_password,
+                    :inbox_name_for_provisioning,
                     { provider_config: {} }].freeze
 
   # default at the moment is 360dialog lets change later.
-  PROVIDERS = %w[default whatsapp_cloud wuzapi baileys zapi evolution].freeze
+  PROVIDERS = %w[default whatsapp_cloud wuzapi baileys zapi evolution gowa].freeze
 
-  encrypts :wuzapi_user_token, :wuzapi_admin_token, :evolution_api_token
+  encrypts :wuzapi_user_token, :wuzapi_admin_token, :evolution_api_token, :gowa_username, :gowa_password
 
   before_validation :ensure_webhook_verify_token
   before_validation :move_tokens_to_encrypted_attributes
   before_validation :provision_wuzapi_user, on: :create
   before_validation :provision_evolution_instance, on: :create
+  before_validation :provision_gowa_device, on: :create
 
   validates :provider, inclusion: { in: PROVIDERS }
   validates :phone_number, presence: true, uniqueness: true
@@ -70,6 +76,8 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
       Whatsapp::Providers::WhatsappZapiService.new(whatsapp_channel: self)
     when 'evolution'
       Whatsapp::Providers::EvolutionService.new(whatsapp_channel: self)
+    when 'gowa'
+      Whatsapp::Providers::GowaService.new(whatsapp_channel: self)
     else
       Whatsapp::Providers::Whatsapp360DialogService.new(whatsapp_channel: self)
     end
@@ -186,16 +194,21 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   private
 
   def webhook_configuration_changed?
-    return true if saved_change_to_provider? && provider.in?(%w[wuzapi evolution])
-    return false unless provider.in?(%w[wuzapi evolution])
+    return true if saved_change_to_provider? && provider.in?(%w[wuzapi evolution gowa])
+    return false unless provider.in?(%w[wuzapi evolution gowa])
 
-    if provider == 'evolution'
-      return saved_change_to_evolution_api_token? ||
-             (saved_change_to_provider_config? && provider_config['evolution_base_url'] != provider_config_before_last_save['evolution_base_url'])
+    provider_webhook_configuration_changed?
+  end
+
+  def provider_webhook_configuration_changed?
+    case provider
+    when 'evolution'
+      saved_change_to_evolution_api_token? || evolution_base_url_changed?
+    when 'gowa'
+      saved_change_to_gowa_username? || saved_change_to_gowa_password? || gowa_connection_config_changed?
+    when 'wuzapi'
+      saved_change_to_wuzapi_user_token? || wuzapi_base_url_changed?
     end
-
-    saved_change_to_wuzapi_user_token? ||
-      (saved_change_to_provider_config? && provider_config['wuzapi_base_url'] != provider_config_before_last_save['wuzapi_base_url'])
   end
 
   def ensure_webhook_verify_token
@@ -204,6 +217,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   def move_tokens_to_encrypted_attributes
     move_evolution_token_to_encrypted_attribute
+    move_gowa_credentials_to_encrypted_attributes
     return unless provider == 'wuzapi'
 
     move_wuzapi_user_token_to_encrypted_attribute
@@ -217,6 +231,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   def perform_webhook_setup
     return setup_wuzapi_webhook if provider == 'wuzapi'
     return setup_evolution_webhook if provider == 'evolution'
+    return setup_gowa_webhook if provider == 'gowa'
     return provider_service.setup_channel_provider if provider_service.respond_to?(:setup_channel_provider)
 
     setup_default_webhook
@@ -227,6 +242,8 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
       teardown_wuzapi_session
     elsif provider == 'evolution'
       teardown_evolution_session
+    elsif provider == 'gowa'
+      teardown_gowa_device
     else
       Whatsapp::WebhookTeardownService.new(self).perform
     end
@@ -293,12 +310,31 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     end
   end
 
+  def provision_gowa_device
+    return unless provider == 'gowa'
+    return if provider_config['gowa_device_id'].present?
+
+    provider_config['webhook_secret'] ||= SecureRandom.hex(32)
+    provider_config['gowa_device_id'] = provisioned_gowa_device_id
+  rescue StandardError => e
+    Rails.logger.error "GOWA provisioning falhou: #{e.message}"
+    errors.add(:base, "Não foi possível preparar a conexão GOWA: #{e.message}")
+    throw(:abort)
+  end
+
   def move_evolution_token_to_encrypted_attribute
     return unless provider == 'evolution'
     return if provider_config['evolution_api_token'].blank?
 
     self.evolution_api_token = provider_config['evolution_api_token']
     provider_config.delete('evolution_api_token')
+  end
+
+  def move_gowa_credentials_to_encrypted_attributes
+    return unless provider == 'gowa'
+
+    self.gowa_username = provider_config.delete('gowa_username') if provider_config['gowa_username'].present?
+    self.gowa_password = provider_config.delete('gowa_password') if provider_config['gowa_password'].present?
   end
 
   def move_wuzapi_user_token_to_encrypted_attribute
@@ -335,6 +371,15 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     Rails.logger.error "Evolution Webhook Setup Failed: #{e.message}"
   end
 
+  def setup_gowa_webhook
+    return if inbox.blank? || gowa_username.blank? || gowa_password.blank?
+
+    client = Gowa::Client.new(provider_config['gowa_base_url'], gowa_username, gowa_password)
+    client.update_webhook(provider_config.fetch('gowa_device_id'), gowa_webhook_url, provider_config.fetch('webhook_secret'))
+  rescue StandardError => e
+    Rails.logger.error "GOWA webhook setup falhou: #{e.message}"
+  end
+
   def setup_default_webhook
     business_account_id = provider_config['business_account_id']
     api_key = provider_config['api_key']
@@ -352,6 +397,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     "#{app_url}/webhooks/evolution/#{phone_number}"
   end
 
+  def gowa_webhook_url
+    app_url = ENV['FRONTEND_URL'].presence || 'http://localhost:3000'
+    "#{app_url}/webhooks/gowa/#{inbox.id}"
+  end
+
   def disconnect_wuzapi_user_session(client)
     return if wuzapi_user_token.blank?
 
@@ -367,6 +417,16 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     end
   end
 
+  def teardown_gowa_device
+    return if provider_config['gowa_base_url'].blank? || provider_config['gowa_device_id'].blank?
+
+    client = Gowa::Client.new(provider_config['gowa_base_url'], gowa_username, gowa_password)
+    client.logout(provider_config['gowa_device_id'])
+    client.delete_device(provider_config['gowa_device_id'])
+  rescue StandardError => e
+    Rails.logger.warn "GOWA cleanup falhou: #{e.message}"
+  end
+
   def safely_with_wuzapi_log(action)
     yield
   rescue StandardError => e
@@ -378,6 +438,29 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     sanitized_inbox_name = raw_name.to_s.gsub(/[^a-zA-Z0-9]/, '_')
     prefix = sanitized_inbox_name.presence || 'Chatwoot'
     "#{prefix}_#{phone_number}"
+  end
+
+  def build_gowa_device_id
+    "chatwoot-#{account_id}-#{phone_number.to_s.gsub(/\D/, '')}"
+  end
+
+  def gowa_connection_config_changed?
+    before = provider_config_before_last_save || {}
+    provider_config['gowa_base_url'] != before['gowa_base_url'] ||
+      provider_config['gowa_device_id'] != before['gowa_device_id']
+  end
+
+  def evolution_base_url_changed?
+    saved_change_to_provider_config? && provider_config['evolution_base_url'] != provider_config_before_last_save['evolution_base_url']
+  end
+
+  def wuzapi_base_url_changed?
+    saved_change_to_provider_config? && provider_config['wuzapi_base_url'] != provider_config_before_last_save['wuzapi_base_url']
+  end
+
+  def provisioned_gowa_device_id
+    response = Gowa::Client.new(provider_config['gowa_base_url'], gowa_username, gowa_password).create_device(build_gowa_device_id)
+    response.dig('results', 'id') || build_gowa_device_id
   end
 
   def provision_wuzapi_user_with_fallback(base_url, admin_token, user_name)

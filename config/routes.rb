@@ -305,6 +305,11 @@ Rails.application.routes.draw do
               get :webhook_info
               put :update_webhook
             end
+            resource :gowa, controller: 'inboxes/gowa', only: [:show] do
+              get :qr
+              post :disconnect
+              put :update_webhook
+            end
           end
 
           resources :inbox_members, only: [:create, :show], param: :inbox_id do
@@ -649,6 +654,7 @@ Rails.application.routes.draw do
   post 'webhooks/tiktok', to: 'webhooks/tiktok#events'
   post 'webhooks/shopify', to: 'webhooks/shopify#events'
   post 'webhooks/wuzapi/:inbox_id', to: 'webhooks/wuzapi#process_payload'
+  post 'webhooks/gowa/:inbox_id', to: 'webhooks/gowa#process_payload'
   post 'webhooks/captain/hermes_callback', to: 'webhooks/captain/hermes_callback#process_payload'
   post 'webhooks/captain/builder_callback', to: 'webhooks/captain/hermes_builder_callback#process_payload'
   post 'webhooks/captain/mcp', to: 'webhooks/captain/mcp#process_payload'

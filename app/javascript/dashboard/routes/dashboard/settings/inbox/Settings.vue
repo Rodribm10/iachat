@@ -25,6 +25,7 @@ import WidgetBuilder from './WidgetBuilder.vue';
 import BotConfiguration from './components/BotConfiguration.vue';
 import AccountHealth from './components/AccountHealth.vue';
 import WuzapiConfiguration from './channels/wuzapi/WuzapiConfiguration.vue';
+import GowaConfiguration from './channels/gowa/GowaConfiguration.vue';
 import EvolutionGoConfiguration from './channels/evolution_go/EvolutionGoConfiguration.vue';
 import InboxAutoResolve from './components/InboxAutoResolve.vue';
 import { FEATURE_FLAGS } from '../../../../featureFlags';
@@ -60,6 +61,7 @@ export default {
     Avatar,
     AccountHealth,
     WuzapiConfiguration,
+    GowaConfiguration,
     EvolutionGoConfiguration,
     InboxAutoResolve,
     LandingHostsConfig,
@@ -610,6 +612,10 @@ export default {
       />
       <WuzapiConfiguration
         v-if="isAWhatsAppChannel && inbox.provider === 'wuzapi'"
+        :inbox="inbox"
+      />
+      <GowaConfiguration
+        v-if="isAWhatsAppChannel && inbox.provider === 'gowa'"
         :inbox="inbox"
       />
       <EvolutionGoConfiguration

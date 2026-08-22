@@ -7,6 +7,7 @@ import ThreeSixtyDialogWhatsapp from './360DialogWhatsapp.vue';
 import CloudWhatsapp from './CloudWhatsapp.vue';
 import WhatsappEmbeddedSignup from './WhatsappEmbeddedSignup.vue';
 import Wuzapi from './Wuzapi.vue';
+import Gowa from './Gowa.vue';
 import EvolutionGo from './EvolutionGo.vue';
 import ZapiWhatsapp from './ZapiWhatsapp.vue';
 import BaileysWhatsapp from './BaileysWhatsapp.vue';
@@ -27,6 +28,7 @@ const PROVIDER_TYPES = {
   BAILEYS: 'baileys',
   ZAPI: 'zapi',
   WUZAPI: 'wuzapi',
+  GOWA: 'gowa',
   EVOLUTION: 'evolution',
 };
 
@@ -75,6 +77,12 @@ const availableProviders = computed(() => [
     icon: 'i-woot-whatsapp',
   },
   {
+    key: PROVIDER_TYPES.GOWA,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.GOWA'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.GOWA_DESC'),
+    icon: 'i-woot-whatsapp',
+  },
+  {
     key: PROVIDER_TYPES.EVOLUTION,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.EVOLUTION'),
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.EVOLUTION_DESC'),
@@ -114,7 +122,7 @@ const handleManualLinkClick = () => {
         </p>
       </div>
 
-      <div class="flex gap-6 justify-start">
+      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
         <ChannelSelector
           v-for="provider in availableProviders"
           :key="provider.key"
@@ -187,6 +195,7 @@ const handleManualLinkClick = () => {
         <CloudWhatsapp v-else-if="shouldShowCloudWhatsapp(selectedProvider)" />
 
         <Wuzapi v-else-if="selectedProvider === PROVIDER_TYPES.WUZAPI" />
+        <Gowa v-else-if="selectedProvider === PROVIDER_TYPES.GOWA" />
         <EvolutionGo
           v-else-if="selectedProvider === PROVIDER_TYPES.EVOLUTION"
         />
