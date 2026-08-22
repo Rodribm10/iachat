@@ -210,3 +210,49 @@ armadilha.
 - **Sai:** motor de resposta + `tools.yml` + `Captain::Tools::*` (menos `GeneratePixTool`).
 - **Fica:** todo o Codex — proxy, credencial, auth, translator e o cron de 30 minutos.
 - **Corrige:** default da coluna `engine` passa a ser `hermes`.
+
+---
+
+## Default `engine` = hermes — tentado e revertido (22/08/2026)
+
+Decisão do Rodrigo: não mexer no motor interno, só trocar o default da coluna
+`captain_assistants.engine` para `hermes`. Implementado, testado — e **revertido**, porque
+quebra mais do que conserta.
+
+### Por quê
+
+`Captain::Assistant` valida, quando `engine == 'hermes'`:
+
+```ruby
+validates :hermes_profile_name, presence: true, if: :hermes?
+validates :hermes_webhook_base_url, presence: true, if: :hermes?
+```
+
+E o formulário de criação no painel
+(`components-next/captain/pageComponents/assistant/AssistantForm.vue`) tem apenas **nome,
+descrição, nome do produto e três checkboxes**. Nenhuma referência a `hermes_profile_name` em
+todo o `app/javascript`.
+
+Ou seja: com o default em `hermes`, **criar assistant pelo painel passa a falhar** com
+"Hermes profile name can't be blank".
+
+Medido na suíte: `spec/enterprise` foi de 59 para **641 falhas** — praticamente todo
+`create(:captain_assistant)` do projeto quebrou pela mesma validação. Depois do rollback,
+voltou a 59.
+
+### Como as atendentes em Hermes foram criadas então
+
+Não pelo formulário. Pelo **Construtor** (`HermesBuilder` + `Captain::Mcp::Tools::SaveAgentSpecTool`),
+que preenche `hermes_profile_name` e `hermes_webhook_base_url` corretamente. O formulário do
+painel só serve pro caminho antigo.
+
+### Opções para a próxima rodada
+
+| Opção | O que é | Custo |
+|---|---|---|
+| **A** | Acrescentar `engine` + os dois campos Hermes ao formulário, e aí trocar o default | frontend pequeno + i18n en/pt_BR |
+| **B** | Validar no ponto de ligação: `CaptainInbox` recusa atrelar inbox a assistant em `captain_interno` | menor, e é exatamente onde a armadilha mora |
+| **C** | Nada em código — criar a atendente da academia pelo Construtor, que já faz certo | zero, mas depende de lembrar |
+
+Recomendação: **B**. O default da coluna é irrelevante enquanto nenhum assistant interno
+conseguir ser atrelado a uma inbox — que é o dano real. E não mexe no fluxo de criação.
