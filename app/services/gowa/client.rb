@@ -46,6 +46,17 @@ class Gowa::Client # rubocop:disable Metrics/ClassLength
     )
   end
 
+  # GOWA expoe a reacao como acao sobre a mensagem alvo, nao como um envio novo:
+  # POST /message/{id}/reaction  { phone, emoji }. Emoji vazio remove a reacao.
+  def send_reaction(device_id, phone_number, message_id, emoji)
+    request(
+      :post,
+      "/message/#{escape(message_id)}/reaction",
+      { phone: normalized_jid(phone_number), emoji: emoji.to_s },
+      device_id: device_id
+    )
+  end
+
   def send_text(device_id, phone_number, message, reply_message_id: nil)
     request(
       :post,

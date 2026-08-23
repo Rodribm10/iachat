@@ -1,5 +1,7 @@
 class Whatsapp::Providers::GowaService < Whatsapp::Providers::BaseService
   def send_message(phone_number, message)
+    return send_reaction_message(phone_number, message) if reaction_message?(message)
+
     response = if message.attachments.present?
                  client.send_attachment(
                    device_id,
@@ -52,5 +54,23 @@ class Whatsapp::Providers::GowaService < Whatsapp::Providers::BaseService
 
   def reply_message_id(message)
     message.in_reply_to_external_id.to_s.delete_prefix('GOWA:').presence
+  end
+
+  def reaction_message?(message)
+    message.content_attributes['is_reaction'] || message.content_attributes[:is_reaction]
+  end
+
+  # O conteudo da mensagem de reacao E o emoji, e o alvo e a mensagem respondida.
+  # Sem o id do alvo nao ha o que reagir — registra e desiste, sem estourar o envio.
+  def send_reaction_message(phone_number, message)
+    target_id = reply_message_id(message)
+    if target_id.blank?
+      Rails.logger.warn "GOWA: reacao sem mensagem alvo (msg #{message.id}) — ignorada"
+      return nil
+    end
+
+    response = client.send_reaction(device_id, phone_number, target_id, message.content)
+    message_id = response.dig('results', 'id') || response.dig('results', 'message_id')
+    message_id.present? ? "GOWA:#{message_id}" : nil
   end
 end

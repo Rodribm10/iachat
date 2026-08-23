@@ -53,7 +53,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
 
   # Reacao so entra aqui quando o provider service sabe enviar de fato.
   # evolution e gowa ficam de fora: nenhum dos dois implementa envio de reacao.
-  REACTION_SUPPORTED_PROVIDERS = %w[whatsapp_cloud baileys zapi wuzapi].freeze
+  REACTION_SUPPORTED_PROVIDERS = %w[whatsapp_cloud baileys zapi wuzapi gowa].freeze
 
   # UI-relevant subset of the baileys new-chat message cap payload that we persist in
   # provider_connection. server_sent_timestamp is intentionally dropped (it changes on every
