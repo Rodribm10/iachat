@@ -95,6 +95,33 @@ RSpec.describe Gowa::Client do
     end
   end
 
+  describe '#send_presence' do
+    # 23/08/2026: o payload mandava { state: }, mas o GOWA valida { phone, action } e
+    # devolvia 400 VALIDATION_ERROR em toda chamada — o "digitando…" nunca aparecia no
+    # WhatsApp. 'start'/'stop' são os valores aceitos (confirmado empiricamente contra
+    # /send/chat-presence, ambos retornam SUCCESS); 'composing'/'paused' é dialeto
+    # wuzapi/whatsmeow e o GOWA rejeita.
+    it 'envia o telefone normalizado em JID e a action de início' do
+      request = stub_request(:post, "#{base_url}/send/chat-presence")
+                .with(basic_auth: [username, password], body: { phone: '5561999999999@s.whatsapp.net', action: 'start' })
+                .to_return(status: 200, body: { code: 'SUCCESS' }.to_json)
+
+      client.send_presence('Device-1', '5561999999999', 'start')
+
+      expect(request).to have_been_requested
+    end
+
+    it 'envia a action de parada, nunca o campo state' do
+      request = stub_request(:post, "#{base_url}/send/chat-presence")
+                .with(body: { phone: '5561999999999@s.whatsapp.net', action: 'stop' })
+                .to_return(status: 200, body: { code: 'SUCCESS' }.to_json)
+
+      client.send_presence('Device-1', '5561999999999', 'stop')
+
+      expect(request).to have_been_requested
+    end
+  end
+
   describe '#download_media' do
     it 'baixa QR e mídia usando a mesma autenticação básica' do
       request = stub_request(:get, "#{base_url}/statics/media/arquivo.jpeg")

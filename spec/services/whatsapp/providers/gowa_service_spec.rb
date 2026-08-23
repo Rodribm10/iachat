@@ -28,16 +28,18 @@ describe Whatsapp::Providers::GowaService do
 
   describe '#toggle_typing_status' do
     # O listener entrega o nome do evento ('conversation.typing_on'). A checagem
-    # antiga só reconhecia 'typing_on'/'on', então todo evento virava 'paused' e
-    # o "digitando…" nunca aparecia pro cliente.
-    it 'traduz o nome do evento do listener em composing' do
-      expect(client).to receive(:send_presence).with('Device-1', '5561999999999', 'composing')
+    # antiga só reconhecia 'typing_on'/'on', então todo evento virava o valor de parada e
+    # o "digitando…" nunca aparecia pro cliente. 'start'/'stop' são os valores que o GOWA
+    # aceita em `action` (confirmado empiricamente) — 'composing'/'paused' é dialeto
+    # wuzapi/whatsmeow e o GOWA rejeita com VALIDATION_ERROR.
+    it 'traduz o nome do evento do listener em start' do
+      expect(client).to receive(:send_presence).with('Device-1', '5561999999999', 'start')
 
       service.toggle_typing_status(Events::Types::CONVERSATION_TYPING_ON, recipient_id: '5561999999999')
     end
 
-    it 'traduz o evento de parada em paused' do
-      expect(client).to receive(:send_presence).with('Device-1', '5561999999999', 'paused')
+    it 'traduz o evento de parada em stop' do
+      expect(client).to receive(:send_presence).with('Device-1', '5561999999999', 'stop')
 
       service.toggle_typing_status(Events::Types::CONVERSATION_TYPING_OFF, recipient_id: '5561999999999')
     end

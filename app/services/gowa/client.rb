@@ -93,11 +93,16 @@ class Gowa::Client # rubocop:disable Metrics/ClassLength
     multipart_request(:post, endpoint, payload, device_id: device_id)
   end
 
-  def send_presence(device_id, phone_number, status)
+  # GOWA valida o payload como { phone, action } — 'state' é dialeto wuzapi/whatsmeow
+  # e não existe aqui. Um POST vazio confirma os campos exigidos:
+  # {"code":"VALIDATION_ERROR","message":"action: cannot be blank; phone: cannot be blank."}
+  # Os valores aceitos em action são 'start'/'stop' (confirmado empiricamente contra
+  # /send/chat-presence, ambos retornam {"code":"SUCCESS", ...}).
+  def send_presence(device_id, phone_number, action)
     request(
       :post,
       '/send/chat-presence',
-      { phone: normalized_jid(phone_number), state: status },
+      { phone: normalized_jid(phone_number), action: action },
       device_id: device_id
     )
   end
