@@ -34,22 +34,18 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     /^\s*aguarde\s+um\s+instante/i
   ].freeze
 
-  # Loop detection: 2 sinais combinados.
+  # Loop detection: 2 sinais.
   # 1. Jaccard de tokens >= 0.50 → resposta praticamente igual.
-  # 2. >= 3 palavras-chave em comum (sem stopwords) E ambas inquisitivas →
-  #    repetiu pergunta sobre o mesmo tópico.
+  # 2. A mesma PERGUNTA reformulada — comparada pergunta contra pergunta, não
+  #    pelo corpo inteiro. Contar palavras em comum no texto todo dava falso
+  #    positivo em venda normal: "Dá pra fazer uma aula experimental. Quer que
+  #    eu veja um horário?" seguido de "Vem fazer a experimental. Consigo te
+  #    encaixar terça ou quinta?" compartilha o assunto, mas a segunda AVANÇA.
+  #    Visto na conv 18 da academia em 23/08/2026 — o cliente disse "to em
+  #    dúvida", a IA convidou com dia marcado e a conversa foi para triagem
+  #    humana como se ela tivesse travado.
   LOOP_SIMILARITY_THRESHOLD = 0.50
-  LOOP_TOPIC_KEYWORD_OVERLAP = 3
-  LOOP_STOPWORDS = %w[
-    voce voces para por pra como mas isso esse essa estou esta este aqui ali
-    eles elas tem ter tinha tendo era ser sou foi fui agora ainda ja muito mais
-    quer quero queria pode posso podia consegue consigo conseguia preciso precisar
-    sim nao não talvez bom boa olha veja oi ola ola tchau certo ok blz beleza
-    obrigado obrigada valeu vlw thanks por favor please
-    apenas somente algum alguma quem onde quando o a os as do da dos das no na nos nas
-    em com sem sob sobre antes apos depois entre meio tudo todo toda
-    perfeito otimo certinho confirma confirme
-  ].freeze
+  LOOP_QUESTION_SIMILARITY = 0.55
 
   # Quando o Hermes falha (token expirado, provider fora do ar), ele às vezes
   # devolve o PRÓPRIO erro técnico no lugar da resposta. Sem esta trava isso vai
@@ -209,14 +205,19 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     intersection.to_f / union
   end
 
-  # Pergunta/confirmação reformulada sobre o mesmo tópico. Detecta tanto "?"
-  # quanto formas imperativas comuns ("me confirma", "qual", "quer").
+  # Mesma pergunta reformulada. Compara a pergunta de uma com a pergunta da
+  # outra: repetir o assunto é normal numa conversa de venda, repetir o PEDIDO
+  # é que indica que o agente travou.
   def repeated_question?(text_a, text_b)
-    return false unless inquisitive?(text_a) && inquisitive?(text_b)
+    question_a = last_inquisitive_sentence(text_a)
+    question_b = last_inquisitive_sentence(text_b)
+    return false if question_a.blank? || question_b.blank?
 
-    keywords_a = tokenize(text_a) - LOOP_STOPWORDS
-    keywords_b = tokenize(text_b) - LOOP_STOPWORDS
-    (keywords_a & keywords_b).size >= LOOP_TOPIC_KEYWORD_OVERLAP
+    similarity(question_a, question_b) >= LOOP_QUESTION_SIMILARITY
+  end
+
+  def last_inquisitive_sentence(text)
+    text.to_s.split(/(?<=[.?!])\s+|\n+/).reverse.find { |sentence| inquisitive?(sentence) }
   end
 
   INQUISITIVE_REGEX = /(\?|\bme\s+confirm|\bvoce\s+(prefere|quer)|\bqual\s+(prefere|deseja|seria)|\bquer\s+(que|saber|ver|um|uma))/i

@@ -34,6 +34,50 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
   end
 
   describe 'POST /webhooks/captain/hermes_callback' do
+    # Regressao (conv 18 da academia, 23/08/2026): cliente disse "to em duvida",
+    # a IA convidou pra experimental com dia marcado — avanco de venda, nao loop —
+    # e a conversa caiu em triagem humana mesmo assim.
+    it 'nao trata convite que avanca a venda como repeticao' do
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: 'Da pra fazer uma aula experimental gratuita antes de escolher. ' \
+                 'Quer que eu veja um horario bom pra voce?',
+        content_attributes: { external_source: 'hermes_callback' }
+      )
+
+      post '/webhooks/captain/hermes_callback',
+           params: {
+             inbox_id: inbox.id,
+             content: 'Sem problema! Vem fazer uma aula experimental gratuita pra sentir a academia ' \
+                      'antes de decidir. Consigo te encaixar na terca ou na quinta?'
+           }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).not_to include('triagem_humana')
+    end
+
+    it 'ainda escala quando a IA repete a mesma pergunta' do
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: 'Perfeito! Qual seu melhor horario pra aula experimental?',
+        content_attributes: { external_source: 'hermes_callback' }
+      )
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'Qual o melhor horario pra sua aula experimental?' }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).to include('triagem_humana')
+    end
+
     # Regressao (conv 17 da academia, 23/08/2026): o gateway do Hermes reiniciou
     # e o proprio aviso de shutdown foi entregue como resposta no WhatsApp.
     it 'nao entrega aviso de shutdown do gateway ao cliente' do
