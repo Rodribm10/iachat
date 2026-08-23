@@ -1,10 +1,18 @@
 module Enterprise::MessageTemplates::HookExecutionService
   def trigger_templates
     super
-    return unless should_process_captain_response?
+    return unless captain_conversation_message?
+
+    # Eligibility is demand-level: every inbound customer message in a
+    # Captain-connected inbox counts, including conversations a human grabbed
+    # first or that arrive while the account is over its usage limit —
+    # otherwise the coverage denominator only ever contains conversations
+    # Captain was already about to answer.
+    track_captain_eligibility
+    return unless conversation.pending?
     return perform_handoff unless inbox.captain_active?
 
-    schedule_captain_response
+    Captain::Conversation::ResponseSchedulerService.new(message: message).perform
   end
 
   def should_send_greeting?
@@ -104,8 +112,6 @@ module Enterprise::MessageTemplates::HookExecutionService
   end
 
   def perform_handoff
-    return unless conversation.pending?
-
     Rails.logger.info("Captain limit exceeded, performing handoff mid-conversation for conversation: #{conversation.id}")
     conversation.messages.create!(
       message_type: :outgoing,
@@ -114,6 +120,13 @@ module Enterprise::MessageTemplates::HookExecutionService
       content: 'Transferring to another agent for further assistance.'
     )
     conversation.bot_handoff!
+    Captain::ConversationEvents.handed_off(
+      conversation: conversation,
+      assistant: inbox.captain_assistant,
+      source: Captain::ConversationEvents::Sources::USAGE_LIMIT,
+      reason_category: :usage_limit,
+      at: Time.current
+    )
     send_out_of_office_message_after_handoff
   end
 
@@ -126,6 +139,10 @@ module Enterprise::MessageTemplates::HookExecutionService
   end
 
   def captain_handling_conversation?
-    conversation.pending? && inbox.respond_to?(:captain_assistant) && inbox.captain_assistant.present?
+    conversation.pending? && captain_assistant_configured?
+  end
+
+  def captain_assistant_configured?
+    inbox.captain_assistant.present?
   end
 end

@@ -78,6 +78,27 @@ RUN apk update && apk add --no-cache \
   libstdc++ \
   libffi \
   gcompat
+  && gem install bundler -v "$BUNDLER_VERSION"
+
+# Restrict libvips to its trusted image loaders when generating variants
+ENV VIPS_BLOCK_UNTRUSTED=1
+
+COPY --from=node /usr/local/bin/node /usr/local/bin/
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+
+RUN if [ "$RAILS_ENV" != "production" ]; then \
+  apk add --no-cache curl \
+  && ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+  && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
+  && npm install -g pnpm@${PNPM_VERSION} \
+  && pnpm --version; \
+  fi
+
+COPY --from=pre-builder /gems/ /gems/
+COPY --from=pre-builder /app /app
+
+# Copy .git_sha file from pre-builder stage
+COPY --from=pre-builder /app/.git_sha /app/.git_sha
 
 WORKDIR /app
 

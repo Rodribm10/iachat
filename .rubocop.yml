@@ -25,6 +25,10 @@ Metrics/ClassLength:
     - 'app/models/inbox.rb'
     - 'app/models/attachment.rb'
     - 'app/models/account.rb'
+    # Cresceu no sync 4.17: validacoes de audiencia/auto-resolve do upstream
+    # somadas ao roteamento pro Hermes do fork
+    - 'enterprise/app/models/captain/assistant.rb'
+    - 'config/initializers/rack_attack.rb'
 
 Metrics/MethodLength:
   Max: 19
