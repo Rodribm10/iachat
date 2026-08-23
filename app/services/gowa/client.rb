@@ -1,6 +1,7 @@
 require 'net/http'
 require 'json'
 require 'erb'
+require 'image_processing/mini_magick'
 
 class Gowa::Client # rubocop:disable Metrics/ClassLength
   class Error < StandardError; end
@@ -8,6 +9,14 @@ class Gowa::Client # rubocop:disable Metrics/ClassLength
   class ConnectionError < Error; end
 
   DEFAULT_READ_TIMEOUT = 30
+  # O GOWA repassa o arquivo pro CDN do WhatsApp e desiste sozinho quando esse
+  # upload demora ("context deadline exceeded", HTTP 500). Uma arte de 1,8 MB
+  # batia nisso toda vez; a mesma imagem em 160 KB sobe em ~20s. Por isso a
+  # imagem grande é recomprimida antes de sair daqui.
+  IMAGE_COMPRESSION_THRESHOLD = 600_000
+  IMAGE_MAX_DIMENSION = 1600
+  IMAGE_QUALITY = 80
+  COMPRESSIBLE_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg'].freeze
   # O GOWA só responde o POST de mídia depois de subir o arquivo pro WhatsApp.
   # Com 30s, uma arte de 2 MB estourava Net::ReadTimeout: a mensagem ficava
   # pendurada no Chatwoot e a foto nunca chegava no celular do cliente.
@@ -73,16 +82,13 @@ class Gowa::Client # rubocop:disable Metrics/ClassLength
   end
 
   def send_attachment(device_id, phone_number, attachment, caption: nil, reply_message_id: nil)
-    endpoint, field_name = attachment_endpoint(attachment.file.content_type)
+    file = attachment_payload(attachment)
+    endpoint, field_name = attachment_endpoint(file[:content_type])
     payload = {
       :phone => normalized_jid(phone_number),
       :caption => caption,
       :reply_message_id => reply_message_id,
-      field_name => {
-        filename: attachment.file.filename.to_s,
-        content_type: attachment.file.content_type,
-        content: attachment_content(attachment)
-      }
+      field_name => file
     }.compact
     multipart_request(:post, endpoint, payload, device_id: device_id)
   end
@@ -218,6 +224,52 @@ class Gowa::Client # rubocop:disable Metrics/ClassLength
     return ['/send/video', :video] if content_type.start_with?('video/')
 
     ['/send/file', :file]
+  end
+
+  def attachment_payload(attachment)
+    blob = attachment.file.blob
+    compress_image(blob) || {
+      filename: blob.filename.to_s,
+      content_type: blob.content_type,
+      content: attachment_content(attachment)
+    }
+  end
+
+  # Sticker (webp) e gif animado ficariam quebrados virando jpg — só png/jpeg
+  # entram aqui, e só acima do limite.
+  def compress_image(blob)
+    return nil unless compressible_image?(blob)
+
+    source = Tempfile.new(['gowa-img', File.extname(blob.filename.to_s)], binmode: true)
+    source.write(blob.download)
+    source.flush
+    result = downscale(source.path)
+
+    {
+      filename: "#{File.basename(blob.filename.to_s, '.*')}.jpg",
+      content_type: 'image/jpeg',
+      content: File.binread(result.path)
+    }
+  rescue StandardError => e
+    Rails.logger.warn("GOWA: não foi possível comprimir a imagem #{blob.id}: #{e.class} - #{e.message}")
+    nil
+  ensure
+    source&.close!
+    result.close! if result.respond_to?(:close!)
+  end
+
+  def compressible_image?(blob)
+    COMPRESSIBLE_IMAGE_TYPES.include?(blob.content_type.to_s) &&
+      blob.byte_size.to_i > IMAGE_COMPRESSION_THRESHOLD
+  end
+
+  def downscale(path)
+    ImageProcessing::MiniMagick
+      .source(path)
+      .convert('jpg')
+      .resize_to_limit(IMAGE_MAX_DIMENSION, IMAGE_MAX_DIMENSION)
+      .saver(quality: IMAGE_QUALITY, strip: true)
+      .call
   end
 
   def attachment_content(attachment)
