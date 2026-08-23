@@ -46,7 +46,7 @@
     "BOT_HANDOFF_MESSAGE": "This conversation is currently handled by {assigneeName}.",
     "BOT_HANDOFF_FALLBACK_ASSIGNEE": "a bot",
     "BOT_HANDOFF_ACTION": "Take over",
-    "BOT_HANDOFF_REOPEN_ACTION": "Mark conversation open",
+    "BOT_HANDOFF_REOPEN_ACTION": "Take over conversation",
     "BOT_HANDOFF_SUCCESS": "Conversation has been handed over to you",
     "BOT_HANDOFF_ERROR": "Failed to take over the conversation. Please try again.",
     "TWILIO_WHATSAPP_CAN_REPLY": "You can only reply to this conversation using a template message due to",
@@ -128,7 +128,7 @@
     "HEADER": {
       "RESOLVE_ACTION": "Resolve",
       "REOPEN_ACTION": "Reopen",
-      "OPEN_ACTION": "Open",
+      "OPEN_ACTION": "Take over",
       "MORE_ACTIONS": "More actions",
       "OPEN": "More",
       "CLOSE": "Close",
@@ -153,7 +153,7 @@
       }
     },
     "RESOLVE_DROPDOWN": {
-      "MARK_PENDING": "Mark as pending",
+      "MARK_PENDING": "Send to AI",
       "SNOOZE_UNTIL": "Snooze",
       "SNOOZE": {
         "TITLE": "Snooze until",
@@ -222,7 +222,7 @@
       "CONFIRM": "Delete"
     },
     "CARD_CONTEXT_MENU": {
-      "PENDING": "Mark as pending",
+      "PENDING": "Send to AI",
       "RESOLVED": "Mark as resolved",
       "MARK_AS_UNREAD": "Mark as unread",
       "MARK_AS_READ": "Mark as read",

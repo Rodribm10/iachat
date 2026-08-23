@@ -39,7 +39,7 @@
     "BOT_HANDOFF_MESSAGE": "Esta conversa está sendo atendida por {assigneeName}.",
     "BOT_HANDOFF_FALLBACK_ASSIGNEE": "um bot",
     "BOT_HANDOFF_ACTION": "Assumir atendimento",
-    "BOT_HANDOFF_REOPEN_ACTION": "Marcar conversa como aberta",
+    "BOT_HANDOFF_REOPEN_ACTION": "Assumir conversa",
     "BOT_HANDOFF_SUCCESS": "Uma conversa foi atribuída a você",
     "BOT_HANDOFF_ERROR": "Falha ao resolver conversas. Por favor, tente novamente.",
     "TWILIO_WHATSAPP_CAN_REPLY": "Você só pode responder a esta conversa usando um modelo de mensagem devido a",
@@ -118,7 +118,7 @@
     "HEADER": {
       "RESOLVE_ACTION": "Resolver",
       "REOPEN_ACTION": "Reabrir",
-      "OPEN_ACTION": "Abrir",
+      "OPEN_ACTION": "Assumir",
       "MORE_ACTIONS": "Mais ações",
       "OPEN": "Mais",
       "CLOSE": "Fechar",
@@ -143,7 +143,7 @@
       }
     },
     "RESOLVE_DROPDOWN": {
-      "MARK_PENDING": "Deixar pendente",
+      "MARK_PENDING": "Enviar para IA",
       "SNOOZE_UNTIL": "Adiar",
       "SNOOZE": {
         "TITLE": "Suspender até",
@@ -184,7 +184,7 @@
       "CONFIRM": "Excluir"
     },
     "CARD_CONTEXT_MENU": {
-      "PENDING": "Deixar pendente",
+      "PENDING": "Enviar para IA",
       "RESOLVED": "Marcar como resolvida",
       "MARK_AS_UNREAD": "Marcar como não lida",
       "MARK_AS_READ": "Marcar como lida",

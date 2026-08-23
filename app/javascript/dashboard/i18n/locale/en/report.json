@@ -591,12 +591,12 @@
     "LIVE": "Live",
     "HEATMAP_ARIA_LABEL": "{metric} by day and hour",
     "ACCOUNT_CONVERSATIONS": {
-      "HEADER": "Open Conversations",
+      "HEADER": "Ongoing Conversations",
       "LOADING_MESSAGE": "Loading conversation metrics...",
-      "OPEN": "Open",
+      "OPEN": "Human",
       "UNATTENDED": "Unattended",
       "UNASSIGNED": "Unassigned",
-      "PENDING": "Pending"
+      "PENDING": "AI"
     },
     "CONVERSATION_HEATMAP": {
       "HEADER": "Conversation Traffic",
@@ -618,7 +618,7 @@
       "NO_AGENTS": "There are no conversations by agents",
       "TABLE_HEADER": {
         "AGENT": "Agent",
-        "OPEN": "Open",
+        "OPEN": "Human",
         "UNATTENDED": "Unattended",
         "STATUS": "Status"
       }
