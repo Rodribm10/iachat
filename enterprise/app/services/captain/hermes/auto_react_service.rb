@@ -17,6 +17,28 @@
 # contexto de preço/reserva/Pix/CPF/suporte operacional passam imagem de
 # automação fraca e atrapalham atendimento.
 class Captain::Hermes::AutoReactService
+  # Quanto o agente reage, por assistente: `config['auto_react_mode']`.
+  #
+  #   'conservative' (padrao) — so agradecimento, despedida, confirmacao curta e
+  #                             a saudacao de abertura. Desenhado pro contexto de
+  #                             motel, onde reagir a preco/reserva soa automatico.
+  #   'frequent'              — soma interesse e elogio, aceita confirmacao dentro
+  #                             de frase curta, e bloqueia so o que e realmente
+  #                             delicado (cobranca, estorno, cancelamento, CPF).
+  #                             Para atendimento de academia/varejo, onde o gesto
+  #                             rapido faz parte do tom da casa.
+  #   'off'                   — nao reage.
+  MODES = %w[off conservative frequent].freeze
+  DEFAULT_MODE = 'conservative'.freeze
+
+  # No modo frequente a conversa e leve: so nao se reage ao que envolve dinheiro
+  # cobrado, quebra de contrato ou dado sensivel — ali um emoji soa deboche.
+  SENSITIVE_CONTEXT_REGEX = /cpf|cobran|estorno|reembols|cancel|reclama|d[ií]vida|multa|processo|advogad|procon/i
+
+  # Interesse declarado: o gesto acompanha bem e nao substitui a resposta.
+  INTEREST_REGEX = /\b(quero|vou querer|tenho interesse|me interessa|bora|partiu|fechado ent[aã]o|vamos marcar|pode marcar)\b/i
+  PRAISE_REGEX = /\b(ador(ei|o)|amei|que (bom|legal|massa)|top|maravilh|show de bola|perfeito mesmo|excelente|muito bom)\b/i
+
   THANKS_REGEX = /\b(muito\s+)?(obrigad[oa]|brigad[oa]|valeu|vlw|thanks|agrade[cç]o|agradecid[oa]|gratid[aã]o)\b/i
   # rubocop:disable Layout/LineLength
   CONFIRMATION_REGEX = /\A(ok|okay|fechado|perfeit[oa]|blz|beleza|combinado|certo|certinho|[oó]tim[oa]|legal|show|maravilha|tranquilo|t[aá]\s*bom|pode\s*ser|isso\s*mesmo)[\s.!,]*\z/i
@@ -72,7 +94,7 @@ class Captain::Hermes::AutoReactService
   def decide_emoji
     text = @message.content.to_s.strip
 
-    return nil if critical_context?(text)
+    return nil if blocked_context?(text)
     return nil if image_attachment? || audio_attachment?
     return '👋' if GREETING_REGEX.match?(text) && first_incoming_in_conversation?
     return '🙏' if farewell?(text)
@@ -80,7 +102,43 @@ class Captain::Hermes::AutoReactService
     return '👍' if CONFIRMATION_REGEX.match?(text)
     return nil if emoji_only?(text)
 
+    frequent_emoji(text)
+  end
+
+  # Extras que so valem no modo frequente. Continuam sem reagir a pergunta:
+  # pergunta merece resposta, nao gesto.
+  def frequent_emoji(text)
+    return nil unless mode == 'frequent'
+    return nil if text.include?('?')
+
+    return '💪' if INTEREST_REGEX.match?(text)
+    return '😊' if PRAISE_REGEX.match?(text)
+    return '👍' if short_acknowledgement?(text)
+
     nil
+  end
+
+  # "ok, entendi" / "beleza então" — confirmacao dentro de frase curta, que o
+  # CONFIRMATION_REGEX (ancorado na mensagem inteira) deixa passar.
+  def short_acknowledgement?(text)
+    return false if text.length > 40
+
+    normalized = ActiveSupport::Inflector.transliterate(text.downcase)
+    /\b(ok|beleza|blz|entendi|certo|combinado|fechado|isso mesmo|perfeito|tranquilo)\b/.match?(normalized)
+  end
+
+  def mode
+    @mode ||= begin
+      configured = @conversation.inbox.captain_assistant&.config.to_h['auto_react_mode'].to_s
+      MODES.include?(configured) ? configured : DEFAULT_MODE
+    end
+  end
+
+  def blocked_context?(text)
+    return true if mode == 'off'
+    return SENSITIVE_CONTEXT_REGEX.match?(text.to_s) if mode == 'frequent'
+
+    critical_context?(text)
   end
 
   def critical_context?(text)

@@ -68,4 +68,56 @@ RSpec.describe Captain::Hermes::AutoReactService do
     reaction = last_auto_react
     expect(reaction&.content).to eq('👍')
   end
+
+  describe 'modo frequente (config auto_react_mode)' do
+    before { assistant.update!(config: assistant.config.to_h.merge('auto_react_mode' => 'frequent')) }
+
+    it 'reage a interesse declarado, que o modo conservador ignora' do
+      described_class.maybe_react!(incoming('quero fazer a matricula'))
+
+      expect(last_auto_react&.content).to eq('💪')
+    end
+
+    it 'reage a elogio' do
+      described_class.maybe_react!(incoming('adorei a academia'))
+
+      expect(last_auto_react&.content).to eq('😊')
+    end
+
+    it 'reage a confirmacao dentro de frase curta' do
+      described_class.maybe_react!(incoming('ok, entendi'))
+
+      expect(last_auto_react&.content).to eq('👍')
+    end
+
+    # Pergunta merece resposta, nao gesto — vale nos dois modos.
+    it 'nao reage a pergunta' do
+      described_class.maybe_react!(incoming('quero saber o valor do plano?'))
+
+      expect(auto_react_count).to eq(0)
+    end
+
+    # No modo frequente a trava de contexto encolhe, mas nao some.
+    it 'continua sem reagir a cobranca e cancelamento' do
+      described_class.maybe_react!(incoming('quero cancelar meu plano'))
+
+      expect(auto_react_count).to eq(0)
+    end
+
+    it 'passa a reagir a assunto que o modo conservador bloqueava por falar de valor' do
+      described_class.maybe_react!(incoming('perfeito, fechado o plano anual'))
+
+      expect(last_auto_react&.content).to eq('👍')
+    end
+  end
+
+  describe 'modo off' do
+    before { assistant.update!(config: assistant.config.to_h.merge('auto_react_mode' => 'off')) }
+
+    it 'nao reage a nada' do
+      described_class.maybe_react!(incoming('obrigado'))
+
+      expect(auto_react_count).to eq(0)
+    end
+  end
 end
