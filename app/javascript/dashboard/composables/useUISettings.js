@@ -106,12 +106,18 @@ const setQuotedReplyFlagForInbox = (channelType, value, updateUISettings) => {
  * @param {string} channelType - The type of the channel.
  * @param {Object} uiSettings - Reactive UI settings object.
  * @returns {boolean} The value of the signature enabled flag.
+ *
+ * Defaults to ON when the agent never touched the toggle: assinar quem esta
+ * falando e o comportamento esperado no atendimento, e deixar desligado por
+ * padrao fazia a assinatura configurada no perfil simplesmente nao aparecer.
+ * Quem nao quiser desliga no botao da caixa de resposta, e a escolha persiste.
  */
 const fetchSignatureFlagFromUISettings = (channelType, uiSettings) => {
   if (!channelType) return false;
 
   const slugifiedChannel = slugifyChannel(channelType);
-  return uiSettings.value[`${slugifiedChannel}_signature_enabled`];
+  const value = uiSettings.value[`${slugifiedChannel}_signature_enabled`];
+  return value === undefined ? true : value;
 };
 
 const fetchQuotedReplyFlagFromUISettings = (channelType, uiSettings) => {

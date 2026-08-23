@@ -111,7 +111,8 @@ describe('useUISettings', () => {
 
   it('fetches signature flag from UI settings correctly', () => {
     const { fetchSignatureFlagFromUISettings } = useUISettings();
-    expect(fetchSignatureFlagFromUISettings('email')).toBe(undefined);
+    // sem valor gravado para o canal, o padrao e ligado
+    expect(fetchSignatureFlagFromUISettings('email')).toBe(true);
   });
 
   it('sets quoted reply flag for inbox correctly', () => {
@@ -155,9 +156,7 @@ describe('useUISettings', () => {
       isEditorHotKeyEnabled,
     } = useUISettings();
     expect(isContactSidebarItemOpen('non_existent_key')).toBe(false);
-    expect(fetchSignatureFlagFromUISettings('non_existent_key')).toBe(
-      undefined
-    );
+    expect(fetchSignatureFlagFromUISettings('non_existent_key')).toBe(true);
     expect(isEditorHotKeyEnabled('non_existent_key')).toBe(false);
   });
 });
