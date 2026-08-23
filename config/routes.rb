@@ -813,6 +813,7 @@ Rails.application.routes.draw do
   post 'webhooks/wuzapi/:inbox_id', to: 'webhooks/wuzapi#process_payload'
   post 'webhooks/gowa/:inbox_id', to: 'webhooks/gowa#process_payload'
   post 'webhooks/captain/hermes_callback', to: 'webhooks/captain/hermes_callback#process_payload'
+  post 'webhooks/captain/typing', to: 'webhooks/captain/typing#toggle'
   post 'webhooks/captain/builder_callback', to: 'webhooks/captain/hermes_builder_callback#process_payload'
   post 'webhooks/captain/mcp', to: 'webhooks/captain/mcp#process_payload'
   get 'webhooks/captain/health', to: 'webhooks/captain/health#show'

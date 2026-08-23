@@ -34,6 +34,20 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
   end
 
   describe 'POST /webhooks/captain/hermes_callback' do
+    # Regressao (conv 17 da academia, 23/08/2026): o gateway do Hermes reiniciou
+    # e o proprio aviso de shutdown foi entregue como resposta no WhatsApp.
+    it 'nao entrega aviso de shutdown do gateway ao cliente' do
+      aviso = '⚠️ Gateway shutting down — Your current task will be interrupted.'
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: aviso }
+
+      expect(response).to have_http_status(:ok)
+      expect(Captain::Hermes::DelayedReplyJob).not_to have_received(:perform_later)
+      expect(conversation.reload.messages.where(private: true).map(&:content).join).to include(aviso)
+      expect(conversation.reload.label_list).to include('triagem_humana')
+    end
+
     # Regressao (conv 17 da academia, 23/08/2026): o agente respondeu o que sabia
     # e fechou com a ancora numa linha final. Ancorado em \A isso nao casava — o
     # cliente lia "vou verificar", a conversa seguia em pending e ninguem assumia.

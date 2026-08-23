@@ -63,6 +63,11 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     /non-retryable\s+error/i,
     /token\s+(is\s+)?expired/i,
     /switching\s+to\s+fallback\s+provider/i,
+    # Aviso do próprio gateway do Hermes (reinício/parada). Em 23/08/2026 o
+    # cliente da academia leu "⚠️ Gateway shutting down — Your current task
+    # will be interrupted." no WhatsApp.
+    /gateway\s+shutting\s+down/i,
+    /current\s+task\s+will\s+be\s+interrupted/i,
     /\bTraceback\b/i,
     /\b(StandardError|NameError|TypeError|NoMethodError|Errno::)\b/
   ].freeze
