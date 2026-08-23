@@ -59,14 +59,23 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
     selected_items = find_selected_items(actual_params)
     return no_images_response(actual_params) if selected_items.blank?
 
-    sent_count = send_images(selected_items)
-    success_payload(selected_items, sent_count, actual_params)
+    deliver_images(selected_items, actual_params)
   rescue StandardError => e
     Rails.logger.error("[SendSuiteImagesTool] Falha ao enviar fotos: #{e.class} - #{normalize_text(e.message)}")
     error_response('Não consegui enviar as fotos agora. Tente novamente em instantes.')
   end
 
   private
+
+  def deliver_images(selected_items, actual_params)
+    deliverable_items = selected_items.select { |item| stored?(item) }
+    return missing_file_response(selected_items) if deliverable_items.blank?
+
+    sent_count = send_images(deliverable_items)
+    return error_response('Não consegui enviar as fotos agora. NÃO diga ao cliente que enviou.') if sent_count.zero?
+
+    success_payload(deliverable_items, sent_count, actual_params)
+  end
 
   def resolve_params(args, params)
     merged = params.to_h
@@ -199,17 +208,36 @@ class Captain::Tools::SendSuiteImagesTool < Captain::Tools::BaseTool
     items.limit(normalize_limit(actual_params[:limit]))
   end
 
+  # `description` é cadastro interno (serve pro LLM escolher a foto) — jamais vira
+  # legenda: já vazou instrução tipo "envie quando o cliente perguntar preço" pro cliente.
+  # A foto vai sem legenda; quem escreve o texto é o assistente.
   def send_images(items)
     items.count do |item|
-      next false unless item.image.attached?
-
       Messages::MessageBuilder.new(@assistant, @conversation, {
-                                     content: item.description.to_s.truncate(220),
+                                     content: nil,
                                      message_type: 'outgoing',
                                      attachments: [item.image.blob.signed_id]
                                    }).perform
       true
     end
+  end
+
+  # O registro do blob pode existir sem o arquivo no storage (ex: volume trocado
+  # num redeploy). Sem essa checagem a mensagem é criada, o envio falha depois no
+  # provider e a tool devolve "enviei" — o assistente promete foto que nunca chega.
+  def stored?(item)
+    item.image.attached? && item.image.blob.service.exist?(item.image.blob.key)
+  rescue StandardError => e
+    Rails.logger.warn("[SendSuiteImagesTool] blob ilegível no item #{item.id}: #{e.class} - #{normalize_text(e.message)}")
+    false
+  end
+
+  def missing_file_response(items)
+    Rails.logger.error("[SendSuiteImagesTool] arquivo ausente no storage para os itens #{items.map(&:id).join(',')}")
+    error_response(
+      'As fotos estão cadastradas mas o arquivo não está disponível no servidor. ' \
+      'NÃO diga ao cliente que enviou a foto — avise que o time vai enviar em seguida.'
+    )
   end
 
   def normalize_limit(value)

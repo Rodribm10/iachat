@@ -69,8 +69,13 @@ class Captain::Mcp::Tools::SendSuiteImagesTool < Captain::Mcp::Tools::BaseTool
       return text_response("Nenhuma foto cadastrada pra #{label}. Avise o cliente que pode pedir pro humano.")
     end
 
-    sent = items.count { |item| send_image_message(conversation, item) }
     label = suite_category.presence || "suíte #{suite_number}"
+    deliverable = items.select { |item| stored?(item) }
+    return missing_file_response(items, label) if deliverable.blank?
+
+    sent = deliverable.count { |item| send_image_message(conversation, item) }
+    return error_response("Não consegui enviar as fotos de #{label} agora. NÃO diga ao cliente que enviou.") if sent.zero?
+
     text_response("#{sent} foto(s) de #{label} enviadas na conversa #{conversation.display_id}.")
   rescue StandardError => e
     Rails.logger.error("[Captain::Mcp::SendSuiteImagesTool] error: #{e.class}: #{e.message}")
@@ -120,13 +125,34 @@ class Captain::Mcp::Tools::SendSuiteImagesTool < Captain::Mcp::Tools::BaseTool
     [n, MAX_LIMIT].min
   end
 
-  def send_image_message(conversation, item)
-    return false unless item.image.attached?
+  # O registro do blob pode existir sem o arquivo no storage (ex: volume trocado
+  # num redeploy). Sem essa checagem a mensagem é criada, o envio falha depois no
+  # provider e a tool devolve "enviei" — o assistente promete foto que nunca chega.
+  def stored?(item)
+    item.image.attached? && item.image.blob.service.exist?(item.image.blob.key)
+  rescue StandardError => e
+    Rails.logger.warn("[Captain::Mcp::SendSuiteImagesTool] blob ilegível no item #{item.id}: #{e.class} - #{e.message}")
+    false
+  end
 
+  def missing_file_response(items, label)
+    Rails.logger.error(
+      "[Captain::Mcp::SendSuiteImagesTool] arquivo ausente no storage para os itens #{items.map(&:id).join(',')}"
+    )
+    error_response(
+      "As fotos de #{label} estão cadastradas mas o arquivo não está disponível no servidor. " \
+      'NÃO diga ao cliente que enviou a foto — avise que o time vai enviar em seguida.'
+    )
+  end
+
+  # `description` é cadastro interno (serve pro LLM escolher a foto) — jamais vira
+  # legenda: já vazou instrução tipo "envie quando o cliente perguntar preço" pro cliente.
+  # A foto vai sem legenda; quem escreve o texto é o assistente.
+  def send_image_message(conversation, item)
     Messages::MessageBuilder.new(
       nil,
       conversation,
-      content: item.description.to_s.truncate(220),
+      content: nil,
       message_type: 'outgoing',
       attachments: [item.image.blob.signed_id]
     ).perform

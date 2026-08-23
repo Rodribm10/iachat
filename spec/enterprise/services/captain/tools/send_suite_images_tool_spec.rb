@@ -8,14 +8,15 @@ RSpec.describe Captain::Tools::SendSuiteImagesTool, type: :model do
   let(:conversation) { create(:conversation, account: account) }
   let(:brand) { create(:captain_brand, account: account) }
   let(:unit) do
-    Captain::Unit.create!(
+    unit = Captain::Unit.create!(
       account: account,
       brand: brand,
-      inbox: conversation.inbox,
       name: 'Unidade Teste Tool',
       inter_pix_key: SecureRandom.uuid,
       inter_account_number: '12345678'
     )
+    unit.inboxes << conversation.inbox
+    unit
   end
   let(:tool) { described_class.new(assistant) }
   let(:tool_context) do
@@ -86,11 +87,11 @@ RSpec.describe Captain::Tools::SendSuiteImagesTool, type: :model do
     other_unit = Captain::Unit.create!(
       account: account,
       brand: brand,
-      inbox: other_inbox,
       name: 'Outra Unidade Teste Tool',
       inter_pix_key: SecureRandom.uuid,
       inter_account_number: '87654321'
     )
+    other_unit.inboxes << other_inbox
     create(
       :captain_gallery_item,
       :inbox_scoped,
@@ -104,7 +105,7 @@ RSpec.describe Captain::Tools::SendSuiteImagesTool, type: :model do
     result = tool.execute(tool_context, suite_category: 'hidromassagem', suite_number: '101')
 
     expect(result[:success]).to be(true)
-    expect(result[:formatted_message]).to match(/não encontrei fotos cadastradas/i)
+    expect(result[:formatted_message]).to match(/não encontrei fotos/i)
   end
 
   it 'infers suite number from customer message when suite_number is not passed' do
