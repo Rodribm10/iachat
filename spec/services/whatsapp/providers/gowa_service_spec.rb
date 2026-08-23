@@ -26,6 +26,23 @@ describe Whatsapp::Providers::GowaService do
     )
   end
 
+  describe '#toggle_typing_status' do
+    # O listener entrega o nome do evento ('conversation.typing_on'). A checagem
+    # antiga só reconhecia 'typing_on'/'on', então todo evento virava 'paused' e
+    # o "digitando…" nunca aparecia pro cliente.
+    it 'traduz o nome do evento do listener em composing' do
+      expect(client).to receive(:send_presence).with('Device-1', '5561999999999', 'composing')
+
+      service.toggle_typing_status(Events::Types::CONVERSATION_TYPING_ON, recipient_id: '5561999999999')
+    end
+
+    it 'traduz o evento de parada em paused' do
+      expect(client).to receive(:send_presence).with('Device-1', '5561999999999', 'paused')
+
+      service.toggle_typing_status(Events::Types::CONVERSATION_TYPING_OFF, recipient_id: '5561999999999')
+    end
+  end
+
   describe '#send_message with a reaction' do
     # Antes desta rota, a mensagem de reacao caia no envio de texto normal e o
     # cliente recebia um "👍" solto como se fosse uma mensagem escrita.

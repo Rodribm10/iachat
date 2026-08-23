@@ -1,4 +1,18 @@
 class Whatsapp::Providers::GowaService < Whatsapp::Providers::BaseService
+  # O listener entrega o NOME DO EVENTO ('conversation.typing_on'), não 'typing_on'.
+  # A comparação antiga só reconhecia a forma curta, então todo evento caía no
+  # 'paused' e o "digitando…" nunca aparecia no WhatsApp. Aceita as duas formas.
+  TYPING_STATE_MAP = {
+    Events::Types::CONVERSATION_TYPING_ON => 'composing',
+    Events::Types::CONVERSATION_RECORDING => 'composing',
+    Events::Types::CONVERSATION_TYPING_OFF => 'paused',
+    'typing_on' => 'composing',
+    'on' => 'composing',
+    'recording' => 'composing',
+    'typing_off' => 'paused',
+    'off' => 'paused'
+  }.freeze
+
   def send_message(phone_number, message)
     return send_reaction_message(phone_number, message) if reaction_message?(message)
 
@@ -32,7 +46,7 @@ class Whatsapp::Providers::GowaService < Whatsapp::Providers::BaseService
   end
 
   def toggle_typing_status(typing_status, recipient_id: nil, **_kwargs)
-    state = %w[typing_on on].include?(typing_status) ? 'composing' : 'paused'
+    state = TYPING_STATE_MAP.fetch(typing_status.to_s, 'paused')
     client.send_presence(device_id, recipient_id, state)
   rescue Gowa::Client::Error => e
     Rails.logger.warn "GOWA: não foi possível atualizar o indicador de digitação: #{e.message}"
