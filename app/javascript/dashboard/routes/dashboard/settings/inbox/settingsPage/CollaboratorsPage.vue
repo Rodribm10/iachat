@@ -1,5 +1,8 @@
-<script>
-import { mapGetters } from 'vuex';
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue';
+import { useStore } from 'vuex';
+import { useRoute, useRouter } from 'vue-router';
+import { vOnClickOutside } from '@vueuse/components';
 import { useVuelidate } from '@vuelidate/core';
 import { minValue } from '@vuelidate/validators';
 import { useAlert } from 'dashboard/composables';
@@ -14,10 +17,10 @@ import TagInput from 'dashboard/components-next/taginput/TagInput.vue';
 import assignmentPoliciesAPI from 'dashboard/api/assignmentPolicies';
 import { useI18n } from 'vue-i18n';
 
-export default {
-  components: {
-    SettingsSection,
-    NextButton,
+const props = defineProps({
+  inbox: {
+    type: Object,
+    default: () => ({}),
   },
 });
 
@@ -118,8 +121,7 @@ const rules = {
   maxAssignmentLimit: {
     minValue: minValue(1),
   },
-  setup() {
-    const { isEnterprise } = useConfig();
+};
 
 const v$ = useVuelidate(rules, { maxAssignmentLimit });
 
@@ -282,12 +284,80 @@ const updateInbox = async () => {
       auto_assignment_config: {
         max_assignment_limit: maxAssignmentLimit.value,
       },
-    },
-    maxAssignmentLimit: {
-      minValue: minValue(1),
-    },
-  },
+    };
+    await store.dispatch('inboxes/updateInbox', payload);
+    useAlert(t('INBOX_MGMT.EDIT.API.SUCCESS_MESSAGE'));
+  } catch (error) {
+    useAlert(t('INBOX_MGMT.EDIT.API.ERROR_MESSAGE'));
+  }
 };
+
+const navigateToCreatePolicy = () => {
+  const accountId = route.params.accountId;
+  router.push({
+    name: 'agent_assignment_policy_create',
+    params: { accountId },
+    query: { inboxId: props.inbox.id },
+  });
+};
+
+const navigateToAssignmentPolicyEdit = () => {
+  if (!assignmentPolicy.value?.id) return;
+  const accountId = route.params.accountId;
+  router.push({
+    name: 'agent_assignment_policy_edit',
+    params: { accountId, id: assignmentPolicy.value.id },
+  });
+};
+
+const navigateToBilling = () => {
+  const accountId = route.params.accountId;
+  router.push({
+    name: 'billing_settings_index',
+    params: { accountId },
+  });
+};
+
+const confirmDeletePolicy = () => {
+  showDeleteConfirmModal.value = true;
+};
+
+const cancelDeletePolicy = () => {
+  showDeleteConfirmModal.value = false;
+};
+
+const deleteAssignmentPolicy = async () => {
+  if (isDeletingPolicy.value) return;
+  isDeletingPolicy.value = true;
+  try {
+    await assignmentPoliciesAPI.removeInboxPolicy(props.inbox.id);
+    assignmentPolicy.value = null;
+    showDeleteConfirmModal.value = false;
+    useAlert(t('INBOX_MGMT.ASSIGNMENT_POLICY.DELETE_SUCCESS'));
+  } catch (error) {
+    useAlert(t('INBOX_MGMT.ASSIGNMENT_POLICY.DELETE_ERROR'));
+  } finally {
+    isDeletingPolicy.value = false;
+  }
+};
+
+const setDefaults = () => {
+  enableAutoAssignment.value = props.inbox.enable_auto_assignment;
+  maxAssignmentLimit.value =
+    props.inbox.auto_assignment_config?.max_assignment_limit || null;
+  fetchAttachedAgents();
+  if (showAdvancedAssignmentUI.value) {
+    fetchAssignmentPolicy();
+    fetchAvailablePolicies();
+  }
+};
+
+// Watch only inbox.id to avoid unnecessary refetches when other properties change
+watch(() => props.inbox.id, setDefaults);
+
+onMounted(() => {
+  setDefaults();
+});
 </script>
 
 <template>
@@ -610,28 +680,20 @@ const updateInbox = async () => {
         <p class="text-sm text-n-slate-11 mb-6 ml-13">
           {{ $t('INBOX_MGMT.ASSIGNMENT_POLICY.DELETE_CONFIRM_MESSAGE') }}
         </p>
-      </label>
-
-      <div v-if="enableAutoAssignment && isEnterprise" class="py-3">
-        <woot-input
-          v-model="maxAssignmentLimit"
-          type="number"
-          :class="{ error: v$.maxAssignmentLimit.$error }"
-          :error="maxAssignmentLimitErrors"
-          :label="$t('INBOX_MGMT.AUTO_ASSIGNMENT.MAX_ASSIGNMENT_LIMIT')"
-          @blur="v$.maxAssignmentLimit.$touch"
-        />
-
-        <p class="pb-1 text-sm not-italic text-n-slate-11">
-          {{ $t('INBOX_MGMT.AUTO_ASSIGNMENT.MAX_ASSIGNMENT_LIMIT_SUB_TEXT') }}
-        </p>
-
-        <NextButton
-          :label="$t('INBOX_MGMT.SETTINGS_POPUP.UPDATE')"
-          :disabled="v$.maxAssignmentLimit.$invalid"
-          @click="updateInbox"
-        />
+        <div class="flex justify-end gap-2">
+          <NextButton
+            color="slate"
+            :label="$t('INBOX_MGMT.ASSIGNMENT_POLICY.CANCEL')"
+            @click="cancelDeletePolicy"
+          />
+          <NextButton
+            color="ruby"
+            :label="$t('INBOX_MGMT.ASSIGNMENT_POLICY.CONFIRM_DELETE')"
+            :is-loading="isDeletingPolicy"
+            @click="deleteAssignmentPolicy"
+          />
+        </div>
       </div>
-    </SettingsSection>
+    </woot-modal>
   </div>
 </template>

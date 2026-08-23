@@ -18,13 +18,12 @@ import HotKeyCard from './HotKeyCard.vue';
 import ChangePassword from './ChangePassword.vue';
 import NotificationPreferences from './NotificationPreferences.vue';
 import AudioNotifications from './AudioNotifications.vue';
-import AggressiveAlertSettings from './AggressiveAlertSettings.vue';
-import FormSection from 'dashboard/components/FormSection.vue';
 import SectionLayout from '../account/components/SectionLayout.vue';
+import AggressiveAlertProfileSetting from './AggressiveAlertProfileSetting.vue';
+import AggressiveAlertSettings from './AggressiveAlertSettings.vue';
 import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
 import AccessToken from './AccessToken.vue';
 import MfaSettingsCard from './MfaSettingsCard.vue';
-import AggressiveAlertProfileSetting from './AggressiveAlertProfileSetting.vue';
 import Policy from 'dashboard/components/policy.vue';
 import {
   ROLES,
@@ -35,6 +34,8 @@ export default {
   components: {
     MessageSignature,
     SectionLayout,
+    AggressiveAlertProfileSetting,
+    AggressiveAlertSettings,
     FontSize,
     UserLanguageSelect,
     UserProfilePicture,
@@ -44,10 +45,8 @@ export default {
     ChangePassword,
     NotificationPreferences,
     AudioNotifications,
-    AggressiveAlertSettings,
     AccessToken,
     MfaSettingsCard,
-    AggressiveAlertProfileSetting,
     BaseSettingsHeader,
   },
   setup() {
@@ -293,6 +292,7 @@ export default {
       :description="$t('PROFILE_SETTINGS.FORM.AGGRESSIVE_ALERT.SECTION_NOTE')"
     >
       <AggressiveAlertProfileSetting />
+      <AggressiveAlertSettings />
     </SectionLayout>
     <SectionLayout
       with-border
@@ -391,22 +391,6 @@ export default {
         <AudioNotifications />
       </SectionLayout>
     </Policy>
-    <FormSection
-      :title="
-        $t(
-          'PROFILE_SETTINGS.FORM.AGGRESSIVE_ALERT_SECTION.TITLE',
-          'Alerta de conversa parada'
-        )
-      "
-      :description="
-        $t(
-          'PROFILE_SETTINGS.FORM.AGGRESSIVE_ALERT_SECTION.NOTE',
-          'Banner vermelho que aparece no topo do painel quando uma conversa fica sem resposta há 5+ minutos.'
-        )
-      "
-    >
-      <AggressiveAlertSettings />
-    </FormSection>
     <Policy :permissions="notificationPermissions">
       <SectionLayout
         with-border

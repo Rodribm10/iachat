@@ -7,9 +7,11 @@ import { useInbox } from 'dashboard/composables/useInbox';
 import { useCaptain } from 'dashboard/composables/useCaptain';
 import { CSAT_DISPLAY_TYPES } from 'shared/constants/messages';
 
+import Icon from 'dashboard/components-next/icon/Icon.vue';
 import WithLabel from 'v3/components/Form/WithLabel.vue';
 import SettingsToggleSection from 'dashboard/components-next/Settings/SettingsToggleSection.vue';
 import CSATDisplayTypeSelector from './components/CSATDisplayTypeSelector.vue';
+import CSATTemplate from 'dashboard/components-next/message/bubbles/Template/CSAT.vue';
 import Editor from 'dashboard/components-next/Editor/Editor.vue';
 import FilterSelect from 'dashboard/components-next/filter/inputs/FilterSelect.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
@@ -29,6 +31,15 @@ const store = useStore();
 const labels = useMapGetter('labels/getLabels');
 const { captainEnabled } = useCaptain();
 
+const { isATwilioWhatsAppChannel, isAWhatsAppCloudChannel } = useInbox(
+  props.inbox?.id
+);
+
+// WhatsApp channels that require CSAT templates (Cloud and Twilio, NOT Baileys/Z-API)
+const isTemplateRequiredWhatsAppChannel = computed(
+  () => isAWhatsAppCloudChannel.value || isATwilioWhatsAppChannel.value
+);
+
 const isUpdating = ref(false);
 const utilityAnalysisLoading = ref(false);
 const utilityAnalysisResult = ref(null);
@@ -39,6 +50,7 @@ const state = reactive({
   csatSurveyEnabled: false,
   displayType: 'emoji',
   message: '',
+  templateButtonText: 'Please rate us',
   surveyRuleOperator: 'contains',
   templateLanguage: 'en',
 });
@@ -209,21 +221,78 @@ const initializeState = () => {
   const {
     display_type: displayType = CSAT_DISPLAY_TYPES.EMOJI,
     message = '',
+    button_text: buttonText = 'Please rate us',
+    language = 'en',
     survey_rules: surveyRules = {},
   } = csat_config;
 
   state.displayType = displayType;
   state.message = message;
+  state.templateButtonText = buttonText;
+  state.templateLanguage = language;
   state.surveyRuleOperator = surveyRules.operator || 'contains';
 
   selectedLabelValues.value = Array.isArray(surveyRules.values)
     ? [...surveyRules.values]
     : [];
+
+  // Store original template values for change detection
+  if (isTemplateRequiredWhatsAppChannel.value) {
+    originalTemplateValues.value = {
+      message: state.message,
+      templateButtonText: state.templateButtonText,
+      templateLanguage: state.templateLanguage,
+    };
+
+    // Set template mode based on stored source
+    const templateSource = csat_config?.template?.source;
+    if (templateSource === 'user_selected') {
+      templateMode.value = 'use_existing';
+      selectedExistingTemplateName.value = csat_config.template.name || '';
+      bodyVariables.value = csat_config.template.body_variables || {};
+      existingTemplateBody.value = message;
+      existingTemplateButtonText.value = buttonText;
+      // Reset create-new fields so they don't show stale data
+      state.message = '';
+      state.templateButtonText = 'Please rate us';
+    } else {
+      templateMode.value = 'create_new';
+    }
+  }
+};
+
+const checkTemplateStatus = async () => {
+  if (!isTemplateRequiredWhatsAppChannel.value) return;
+
+  try {
+    templateLoading.value = true;
+    const response = await store.dispatch('inboxes/getCSATTemplateStatus', {
+      inboxId: props.inbox.id,
+    });
+
+    // Handle case where template doesn't exist
+    if (!response.template_exists && response.error === 'Template not found') {
+      templateStatus.value = {
+        template_exists: false,
+        error: 'TEMPLATE_NOT_FOUND',
+      };
+    } else {
+      templateStatus.value = response;
+    }
+  } catch (error) {
+    templateStatus.value = {
+      template_exists: false,
+      error: 'API_ERROR',
+    };
+  } finally {
+    templateLoading.value = false;
+  }
 };
 
 onMounted(() => {
   initializeState();
   if (!labels.value?.length) store.dispatch('labels/get');
+  if (isTemplateRequiredWhatsAppChannel.value) checkTemplateStatus();
 });
 
 watch(() => props.inbox, initializeState, { immediate: true });
@@ -330,6 +399,67 @@ const removeLabel = label => {
   }
 };
 
+// Check if template-related fields have changed
+const hasTemplateChanges = () => {
+  if (!isTemplateRequiredWhatsAppChannel.value) return false;
+
+  const original = originalTemplateValues.value;
+  return (
+    original.message !== state.message ||
+    original.templateButtonText !== state.templateButtonText ||
+    original.templateLanguage !== state.templateLanguage
+  );
+};
+
+// Check if there's an existing template
+const hasExistingTemplate = () => {
+  const { template_exists, error } = templateStatus.value || {};
+  return template_exists && !error;
+};
+
+// Check if we should create a template
+const shouldCreateTemplate = () => {
+  // Create template if no existing template
+  if (!hasExistingTemplate()) {
+    return true;
+  }
+
+  // Create template if there are changes to template fields
+  return hasTemplateChanges();
+};
+
+// Build template config for saving
+const buildTemplateConfig = () => {
+  if (!hasExistingTemplate()) {
+    return null;
+  }
+
+  const { template_name, template_id, template, status } =
+    templateStatus.value || {};
+
+  if (isATwilioWhatsAppChannel.value) {
+    // Twilio WhatsApp format - get from existing template config
+    const existingTemplate = props.inbox?.csat_config?.template;
+
+    return existingTemplate
+      ? {
+          friendly_name: existingTemplate.friendly_name,
+          content_sid: existingTemplate.content_sid,
+          language: existingTemplate.language || state.templateLanguage,
+          status: existingTemplate.status || status,
+        }
+      : null;
+  }
+
+  // WhatsApp Cloud format
+  return {
+    name: template_name,
+    template_id,
+    language: template?.language || state.templateLanguage,
+    status,
+  };
+};
+
 const updateInbox = async attributes => {
   const payload = {
     id: props.inbox.id,
@@ -337,21 +467,149 @@ const updateInbox = async attributes => {
     ...attributes,
   };
 
-  return store.dispatch('inboxes/updateInbox', payload);
+  await store.dispatch('inboxes/updateInbox', payload);
 };
 
-const saveSettings = async () => {
+const createTemplate = async () => {
+  if (!isTemplateRequiredWhatsAppChannel.value) return null;
+
+  const response = await store.dispatch('inboxes/createCSATTemplate', {
+    inboxId: props.inbox.id,
+    template: {
+      message: state.message,
+      button_text: state.templateButtonText,
+      language: state.templateLanguage,
+    },
+  });
+  useAlert(t('INBOX_MGMT.CSAT.TEMPLATE_CREATION.SUCCESS_MESSAGE'));
+  return response.template;
+};
+
+const linkTemplate = async () => {
+  if (!selectedExistingTemplateName.value) return null;
+
+  const response = await store.dispatch('inboxes/linkCSATTemplate', {
+    inboxId: props.inbox.id,
+    template: {
+      name: selectedExistingTemplateName.value,
+      language: state.templateLanguage,
+      body_variables: bodyVariables.value,
+    },
+  });
+  useAlert(t('INBOX_MGMT.CSAT.EXISTING_TEMPLATE.LINK_SUCCESS'));
+  return response.template;
+};
+
+const handleTemplateSelected = template => {
+  state.templateLanguage = template.language || 'en';
+  existingTemplateBody.value = template.body_text || '';
+  existingTemplateButtonText.value =
+    template.button_text || t('INBOX_MGMT.CSAT.BUTTON_TEXT.PLACEHOLDER');
+};
+
+const performSave = async () => {
   try {
     isUpdating.value = true;
+    let newTemplateData = null;
+
+    // For WhatsApp channels, handle template based on mode
+    if (isTemplateRequiredWhatsAppChannel.value && state.csatSurveyEnabled) {
+      if (
+        templateMode.value === 'use_existing' &&
+        isAWhatsAppCloudChannel.value
+      ) {
+        // Link existing template mode — require selection
+        if (!selectedExistingTemplateName.value) return;
+
+        // Validate all body variables are filled
+        if (
+          templateSelectorRef.value &&
+          !templateSelectorRef.value.validate()
+        ) {
+          useAlert(t('INBOX_MGMT.CSAT.TEMPLATE_VARIABLES.VALIDATION_ERROR'));
+          return;
+        }
+
+        try {
+          newTemplateData = await linkTemplate();
+        } catch (error) {
+          const errorMessage =
+            error.response?.data?.error ||
+            t('INBOX_MGMT.CSAT.EXISTING_TEMPLATE.LINK_ERROR');
+          useAlert(errorMessage);
+          return;
+        }
+      } else if (shouldCreateTemplate()) {
+        // Create new template mode
+        try {
+          newTemplateData = await createTemplate();
+        } catch (error) {
+          const errorMessage =
+            error.response?.data?.error ||
+            t('INBOX_MGMT.CSAT.TEMPLATE_CREATION.ERROR_MESSAGE');
+          useAlert(errorMessage);
+          return;
+        }
+      }
+    }
 
     const csatConfig = {
       display_type: state.displayType,
-      message: state.message,
+      message:
+        templateMode.value === 'use_existing'
+          ? existingTemplateBody.value
+          : state.message,
+      button_text:
+        templateMode.value === 'use_existing'
+          ? existingTemplateButtonText.value
+          : state.templateButtonText,
+      language: state.templateLanguage,
       survey_rules: {
         operator: state.surveyRuleOperator,
         values: selectedLabelValues.value,
       },
     };
+
+    // Use new template data if created/linked, otherwise preserve existing template information
+    if (newTemplateData) {
+      if (newTemplateData.source === 'user_selected') {
+        // User-selected existing template
+        csatConfig.template = {
+          name: newTemplateData.name,
+          template_id: newTemplateData.template_id,
+          language: newTemplateData.language,
+          status: newTemplateData.status,
+          source: 'user_selected',
+          linked_at: newTemplateData.linked_at,
+          body_variables: bodyVariables.value,
+        };
+      } else if (isATwilioWhatsAppChannel.value) {
+        // Twilio WhatsApp template format
+        csatConfig.template = {
+          friendly_name: newTemplateData.friendly_name,
+          content_sid: newTemplateData.content_sid,
+          language: newTemplateData.language,
+          status: newTemplateData.status,
+          source: 'auto_created',
+          created_at: new Date().toISOString(),
+        };
+      } else {
+        // WhatsApp Cloud template format
+        csatConfig.template = {
+          name: newTemplateData.name,
+          template_id: newTemplateData.template_id,
+          language: newTemplateData.language,
+          status: newTemplateData.status,
+          source: 'auto_created',
+          created_at: new Date().toISOString(),
+        };
+      }
+    } else {
+      const templateConfig = buildTemplateConfig();
+      if (templateConfig) {
+        csatConfig.template = templateConfig;
+      }
+    }
 
     await updateInbox({
       csat_survey_enabled: state.csatSurveyEnabled,
@@ -359,11 +617,43 @@ const saveSettings = async () => {
     });
 
     useAlert(t('INBOX_MGMT.CSAT.API.SUCCESS_MESSAGE'));
+    checkTemplateStatus();
   } catch (error) {
     useAlert(t('INBOX_MGMT.CSAT.API.ERROR_MESSAGE'));
   } finally {
     isUpdating.value = false;
   }
+};
+
+const saveSettings = async () => {
+  // For "use existing" mode, no confirmation needed — just save
+  if (templateMode.value === 'use_existing') {
+    await performSave();
+    return;
+  }
+
+  // Check if we need to show confirmation dialog for WhatsApp template changes
+  // This applies to both WhatsApp Cloud and Twilio WhatsApp channels
+  if (
+    isTemplateRequiredWhatsAppChannel.value &&
+    state.csatSurveyEnabled &&
+    hasExistingTemplate() &&
+    hasTemplateChanges()
+  ) {
+    // Only show dialog if the existing template was auto-created (will be deleted)
+    const existingSource = props.inbox?.csat_config?.template?.source;
+    if (existingSource !== 'user_selected') {
+      confirmDialog.value?.open();
+      return;
+    }
+  }
+
+  await performSave();
+};
+
+const handleConfirmTemplateUpdate = async () => {
+  // We will delete the template before creating the template
+  await performSave();
 };
 </script>
 
