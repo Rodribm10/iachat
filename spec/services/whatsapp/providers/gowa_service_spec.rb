@@ -15,14 +15,17 @@ describe Whatsapp::Providers::GowaService do
 
   before { allow(Gowa::Client).to receive(:new).and_return(client) }
 
-  def build_message(content:, attributes:, in_reply_to_external_id: nil)
+  def build_message(content:, attributes:, in_reply_to_external_id: nil, attachments: [],
+                    inbox: instance_double(Inbox, message_signature_enabled?: false), sender: nil)
     instance_double(
       Message,
       id: 1,
       content: content,
       content_attributes: attributes,
-      attachments: [],
-      in_reply_to_external_id: in_reply_to_external_id
+      attachments: attachments,
+      in_reply_to_external_id: in_reply_to_external_id,
+      inbox: inbox,
+      sender: sender
     )
   end
 
@@ -76,6 +79,48 @@ describe Whatsapp::Providers::GowaService do
       expect(client).not_to receive(:send_reaction)
 
       expect(service.send_message('5561999999999', message)).to eq('GOWA:MSG1')
+    end
+
+    # Reacao e so o emoji apontando pra mensagem alvo — nao existe "assinatura"
+    # de reacao, entao o conteudo enviado ao GOWA tem que continuar cru mesmo
+    # com a inbox assinando as demais mensagens.
+    it 'does not sign the reaction message even when the signature is enabled' do
+      inbox = instance_double(Inbox, message_signature_enabled?: true)
+      sender = User.new(name: 'Ana Paula', display_name: 'Ana')
+      message = build_message(content: '👍', attributes: { 'is_reaction' => true },
+                              in_reply_to_external_id: 'GOWA:ABC123', inbox: inbox, sender: sender)
+
+      expect(client).to receive(:send_reaction)
+        .with('Device-1', '5561999999999', 'ABC123', '👍')
+        .and_return({ 'results' => { 'id' => 'REACT2' } })
+
+      expect(service.send_message('5561999999999', message)).to eq('GOWA:REACT2')
+    end
+  end
+
+  describe '#send_message signature' do
+    let(:inbox) { instance_double(Inbox, message_signature_enabled?: true) }
+    let(:sender) { User.new(name: 'Ana Paula', display_name: 'Ana') }
+
+    it 'signs the text message when the inbox has the signature enabled' do
+      message = build_message(content: 'Bom dia', attributes: {}, inbox: inbox, sender: sender)
+
+      expect(client).to receive(:send_text)
+        .with('Device-1', '5561999999999', "*Ana*\nBom dia", reply_message_id: nil)
+        .and_return({ 'results' => { 'id' => 'MSG2' } })
+
+      expect(service.send_message('5561999999999', message)).to eq('GOWA:MSG2')
+    end
+
+    it 'signs the attachment caption when the inbox has the signature enabled' do
+      attachment = instance_double(Attachment)
+      message = build_message(content: 'Segue o comprovante', attributes: {}, attachments: [attachment], inbox: inbox, sender: sender)
+
+      expect(client).to receive(:send_attachment)
+        .with('Device-1', '5561999999999', attachment, caption: "*Ana*\nSegue o comprovante", reply_message_id: nil)
+        .and_return({ 'results' => { 'id' => 'MSG3' } })
+
+      expect(service.send_message('5561999999999', message)).to eq('GOWA:MSG3')
     end
   end
 end

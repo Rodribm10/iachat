@@ -15,7 +15,7 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
     log_outgoing_message(message)
     return send_reaction_message(normalized_phone, message) if reaction_message?(message)
 
-    content_to_send = build_content_with_signature(message)
+    content_to_send = content_with_signature(message)
     response = dispatch_message(user_token, normalized_phone, message, content_to_send)
     extract_message_id(response)
   end
@@ -235,25 +235,6 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
 
   def log_outgoing_message(message)
     Rails.logger.info "[WuzapiService] Sending Message: ID=#{message.id} Conv=#{message.conversation_id} Content=#{message.content&.truncate(50)}"
-  end
-
-  def sender_name_for(message)
-    agent = message.sender
-    if agent.is_a?(User)
-      agent.display_name.presence || agent.name
-    elsif agent.is_a?(Captain::Assistant)
-      agent.name
-    else
-      message.inbox.shift_signature_name
-    end
-  end
-
-  def build_content_with_signature(message)
-    content = normalize_whatsapp_markdown(message.content)
-    return content unless message.inbox.message_signature_enabled?
-
-    name = sender_name_for(message)
-    name.present? ? "*#{name}*\n#{content}" : content
   end
 
   def reply_params(message)

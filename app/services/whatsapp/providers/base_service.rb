@@ -11,6 +11,14 @@
 class Whatsapp::Providers::BaseService
   pattr_initialize [:whatsapp_channel!]
 
+  # O Hermes grava o nome do assistente com um sufixo tecnico interno que
+  # identifica o motor por tras do atendimento (ex.: "Bianca · H", "Duda · H",
+  # "Lara.H") — isso vazou pro cliente final, que lia literalmente
+  # "*Bianca · H*" no topo da mensagem. Casa só separador (·/./-) seguido de
+  # "H" ou "Hermes" no FIM do nome, entao sufixos legitimos como
+  # "Sofia · Prime" nao sao tocados.
+  TECHNICAL_SUFFIX_REGEX = /\s*[·.\-]\s*(?:hermes|h)\z/i
+
   def send_message(_phone_number, _message)
     raise 'Overwrite this method in child class'
   end
@@ -162,6 +170,33 @@ class Whatsapp::Providers::BaseService
     return content if content.blank?
 
     content.gsub(/\*\*([^*\n]+?)\*\*/, '*\1*')
+  end
+
+  # Nome do remetente para a assinatura da mensagem enviada ao cliente. User usa
+  # o nome de exibicao (ou o `name`, se nao houver display_name); Captain::Assistant
+  # usa o nome do agente IA, limpo do sufixo tecnico interno do Hermes (ver
+  # TECHNICAL_SUFFIX_REGEX); qualquer outro remetente cai no nome de turno
+  # configurado na inbox.
+  def signature_name_for(message)
+    agent = message.sender
+    if agent.is_a?(User)
+      agent.display_name.presence || agent.name
+    elsif agent.is_a?(Captain::Assistant)
+      agent.name.to_s.sub(TECHNICAL_SUFFIX_REGEX, '').strip
+    else
+      message.inbox.shift_signature_name
+    end
+  end
+
+  # Conteudo final enviado ao cliente: markdown normalizado e, quando a inbox
+  # tem assinatura habilitada (`message_signature_enabled?`) e ha um nome
+  # valido, prefixado com "*Nome*\n".
+  def content_with_signature(message)
+    content = normalize_whatsapp_markdown(message.content)
+    return content unless message.inbox.message_signature_enabled?
+
+    name = signature_name_for(message)
+    name.present? ? "*#{name}*\n#{content}" : content
   end
 
   def attachment_to_base64(attachment)
