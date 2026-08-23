@@ -77,7 +77,7 @@ RUN apk update && apk add --no-cache \
   shared-mime-info \
   libstdc++ \
   libffi \
-  gcompat
+  gcompat \
   && gem install bundler -v "$BUNDLER_VERSION"
 
 # Restrict libvips to its trusted image loaders when generating variants
