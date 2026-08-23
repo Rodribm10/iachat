@@ -1504,6 +1504,9 @@ describe Whatsapp::ZapiHandlers::ReceivedCallback do
     end
 
     it 'waits for the lock if it is already acquired' do
+      # Default primeiro: o caminho de auto-assignment do upstream tambem chama
+      # Redis::Alfred.set, e sem esse default o stub estrito quebra o teste.
+      allow(Redis::Alfred).to receive(:set).and_return(true)
       # Stub the message processing lock to always succeed
       allow(Redis::Alfred).to receive(:set)
         .with(format_message_source_key('msg_123'), true, nx: true, ex: 1.day)
