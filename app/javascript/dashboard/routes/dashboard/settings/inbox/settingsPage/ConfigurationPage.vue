@@ -372,24 +372,6 @@ export default {
       </NextButton>
     </SettingsFieldSection>
   </div>
-  <div v-else-if="isAVoiceChannel">
-    <SettingsFieldSection
-      :label="$t('INBOX_MGMT.ADD.VOICE.CONFIGURATION.TWILIO_VOICE_URL_TITLE')"
-      :help-text="
-        $t('INBOX_MGMT.ADD.VOICE.CONFIGURATION.TWILIO_VOICE_URL_SUBTITLE')
-      "
-    >
-      <woot-code :script="inbox.voice_call_webhook_url" lang="html" />
-    </SettingsFieldSection>
-    <SettingsFieldSection
-      :label="$t('INBOX_MGMT.ADD.VOICE.CONFIGURATION.TWILIO_STATUS_URL_TITLE')"
-      :help-text="
-        $t('INBOX_MGMT.ADD.VOICE.CONFIGURATION.TWILIO_STATUS_URL_SUBTITLE')
-      "
-    >
-      <woot-code :script="inbox.voice_status_webhook_url" lang="html" />
-    </SettingsFieldSection>
-  </div>
 
   <div v-else-if="isALineChannel">
     <SettingsFieldSection
@@ -928,7 +910,7 @@ export default {
 
 <style lang="scss" scoped>
 .whatsapp-settings--content {
-  ::v-deep input {
+  :deep(input) {
     margin-bottom: 0;
   }
 }

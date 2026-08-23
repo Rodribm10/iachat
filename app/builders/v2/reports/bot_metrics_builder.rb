@@ -47,10 +47,19 @@ class V2::Reports::BotMetricsBuilder
   end
 
   def bot_resolutions_count
+    # Handoff manda: conversa que teve handoff no mesmo periodo nao conta como
+    # resolvida pelo bot (regra que veio do upstream no 4.14).
     @bot_resolutions_count ||= base_reporting_events.joins(:conversation)
                                                     .select(:conversation_id)
                                                     .where(name: :conversation_bot_resolved)
+                                                    .where.not(conversation_id: bot_handoff_conversation_ids_subquery)
                                                     .distinct.count
+  end
+
+  def bot_handoff_conversation_ids_subquery
+    base_reporting_events.where(name: :conversation_bot_handoff)
+                         .where.not(conversation_id: nil)
+                         .select(:conversation_id)
   end
 
   # Auto handoff = Jasmine called bot_handoff! explicitly (loop, timeout, max_turns, intent)

@@ -1,13 +1,33 @@
-class Webhooks::WhatsappEventsJob < ApplicationJob
+class Webhooks::WhatsappEventsJob < MutexApplicationJob
   queue_as :low
+  # Retry budget (19 × 2s = 38s) must exceed the 30s lock TTL set in `perform`, otherwise
+  # a webhook that arrives just after the lock is acquired can exhaust retries before the
+  # holder finishes and silently drop its message.
+  retry_on LockAcquisitionError, wait: 2.seconds, attempts: 20
 
   def perform(params = {})
-    channel = find_channel(params)
+    dump_raw_payload(params)
+    channel = find_channel_from_whatsapp_business_payload(params)
+
     if channel_is_inactive?(channel)
       Rails.logger.warn("Inactive WhatsApp channel: #{channel&.phone_number || "unknown - #{params[:phone_number]}"}")
       return
     end
 
+    sender_id = contact_sender_id(params)
+    return process_events(channel, params) if sender_id.blank?
+
+    # Album uploads arrive as separate concurrent webhooks. Serialize per (inbox, contact)
+    # so the first webhook creates the conversation and the rest append to it.
+    # 30s TTL covers the attachment download + transaction — the default 1s expires
+    # mid-processing and lets a concurrent webhook re-acquire before the first commit.
+    key = format(::Redis::Alfred::WHATSAPP_MESSAGE_MUTEX, inbox_id: channel.inbox.id, sender_id: sender_id)
+    with_lock(key, 30.seconds) do
+      process_events(channel, params)
+    end
+  end
+
+  def process_events(channel, params)
     if message_echo_event?(params)
       handle_message_echo(channel, params)
     else
@@ -74,31 +94,90 @@ class Webhooks::WhatsappEventsJob < ApplicationJob
 
   private
 
-  def find_channel(params)
-    return find_channel_from_whatsapp_business_payload(params) if params[:object] == 'whatsapp_business_account'
+  # Debug aid for non-production only: set WHATSAPP_WEBHOOK_DEBUG=true to log the
+  # raw inbound webhook payload (Baileys or Cloud) so you can capture a real
+  # Click-to-WhatsApp ad referral / externalAdReply and replay it later. Logs
+  # full message content, so it never runs in production and is off by default.
+  def dump_raw_payload(params)
+    return if Rails.env.production?
+    return unless ActiveModel::Type::Boolean.new.cast(ENV.fetch('WHATSAPP_WEBHOOK_DEBUG', false))
 
-    return unless params[:phone_number]
+    Rails.logger.info("[WhatsappWebhookDebug] #{params.to_json}")
+  end
 
-    find_channel_by_phone_number(params[:phone_number])
+  # Echo payloads reverse the fields — `from` is the business number and `to` is the contact.
+  # Returns nil for status-only webhooks so they bypass the lock.
+  def contact_sender_id(params)
+    value = params.dig(:entry, 0, :changes, 0, :value) || params
+    return contact_sender_id_from_message_echoes(value[:message_echoes]) if value[:message_echoes].present?
+
+    contact_sender_id_from_messages(value[:messages], value[:contacts])
+  end
+
+  # Echo payloads are outbound messages from the WhatsApp Business app, so `to`
+  # points to the contact. Prefer parent BSUID when present so payloads that have
+  # both regular+parent BSUIDs serialize with parent-BSUID-only payloads.
+  def contact_sender_id_from_message_echoes(message_echoes)
+    message = message_echoes&.first
+    return if message.blank?
+
+    [message[:to_parent_user_id], message[:to_user_id], message[:to]].compact_blank.first
+  end
+
+  # Regular inbound payloads are sent by the contact, so `from` points to the
+  # contact. Prefer parent BSUID when present so payloads that have both
+  # regular+parent BSUIDs serialize with parent-BSUID-only payloads.
+  def contact_sender_id_from_messages(messages, contacts)
+    message = messages&.first
+    return if message.blank?
+
+    contact = contacts&.first || {}
+
+    [
+      message[:from_parent_user_id],
+      contact[:parent_user_id],
+      message[:from_user_id],
+      contact[:user_id],
+      message[:from]
+    ].compact_blank.first
   end
 
   def channel_is_inactive?(channel)
     return true if channel.blank?
-    return true if channel.reauthorization_required?
+    # Only skip for embedded signup when reauth is required; manual flow uses API keys and should still receive webhooks
+    return true if channel.reauthorization_required? && embedded_signup_channel?(channel)
     return true unless channel.account.active?
 
     false
+  end
+
+  def embedded_signup_channel?(channel)
+    (channel.provider_config || {}).to_h['source'] == 'embedded_signup'
+  end
+
+  def find_channel_by_url_param(params)
+    return unless params[:phone_number]
+
+    # Normaliza o telefone: wuzapi, evolution e gowa mandam formatos diferentes
+    # na URL do webhook.
+    find_channel_by_phone_number(params[:phone_number])
   end
 
   def find_channel_from_whatsapp_business_payload(params)
     # for the case where facebook cloud api support multiple numbers for a single app
     # https://github.com/chatwoot/chatwoot/issues/4712#issuecomment-1173838350
     # we will give priority to the phone_number in the payload
-    phone_number = "+#{params[:entry].first[:changes].first.dig(:value, :metadata, :display_phone_number)}"
-    phone_number_id = params[:entry].first[:changes].first.dig(:value, :metadata, :phone_number_id)
+    return get_channel_from_wb_payload(params) if params[:object] == 'whatsapp_business_account'
+
+    find_channel_by_url_param(params)
+  end
+
+  def get_channel_from_wb_payload(wb_params)
+    phone_number = "+#{wb_params[:entry].first[:changes].first.dig(:value, :metadata, :display_phone_number)}"
+    phone_number_id = wb_params[:entry].first[:changes].first.dig(:value, :metadata, :phone_number_id)
     channel = find_channel_by_phone_number(phone_number)
     # validate to ensure the phone number id matches the whatsapp channel
-    channel if channel && channel.provider_config['phone_number_id'] == phone_number_id
+    return channel if channel && channel.provider_config['phone_number_id'] == phone_number_id
   end
 
   def find_channel_by_phone_number(phone_number)
@@ -111,3 +190,5 @@ class Webhooks::WhatsappEventsJob < ApplicationJob
       Channel::Whatsapp.where("regexp_replace(phone_number, '[^0-9]', '', 'g') = ?", digits_only).first
   end
 end
+
+Webhooks::WhatsappEventsJob.prepend_mod_with('Webhooks::WhatsappEventsJob')

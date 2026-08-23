@@ -21,6 +21,10 @@ Metrics/ClassLength:
     - 'app/models/message.rb'
     - 'app/models/conversation.rb'
     - 'enterprise/app/services/captain/tools/generate_pix_tool.rb'
+    # Passaram do limite com o que o fork somou ao que veio do upstream no sync 4.14
+    - 'app/models/inbox.rb'
+    - 'app/models/attachment.rb'
+    - 'app/models/account.rb'
 
 Metrics/MethodLength:
   Max: 19

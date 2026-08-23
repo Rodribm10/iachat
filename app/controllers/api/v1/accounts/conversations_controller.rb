@@ -28,7 +28,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def attachments
     @attachments_count = @conversation.attachments.count
     @attachments = @conversation.attachments
-                                .includes(:message)
+                                .includes({ file_attachment: :blob }, message: [:inbox, { sender: { avatar_attachment: :blob } }])
                                 .order(created_at: :desc)
                                 .page(attachment_params[:page])
                                 .per(ATTACHMENT_RESULTS_PER_PAGE)
@@ -179,6 +179,8 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     # rubocop:disable Rails/SkipsModelValidations
     @conversation.update_columns(updates)
     # rubocop:enable Rails/SkipsModelValidations
+
+    ::Conversations::UnreadCounts::Notifier.new(@conversation).perform
   end
 
   def unseen_activity?
@@ -247,7 +249,8 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
       contact: @contact,
       inbox: @inbox,
       source_id: params[:source_id],
-      hmac_verified: hmac_verified?
+      hmac_verified: hmac_verified?,
+      validate_baileys_phone: true
     ).perform
   end
 

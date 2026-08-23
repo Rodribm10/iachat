@@ -77,6 +77,22 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     REACTION_SUPPORTED_PROVIDERS.include?(provider)
   end
 
+  # Mirrors Channel::TwilioSms#voice_enabled? so the call subsystem can duck-type across providers.
+  # Meta's Calling API is available to any whatsapp_cloud inbox (embedded-signup or manual keys);
+  # only 360dialog (default provider) can't reach the call APIs.
+  def voice_enabled?
+    voice_calling_supported? &&
+      provider_config['calling_enabled'].present? &&
+      account.feature_enabled?('channel_voice')
+  end
+
+  # Whether this inbox can do WhatsApp calling at all. Meta's Calling API is
+  # reachable by any whatsapp_cloud inbox, so 360dialog inboxes can't be toggled
+  # on even though calling_enabled would persist.
+  def voice_calling_supported?
+    provider == 'whatsapp_cloud'
+  end
+
   def provider_service
     case provider
     when 'whatsapp_cloud'
@@ -96,20 +112,60 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     end
   end
 
+  def use_internal_host?
+    provider == 'baileys' && ENV.fetch('BAILEYS_PROVIDER_USE_INTERNAL_HOST_URL', false)
+  end
+
+  # Enables voice: turns calling on at Meta (idempotent), subscribes the `calls`
+  # webhook field, and sets calling_enabled. Raises on Meta failure.
+  # Saved with validate: false to skip validate_provider_config's remote credential
+  # re-check, which could spuriously fail and desync the flag from Meta.
+  def enable_voice_calling!
+    raise 'WhatsApp calling requires a whatsapp_cloud inbox' unless voice_calling_supported?
+    raise 'WhatsApp calling requires the channel_voice feature' unless account.feature_enabled?('channel_voice')
+
+    provider_service.update_calling_status('ENABLED')
+    webhook_setup_service.register_callback
+    self.provider_config = provider_config.merge('calling_enabled' => true)
+    save!(validate: false)
+  end
+
+  # Disables voice: unsets calling_enabled (gates the call subsystem) and drops
+  # `calls` from the webhook subscription (best-effort, so a Meta outage can't
+  # trap admins). Leaves Meta's WABA calling.status untouched.
+  def disable_voice_calling!
+    raise 'WhatsApp calling requires a whatsapp_cloud inbox' unless voice_calling_supported?
+
+    self.provider_config = provider_config.merge('calling_enabled' => false)
+    save!(validate: false)
+    begin
+      webhook_setup_service.register_callback(subscribed_fields: %w[messages smb_message_echoes])
+    rescue StandardError => e
+      Rails.logger.warn "[WHATSAPP CALL] disable webhook re-subscribe failed: #{e.message}"
+    end
+  end
+
   def mark_message_templates_updated
     # rubocop:disable Rails/SkipsModelValidations
     update_column(:message_templates_last_updated, Time.zone.now)
     # rubocop:enable Rails/SkipsModelValidations
   end
 
-  def use_internal_host?
-    provider == 'baileys' && ENV.fetch('BAILEYS_PROVIDER_USE_INTERNAL_HOST_URL', false)
-  end
-
   def update_provider_connection!(provider_connection)
-    assign_attributes(provider_connection: provider_connection)
-    # NOTE: Skip `validate_provider_config?` check
-    save!(validate: false)
+    provider_connection ||= {} # deep_stringify_keys below requires a hash
+    # Normalize to string keys to match the persisted jsonb (which always reads back as
+    # strings) so an unchanged status is recognized as a no-op and skipped.
+    normalized = provider_connection.deep_stringify_keys
+    return if normalized == self.provider_connection
+
+    assign_attributes(provider_connection: normalized)
+    # NOTE: Skip `validate_provider_config?` check.
+    # `Inbox.no_touching` suppresses the `has_one :inbox, touch: true` callback
+    # (inherited from Channelable) so this high-frequency connection-status change does
+    # NOT touch the inbox and invalidate the whole account inbox cache. The change is
+    # pushed to clients via a targeted `inbox.provider_connection_updated` event.
+    Inbox.no_touching { save!(validate: false) }
+    broadcast_provider_connection_updated
   end
 
   def provider_connection_data
@@ -370,6 +426,18 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     end
   end
 
+  # Pushes the connection status to the account's agents over the websocket without
+  # going through the full dispatcher, which would always enqueue an EventDispatcherJob
+  # (wasteful for such a high-frequency event). Sync-only keeps it cheap.
+  def broadcast_provider_connection_updated
+    return if inbox.blank?
+
+    Rails.configuration.dispatcher.sync_dispatcher.dispatch(
+      Events::Types::INBOX_PROVIDER_CONNECTION_UPDATED, Time.zone.now,
+      inbox: inbox, provider_connection: provider_connection
+    )
+  end
+
   def ensure_webhook_verify_token
     provider_config['webhook_verify_token'] ||= SecureRandom.hex(16) if provider.in?(%w[whatsapp_cloud baileys])
   end
@@ -394,6 +462,10 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     return provider_service.setup_channel_provider if provider_service.respond_to?(:setup_channel_provider)
 
     setup_default_webhook
+  end
+
+  def webhook_setup_service
+    Whatsapp::WebhookSetupService.new(self, provider_config['business_account_id'], provider_config['api_key'])
   end
 
   def teardown_webhooks

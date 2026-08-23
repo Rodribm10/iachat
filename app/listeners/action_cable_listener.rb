@@ -38,6 +38,31 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
               })
   end
 
+  def inbox_provider_connection_updated(event)
+    inbox = event.data[:inbox]
+    account = inbox.account
+    provider_connection = event.data[:provider_connection] || {}
+
+    # QR code / error are admin-only (mirrors Channel::Whatsapp#provider_connection_data):
+    # the QR grants full access to the WhatsApp account, so it must not reach agents.
+    # Agents and admins receive different payloads (admins also get qr_data_url/error,
+    # which grant full WhatsApp account access), so the two recipient lists are built
+    # separately. Querying each role directly also avoids `user_tokens` re-querying
+    # administrators. The roles are disjoint, so the lists never overlap.
+    admin_tokens = account.administrators.pluck(:pubsub_token)
+    agent_tokens = account.agents.pluck(:pubsub_token)
+
+    connection = { connection: provider_connection['connection'] }
+    broadcast(account, agent_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, { inbox_id: inbox.id, provider_connection: connection })
+    broadcast(account, admin_tokens, INBOX_PROVIDER_CONNECTION_UPDATED, {
+                inbox_id: inbox.id,
+                provider_connection: connection.merge(
+                  qr_data_url: provider_connection['qr_data_url'],
+                  error: provider_connection['error']
+                )
+              })
+  end
+
   def message_created(event)
     message, account = extract_message_and_account(event)
     conversation = message.conversation
@@ -139,6 +164,15 @@ class ActionCableListener < BaseListener # rubocop:disable Metrics/ClassLength
     metadata = event.data[:broadcast_metadata]
     payload = payload.merge(event_metadata: metadata) if metadata.present?
     broadcast(account, tokens, CONVERSATION_UPDATED, payload)
+  end
+
+  def conversation_unread_count_changed(event)
+    account, inbox_members = ::Conversations::UnreadCounts::BroadcastScope.new(event).perform
+    return if account.blank? || !account.feature_enabled?('conversation_unread_counts')
+
+    tokens = user_tokens(account, inbox_members)
+
+    broadcast(account, tokens, CONVERSATION_UNREAD_COUNT_CHANGED, {})
   end
 
   def conversation_typing_on(event)
