@@ -64,9 +64,10 @@ class ConversationApi extends ApiClient {
     });
   }
 
-  assignAgent({ conversationId, agentId }) {
+  assignAgent({ conversationId, agentId, assigneeType }) {
     return axios.post(`${this.url}/${conversationId}/assignments`, {
       assignee_id: agentId,
+      assignee_type: assigneeType,
     });
   }
 
@@ -106,6 +107,18 @@ class ConversationApi extends ApiClient {
 
   unmute(conversationId) {
     return axios.post(`${this.url}/${conversationId}/unmute`);
+  }
+
+  pin(conversationId) {
+    return axios.post(`${this.url}/${conversationId}/pin`);
+  }
+
+  unpin(conversationId) {
+    return axios.delete(`${this.url}/${conversationId}/unpin`);
+  }
+
+  fetchPins() {
+    return axios.get(`${this.url}/pins`);
   }
 
   meta({ inboxId, status, assigneeType, labels, teamId, conversationType }) {

@@ -17,9 +17,28 @@ import {
 import { VOICE_CALL_PROVIDERS } from 'dashboard/helper/inbox';
 import { VOICE_CALL_DIRECTION } from 'dashboard/components-next/message/constants';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
+import { getUserPermissions } from 'dashboard/helper/permissionsHelper';
+import {
+  CONVERSATION_PARTICIPATING_PERMISSIONS,
+  CONVERSATION_UNASSIGNED_PERMISSIONS,
+  MANAGE_ALL_CONVERSATION_PERMISSIONS,
+} from 'dashboard/constants/permissions';
 
 const { isImpersonating } = useImpersonation();
 const UNREAD_COUNTS_REFETCH_THROTTLE_MS = 5000;
+const FILTERED_UNREAD_COUNTS_REFRESH_RETRY_MS = 30000;
+const FILTERED_UNREAD_COUNTS_REFRESH_RETRY_JITTER_MS = 15000;
+const MENTION_UNREAD_COUNTS_REFETCH_DELAY_MS =
+  UNREAD_COUNTS_REFETCH_THROTTLE_MS;
+// The only roles whose accessible set follows assignment. Everyone else, plain agents and administrators
+// included, sees by inbox membership, so no assignment can hide a conversation and later hand it back.
+const ASSIGNMENT_SCOPED_PERMISSIONS = [
+  CONVERSATION_UNASSIGNED_PERMISSIONS,
+  CONVERSATION_PARTICIPATING_PERMISSIONS,
+];
+const getFilteredUnreadCountsRefreshRetryDelay = () =>
+  FILTERED_UNREAD_COUNTS_REFRESH_RETRY_MS +
+  Math.random() * FILTERED_UNREAD_COUNTS_REFRESH_RETRY_JITTER_MS;
 
 class ActionCableConnector extends BaseActionCableConnector {
   constructor(app, pubsubToken) {
@@ -28,6 +47,9 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.CancelTyping = [];
     this.lastUnreadCountsFetchAt = null;
     this.unreadCountsFetchTimer = null;
+    this.mentionUnreadCountsFetchTimer = null;
+    this.mentionUnreadCountsRetryTimer = null;
+    this.filteredUnreadCountsRetryTimer = null;
     this.events = {
       'message.created': this.onMessageCreated,
       'message.updated': this.onMessageUpdated,
@@ -45,6 +67,8 @@ class ActionCableConnector extends BaseActionCableConnector {
       'contact.updated': this.onContactUpdate,
       'contact.group_synced': this.onContactGroupSynced,
       'conversation.mentioned': this.onConversationMentioned,
+      'conversation.pinned': this.onConversationPinned,
+      'conversation.unpinned': this.onConversationUnpinned,
       'notification.created': this.onNotificationCreated,
       'notification.deleted': this.onNotificationDeleted,
       'notification.updated': this.onNotificationUpdated,
@@ -123,7 +147,43 @@ class ActionCableConnector extends BaseActionCableConnector {
     if (id) {
       this.app.$store.dispatch('updateConversation', payload);
     }
+    if (this.assignmentMayHaveGrantedAccess(payload)) {
+      this.app.$store.dispatch('conversationPins/fetch');
+    }
     this.fetchConversationStats();
+  };
+
+  // A custom role can scope what an agent sees down to the conversations assigned to them or left
+  // unassigned, so an assignment can hand back a conversation that was invisible when the pins were last
+  // read. The server then leads the list with a pin the client no longer knows about, and the client
+  // re-sorts it away as unpinned until the next reconnect. Being added as a participant grants access the
+  // same way but emits no event, so that path still waits for one.
+  assignmentMayHaveGrantedAccess = payload => {
+    const user = this.app.$store.getters.getCurrentUser;
+    const accountId = this.app.$store.getters.getCurrentAccountId;
+    const permissions = getUserPermissions(user, accountId);
+
+    // This event reaches every member of the inbox, and auto assignment fires it constantly, so it is only
+    // worth a request for the roles that can lose a conversation to an assignment in the first place.
+    // Manage-all is checked first because holding it says nothing on its own: the role editor adds both
+    // scoped permissions alongside it, and the backend reads it with precedence over them, so such a role
+    // sees by inbox membership like a plain agent does.
+    if (permissions.includes(MANAGE_ALL_CONVERSATION_PERMISSIONS)) return false;
+    if (!permissions.some(held => ASSIGNMENT_SCOPED_PERMISSIONS.includes(held)))
+      return false;
+
+    // A conversation handed to a bot is unassigned as far as visibility goes: the assignment service
+    // clears `assignee_id` and tracks the bot beside it, so the filter that scopes a role to the
+    // unassigned ones takes it in even though the payload still names the bot.
+    const { assignee, assignee_type: assigneeType } = payload.meta || {};
+    const humanAssignee = assigneeType === 'User' ? assignee : null;
+    if (humanAssignee && humanAssignee.id === user?.id) return true;
+
+    // Losing the assignee hands the conversation back to a role that sees the unassigned ones.
+    return (
+      !humanAssignee &&
+      permissions.includes(CONVERSATION_UNASSIGNED_PERMISSIONS)
+    );
   };
 
   onConversationCreated = data => {
@@ -287,7 +347,12 @@ class ActionCableConnector extends BaseActionCableConnector {
   };
 
   onConversationUnreadCountChanged = () => {
+    this.refreshConversationUnreadCountsWithFilteredRetry();
+  };
+
+  refreshConversationUnreadCountsWithFilteredRetry = () => {
     this.throttledFetchConversationUnreadCounts();
+    this.scheduleFilteredUnreadCountsRetry();
   };
 
   throttledFetchConversationUnreadCounts = () => {
@@ -318,6 +383,51 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.unreadCountsFetchTimer = null;
   };
 
+  scheduleMentionUnreadCountsFetch = () => {
+    if (!this.isFilteredUnreadCountsEnabled()) return;
+
+    // Mention invalidation runs through the async dispatcher, and stale snapshots
+    // can be served until the filtered-count backend refresh window opens.
+    this.scheduleUnreadCountsFetchAfter(
+      'mentionUnreadCountsFetchTimer',
+      MENTION_UNREAD_COUNTS_REFETCH_DELAY_MS
+    );
+    this.scheduleUnreadCountsFetchAfter(
+      'mentionUnreadCountsRetryTimer',
+      getFilteredUnreadCountsRefreshRetryDelay(),
+      { reset: true }
+    );
+  };
+
+  scheduleFilteredUnreadCountsRetry = () => {
+    if (!this.isFilteredUnreadCountsEnabled()) return;
+
+    // Filtered snapshots can intentionally stay stale until the backend
+    // refresh window opens.
+    this.scheduleUnreadCountsFetchAfter(
+      'filteredUnreadCountsRetryTimer',
+      getFilteredUnreadCountsRefreshRetryDelay(),
+      { reset: true }
+    );
+  };
+
+  scheduleUnreadCountsFetchAfter = (
+    timerName,
+    delay,
+    { reset = false } = {}
+  ) => {
+    if (this[timerName]) {
+      if (!reset) return;
+
+      clearTimeout(this[timerName]);
+    }
+
+    this[timerName] = setTimeout(() => {
+      this[timerName] = null;
+      this.throttledFetchConversationUnreadCounts();
+    }, delay);
+  };
+
   fetchConversationUnreadCounts = () => {
     if (!this.isConversationUnreadCountsEnabled()) return;
 
@@ -333,6 +443,17 @@ class ActionCableConnector extends BaseActionCableConnector {
     return isFeatureEnabled?.(
       accountId,
       FEATURE_FLAGS.CONVERSATION_UNREAD_COUNTS
+    );
+  };
+
+  isFilteredUnreadCountsEnabled = () => {
+    const accountId = this.app.$store.getters.getCurrentAccountId;
+    const isFeatureEnabled =
+      this.app.$store.getters['accounts/isFeatureEnabledonAccount'];
+
+    return (
+      isFeatureEnabled?.(accountId, FEATURE_FLAGS.CONVERSATION_UNREAD_COUNTS) &&
+      isFeatureEnabled?.(accountId, FEATURE_FLAGS.UNREAD_COUNT_FOR_FILTERS)
     );
   };
 
@@ -390,6 +511,15 @@ class ActionCableConnector extends BaseActionCableConnector {
 
   onConversationMentioned = data => {
     this.app.$store.dispatch('addMentions', data);
+    this.scheduleMentionUnreadCountsFetch();
+  };
+
+  onConversationPinned = data => {
+    this.app.$store.dispatch('conversationPins/add', data);
+  };
+
+  onConversationUnpinned = data => {
+    this.app.$store.dispatch('conversationPins/remove', data);
   };
 
   clearTimer = timerKey => {
@@ -460,6 +590,16 @@ class ActionCableConnector extends BaseActionCableConnector {
     this.app.$store.dispatch('labels/revalidate', { newKey: keys.label });
     this.app.$store.dispatch('inboxes/revalidate', { newKey: keys.inbox });
     this.app.$store.dispatch('teams/revalidate', { newKey: keys.team });
+    // Same reason as the unread counts below: which pins are visible follows the accessible set, so a
+    // regained role or custom role would otherwise leave a pinned conversation rendering as unpinned until
+    // the next reconnect. Inbox membership does not emit this event, so that path still waits for one.
+    this.app.$store.dispatch('conversationPins/fetch');
+
+    if (this.isFilteredUnreadCountsEnabled()) {
+      // Inbox/team/label visibility changes can change the accessible set used
+      // by filtered unread counts even when no conversation row changes.
+      this.refreshConversationUnreadCountsWithFilteredRetry();
+    }
   };
 
   onInboxProviderConnectionUpdated = data => {

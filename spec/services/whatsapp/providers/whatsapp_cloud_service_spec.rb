@@ -306,6 +306,59 @@ describe Whatsapp::Providers::WhatsappCloudService do
     end
   end
 
+  describe 'when the recipient is a Business-Scoped User ID (BSUID)' do
+    # Meta requires a BSUID to be sent in the `recipient` field (with recipient_type: individual), not `to`.
+    let(:bsuid) { 'BR.13491208655302741918' }
+
+    it 'sends a text message via the recipient field instead of to' do
+      stub_request(:post, 'https://graph.facebook.com/v13.0/123456789/messages')
+        .with(
+          body: {
+            messaging_product: 'whatsapp',
+            context: nil,
+            recipient_type: 'individual',
+            recipient: bsuid,
+            text: { body: message.content },
+            type: 'text'
+          }.to_json
+        )
+        .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      expect(service.send_message(bsuid, message)).to eq 'message_id'
+    end
+
+    it 'sends a template via the recipient field instead of to' do
+      template_info = { name: 'test_template', namespace: 'test_namespace', lang_code: 'en_US', parameters: [] }
+      stub_request(:post, 'https://graph.facebook.com/v13.0/123456789/messages')
+        .with(body: hash_including({ messaging_product: 'whatsapp', recipient_type: 'individual', recipient: bsuid, type: 'template' }))
+        .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      expect(service.send_template(bsuid, template_info, message)).to eq 'message_id'
+    end
+
+    it 'sends an interactive message via the recipient field instead of to' do
+      interactive_message = create(:message, message_type: :outgoing, content: 'test', inbox: whatsapp_channel.inbox,
+                                             content_type: 'input_select',
+                                             content_attributes: { items: [{ title: 'Burito', value: 'Burito' }] })
+      stub_request(:post, 'https://graph.facebook.com/v13.0/123456789/messages')
+        .with(body: hash_including({ messaging_product: 'whatsapp', recipient_type: 'individual', recipient: bsuid, type: 'interactive' }))
+        .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      expect(service.send_message(bsuid, interactive_message)).to eq 'message_id'
+    end
+
+    it 'sends an attachment via the recipient field instead of to' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'avatar.png', content_type: 'image/png')
+
+      stub_request(:post, 'https://graph.facebook.com/v24.0/123456789/messages')
+        .with(body: hash_including({ messaging_product: 'whatsapp', recipient_type: 'individual', recipient: bsuid, type: 'image' }))
+        .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
+
+      expect(service.send_message(bsuid, message)).to eq 'message_id'
+    end
+  end
+
   describe '#sync_templates' do
     context 'when called' do
       it 'updated the message templates' do
@@ -626,6 +679,57 @@ describe Whatsapp::Providers::WhatsappCloudService do
         .to_return(status: 200, body: whatsapp_response.to_json, headers: response_headers)
 
       expect(service.send_message('+123456789', message_with_reaction)).to eq 'message_id'
+    end
+  end
+
+  describe '#upload_media' do
+    let(:upload_url) { 'https://graph.facebook.com/v24.0/123456789/media' }
+    let(:file) { Tempfile.new(['sample', '.jpg']) }
+
+    after { file.close! }
+
+    it 'returns the media id' do
+      stub_request(:post, upload_url).to_return(status: 200, body: { id: '4565669250245108' }.to_json, headers: response_headers)
+
+      expect(service.upload_media(file, 'image/jpeg')).to eq '4565669250245108'
+    end
+
+    # `error.message` for a rejected upload is only "(#100) Invalid parameter"; the actionable reason
+    # (sample media above Meta's size limit, unsupported format) lives in `error_data.details`.
+    it 'raises with the detail Meta gives, not the generic message' do
+      body = {
+        error: {
+          message: '(#100) Invalid parameter',
+          code: 100,
+          error_data: { messaging_product: 'whatsapp', details: 'File Too Large: The file you uploaded is too large.' }
+        }
+      }
+      stub_request(:post, upload_url).to_return(status: 400, body: body.to_json, headers: response_headers)
+
+      expect { service.upload_media(file, 'video/mp4') }
+        .to raise_error(CustomExceptions::Whatsapp::MediaUploadError, /File Too Large/)
+    end
+
+    # MediaUploadError fails the message for good, so a blip must not raise it.
+    it 'lets a server error propagate so the job can be retried' do
+      stub_request(:post, upload_url).to_return(status: 503, body: '', headers: response_headers)
+
+      expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPFatalError)
+    end
+
+    it 'lets a rate limit propagate so the job can be retried' do
+      stub_request(:post, upload_url).to_return(status: 429, body: '', headers: response_headers)
+
+      expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPClientException)
+    end
+
+    # Graph reports throttling and other passing conditions inside a 400 envelope, so the status alone
+    # would read them as a rejected file.
+    it 'lets a transient error dressed as HTTP 400 propagate so the job can be retried' do
+      body = { error: { message: '(#4) Application request limit reached', code: 4, is_transient: true } }
+      stub_request(:post, upload_url).to_return(status: 400, body: body.to_json, headers: response_headers)
+
+      expect { service.upload_media(file, 'image/jpeg') }.to raise_error(Net::HTTPClientException)
     end
   end
 end

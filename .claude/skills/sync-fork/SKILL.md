@@ -23,7 +23,9 @@ Branch from our fork's `main`, merge `upstream/develop` (or a release tag like `
 
 ### B) fazer-ai/chatwoot → fazer-ai/chatwoot-pro (Pro merge)
 
-Switch to `chatwoot-pro-main`, pull it even with `chatwoot-pro/main`, then `git merge main --no-ff -m "Merge branch 'main' into chatwoot-pro-main"`. Repo history shows this is done directly on `chatwoot-pro-main` (no PR), then pushed to `chatwoot-pro/main` along with the new `vX.Y.Z-fazer-ai-pro.N` tag.
+Switch to `chatwoot-pro-main`, pull it even with `chatwoot-pro/chatwoot-pro-main`, then `git merge main --no-ff -m "Merge branch 'main' into chatwoot-pro-main"`. Repo history shows this is done directly on `chatwoot-pro-main` (no PR), then pushed to `chatwoot-pro/chatwoot-pro-main` along with the new `vX.Y.Z-fazer-ai-pro.N` tag.
+
+⚠️ The remote branch is `chatwoot-pro-main`, so the tracking ref is `chatwoot-pro/chatwoot-pro-main`. **`chatwoot-pro/main` is a different, long-dead branch** that the Pro repo keeps only as its nominal GitHub default. Resetting onto it or pushing to it puts the merge on a stale ancestor.
 
 - HEAD = Pro (`chatwoot-pro-main`), MERGE_HEAD = CE (`main`).
 - Pro is a strict superset of CE: every conflict is either "CE changed something we overrode" (usually KC/CO to preserve Pro behavior) or "CE added new code next to our additions" (usually CO).
@@ -39,9 +41,33 @@ When triggered on a merge, don't just read the file and wing it — walk the ful
 4. Run the **Validation flow** end-to-end (it is mandatory, not optional). Do not commit if any step fails.
 5. Run the **Mandatory subagent review** (see section below) — it is a required gate, not optional. Address every FAIL before merging.
 6. Trigger the upstream CI on the branch (**Validate on upstream CI** section) and wait for green before merging.
-7. For Pro merges, recall that pushing to `chatwoot-pro/main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
+7. Merge the CE sync PR with a **merge commit, never squash** (**Merging the sync PR** section), then verify the upstream tag is an ancestor of `main`.
+8. For Pro merges, recall that pushing to `chatwoot-pro/chatwoot-pro-main` is directly followed by tagging `vX.Y.Z-fazer-ai-pro.N` and cutting a release — coordinate with the `release-user-notes` skill (and its `PRIVACY.md` companion) before writing the release body.
 
 ## Pre-flight
+
+**Before creating the sync branch (CE), check that the last synced upstream tag is still an ancestor of `main`:**
+
+```bash
+git merge-base --is-ancestor <last-synced-tag> main && echo "ancestry ok" || echo "ANCESTRY BROKEN — see below"
+git merge-base main <new-tag> | xargs git log -1 --format='%h %s'   # this is the base the merge will use
+```
+
+If it says BROKEN, a previous sync PR was squashed and the merge you're about to run will base on a much older tag — replaying a whole version's diff and fabricating conflicts on every file the fork touched since. Restore the lost parent on the sync branch first (see **Repairing a squashed sync** below), then merge.
+
+> **Precedent: v4.16.2 (PR #348), already repaired.** That PR was merged with `--squash`, so `v4.16.2` stopped being an ancestor of `main` — the merge base fell back to `00a50dd79c` (`Merge branch 'release/4.16.0'`), 52 commits behind, and GitHub reported `main` as 197 commits behind `chatwoot:develop`. Repaired on 2026-08-17 by commit `590ca10ebf`, which recorded the PR head `2efdd58b30` as a second parent with the recipe below (the squashed commit `0a29032c9f` had a byte-identical tree, so nothing on disk changed). `git rev-list --count main..v4.16.2` is now 0.
+
+### Repairing a squashed sync
+
+```bash
+git checkout -b chore/merge-upstream-X.Y.Z main
+git diff --stat <squashed-pr-head> <squash-commit>   # MUST be empty — proves the tree already contains that sync
+git merge -s ours <squashed-pr-head> -m "chore: restore upstream vA.B.C ancestry (squashed in #NNN)"
+git merge-base --is-ancestor vA.B.C HEAD && echo "link restored"
+git merge vX.Y.Z    # now bases on vA.B.C instead of the stale tag
+```
+
+`-s ours` records the second parent without touching a single file — it does not re-apply anything, it only tells git what the tree already contains. If the `git diff --stat` above is NOT empty, stop: the squash and the branch diverged, and `-s ours` would permanently hide the difference. Resolve that by hand before merging.
 
 After `git merge upstream/develop` (CE) or `git merge main` (Pro), before touching anything:
 
@@ -152,6 +178,23 @@ Fork architecture: `Attachment#normalize_opus_blob_content_type!` (lazy, called 
 
 Upstream 4.14.x extracted the public portal layout into shared partials `app/views/layouts/_portal_head.html.erb` and `_portal_scripts.html.erb`, used by both `portal.html.erb` and the new `portal.html+documentation.erb` variant. The fork's `custom_head_html`/`custom_body_html` injection lives at the END of those partials (guarded by `!@is_plain_layout_enabled`). If upstream rewrites the layouts again, re-attach the injection to whatever shared partial both variants render. Also: `show_author` must stay in `Portal::CONFIG_JSON_KEYS`, and the fork's `merged_portal_params` controller helper is GONE — upstream's model-level `normalize_config` (merges `persisted_config`) replaced it.
 
+### Feature flags went multi-column (4.16.0)
+
+Upstream 4.16.0 rearchitected `Featurable`: `FEATURE_FLAG_COLUMNS = ['feature_flags', 'feature_flags_ext_1']`, max 63 flags per bigint column **validated at boot** (`validate_feature_count!` raises), and `features.yml` entries pick their column via `column:`. The default column is FULL (63/63). Decisions locked in the 4.16.0 merge:
+
+- The fork's `Featurable.feature_flag_value` two's-complement helper was **removed on CE** (zero CE call sites). NOTE: it had **6 call sites on Pro** (`account_dashboard`, `features_helper`, `fazer_ai` account concern, `reconcile_subscription_service`, `fazer_ai_hub`) — don't assume "zero call sites" holds on Pro when you write CE-side notes; grep both trees.
+- Keep `save!` in `enable_features!`/`disable_features!` (upstream uses non-bang `save`).
+- CE `main` made no features.yml changes, so the file stays byte-identical to upstream — verify with `git diff <merge>^2 HEAD -- config/features.yml` (must be empty). Any fork-side reorder shifts persisted bits.
+- ⚠️ **CE→Pro merge landmine (RESOLVED via a preparatory PR — do this BEFORE the 4.16.0 CE→Pro merge):** Pro inserts `kanban` + `internal_chat_pro` mid-list in the DEFAULT column → 65 flags → boot raises `ArgumentError: ... supports up to 63 features`. The fix that shipped (chatwoot-pro#74) does NOT move them to `feature_flags_ext_1` (still bitmask, still drifts, still needs the 6 queries rewritten). Instead it moves both Pro-only toggles to the **`settings` jsonb column** (the fazer.ai `store_accessor :settings` pattern), so `config/features.yml` becomes byte-identical to CE and never conflicts/drifts again. Recipe: (1) remove the two entries from `config/features.yml`; (2) in `FazerAi::Concerns::Account` add `store_accessor :settings, :kanban_enabled, :internal_chat_pro_enabled` + boolean-cast writers and override `feature_enabled?`/`enable_features`/`disable_features`/`enabled_features` to route those names through settings (so frontend `json.features` and callers are unchanged); leave `all_features` bitmask-only (super-admin grid); (3) add `Field::Boolean` entries to `account_dashboard.rb` + the two keys to `account_settings_schema.rb`; (4) rewrite the 6 bit queries to `where("settings @> ?", {kanban_enabled: true}.to_json)`; (5) a data migration copies old bits 60/61 → settings and shifts the three CE flags (captain_tasks/conversation_required_attributes/advanced_assignment) from bits 62/63/64 down to 60/61/62 — read bits unsigned (`& ((1<<64)-1)`) and clamp writes to 64 bits so `down` doesn't overflow; (6) do NOT add a `before_create` default — new-account `internal_chat_pro` stays on via `ACCOUNT_LEVEL_FEATURE_DEFAULTS` (ConfigLoader is additive, so removing it from features.yml doesn't drop it from an existing install's config; forcing it in `before_create` instead breaks CE specs that assert minimal defaults). After this PR ships, the actual 4.16.0 CE→Pro merge has a features.yml with zero conflicts.
+
+### WhatsApp embedded signup: fork API rename + new upstream HTTP calls (4.16.0)
+
+- **JS API rename trap:** the fork renamed `whatsappChannel.reauthorizeWhatsApp` → `postEmbeddedSignupAuthorization` (same body). Upstream keeps the old name and **adds new callers with it** (4.16.0: `ConfigurationPage.vue`'s `reconfigureWhatsApp()`). Auto-merges cleanly, fails at runtime with a swallowed TypeError (no spec covers it; frontend CI stays green — only the semantic-breakage sweep caught it). After every merge: `git grep -n 'reauthorizeWhatsApp' app/javascript` must return zero hits.
+- `Whatsapp::Providers::WhatsappCloudService#validate_provider_config?` now makes **two** Meta calls: GET `message_templates` + (when `provider_config_changed?`) GET `phone_numbers` to verify the phone_number_id belongs to the WABA. Fork specs that save a cloud channel must stub BOTH (return the expected id in `data: [{ id: ... }]`).
+- `Whatsapp::WebhookTeardownService` now also clears the phone-level override: POST `graph.facebook.com/<ver>/<phone_number_id>` with `webhook_configuration.override_callback_uri: ''`. Fork specs stubbing teardown need this stub next to the `subscribed_apps` DELETE one.
+- Controller gate: `can_reconfigure_channel?` (upstream name, our body) accepts any `Channel::Whatsapp` (fork conversion flow) and requires the `whatsapp_reconfigure` feature flag only when `provider_config['source'] == 'embedded_signup'`. Keep that shape.
+- Enterprise's new `Inbox#ensure_create_permitted` runs `account.inboxes.count` in `before_create` — fork specs that `instance_double` the `account.inboxes` relation must materialize factory records BEFORE installing the double (lazy `let` inside the `allow(...).with(baileys_inbox.id)` line fires mid-stub otherwise).
+
 ### db/schema.rb
 
 Always conflicts because both sides have different migration versions. Resolution is mechanical but has traps:
@@ -211,9 +254,16 @@ Pro adds `PROTECTED_SUBSCRIPTION_KEYS` constant + `protected_subscription_key_ch
 
 ### i18n files
 
-`config/locales/en.yml` / `pt_BR.yml` and `app/javascript/dashboard/i18n/locale/en/settings.json` / `pt_BR/settings.json` conflict because both sides add keys. Almost always **CO**: merge both key sets under the right parent.
+**This section changed with the i18n split (PR #364). The old advice was to merge both key sets under the right parent; doing that now fails CI.**
 
-When upstream only adds `en.yml` keys and not `pt_BR.yml`, match upstream's scope — do not invent pt_BR translations as part of the merge. Those come in as community PRs or a separate translation pass.
+Upstream's locale files (`config/locales/<locale>.yml`, `app/javascript/dashboard/i18n/locale/**`) no longer carry a single fork key. Everything we translate lives in `app/javascript/dashboard/i18n/fazer-ai/locale/<locale>/` and `config/locales/fazer_ai.<locale>.yml`, deep-merged on top at runtime. So:
+
+- Conflicts in an upstream locale file are **TU**, wholesale. Take upstream's side and do not carry anything of ours across. The `drift` check compares those files byte-for-byte against the tracked tag and fails on any difference.
+- A conflict there at all means the fork side still has a stray key. Resolve as TU, then run `check` to find where it should have lived.
+- Our own files (`fazer_ai.*.yml`, `fazer-ai/locale/**`) are ours alone. Upstream never touches them, so they only conflict on a CE → Pro merge, resolved as **CO** like any other fork file.
+- After the merge, bump `UPSTREAM_BASE` in `scripts/i18n/fork_translations.rb` to the new tag and run `check` and `drift`.
+
+Upstream adding an `en.yml` key without the `pt_BR.yml` counterpart is still upstream's business: match their scope and do not invent translations for their files. Our own three languages are a different rule, and `check` enforces them (see **Fork translations** in `AGENTS.md`).
 
 ### New features from both sides
 
@@ -298,6 +348,29 @@ gh run watch <run-id>                                                           
 
 For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and is triggered the same way against `chatwoot-pro-main` (push goes to the `chatwoot-pro` remote — see the push-target feedback memory). CI green is a pre-condition for merge, not authorization to merge — still wait for explicit user OK.
 
+## Merging the sync PR: merge commit, NEVER squash
+
+This fork's default PR strategy is `--squash`. **Sync PRs are one of the two exceptions** (the other is a PR already merged into `chatwoot-pro-main` — see **Merge strategy** in `AGENTS.md`), and it is not a style preference: squashing `chore/merge-upstream-X.Y.Z` flattens it into a single-parent commit, so the upstream tag stops being an ancestor of `main` even though every line of it landed. Two consequences, both permanent:
+
+- GitHub shows `main` as "N commits behind chatwoot:develop" forever, and the count only grows with each squashed sync (after the squashed 4.16.2 sync it read 197).
+- The NEXT sync's merge base falls back to the last non-squashed tag, so git replays an entire version's diff and manufactures conflicts on every file the fork changed in between.
+
+```bash
+gh pr merge <n> --merge --admin --repo fazer-ai/chatwoot   # sync PRs ONLY — every other PR stays --squash
+```
+
+Verify the link immediately after merging — this is the check that catches a wrong strategy while it is still cheap to fix:
+
+```bash
+git checkout main && git pull origin main
+git merge-base --is-ancestor vX.Y.Z main && echo "upstream tag is an ancestor: ok"
+git rev-list --count main..vX.Y.Z      # MUST be 0
+```
+
+If it isn't 0, the PR was squashed: repair it right away with the `-s ours` recipe in **Repairing a squashed sync** (using the PR head commit, still reachable via `git fetch origin refs/pull/<n>/head`) rather than leaving it for the next sync.
+
+`git rev-list --count main..upstream/develop` stays non-zero — that's just `develop` moving past the tag we synced, which is expected. What must be zero is the count against the tag we actually merged.
+
 ## Pre-commit pitfalls
 
 1. **Husky rubocop check only inspects files with staged diff.** Upstream files merged as-is don't appear in the diff, so their offenses slip past the hook and blow up in CI. Before commit:
@@ -311,6 +384,10 @@ For a CE→Pro merge, the Pro CI lives in the `chatwoot-pro` repo and is trigger
 3. **Missing imports after removing conflict hunks.** When resolving AI (accept incoming) conflicts in JS/Vue files, you can accidentally delete imports you still need. Example from 4.13.0: `replaceVariablesInMessage` in `ReplyBox.vue` — the `replaceText` method came in from main but its import was above the conflict. After keeping `replaceText`, add the import.
 
 4. **Duplicate `defineExpose` / `setup()` returns.** Same category: when combining both sides of a Vue component, watch for duplicate `defineExpose({ ... })` calls or duplicate keys in the `setup()` return object. Consolidate.
+
+5. **Orphan closing markers after partial hunk edits.** Editing a conflict by rewriting only the top of the hunk leaves the trailing `>>>>>>> vX.Y.Z` in place — and a sweep that greps only `<<<<<<<` reports clean (real case: 4.16.0, both `conversation.json` locales, staged and committed; caught later by a Vite JSON parse error in vitest). Sweep with all three patterns anchored at line start: `git grep -nE '^(<{7}|>{7})( |$)'` plus `^={7}$` (evaluate markdown-heading false positives), and JSON-validate every resolved .json (`python3 -c "import json; json.load(open(...))"`).
+
+6. **`gh run watch --exit-status` can lie.** In the 4.16.0 merge it exited 0 while the run concluded `failure` (frontend job). Don't trust the watch exit code — poll `gh run view <id> --json status,conclusion` and read the actual conclusion string.
 
 ## What this skill deliberately does NOT cover
 

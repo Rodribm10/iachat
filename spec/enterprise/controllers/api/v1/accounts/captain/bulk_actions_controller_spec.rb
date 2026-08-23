@@ -11,8 +11,7 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
       :captain_assistant_response,
       2,
       assistant: assistant,
-      account: account,
-      status: 'pending'
+      account: account
     )
   end
   let!(:documents) do
@@ -57,7 +56,7 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
       let(:delete_params) do
         {
           type: 'AssistantResponse',
-          ids: pending_responses.map(&:id),
+          ids: responses.map(&:id),
           fields: { status: 'delete' }
         }
       end
@@ -116,8 +115,8 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
       let(:invalid_params) do
         {
           type: 'InvalidType',
-          ids: pending_responses.map(&:id),
-          fields: { status: 'approve' }
+          ids: responses.map(&:id),
+          fields: { status: 'delete' }
         }
       end
 
@@ -130,10 +129,7 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response[:success]).to be(false)
 
-        # Verify no changes were made
-        pending_responses.each do |response|
-          expect(response.reload.status).to eq('pending')
-        end
+        expect(responses.map(&:reload)).to all(be_approved)
       end
     end
 
@@ -275,7 +271,7 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
       let(:missing_params) do
         {
           type: 'AssistantResponse',
-          fields: { status: 'approve' }
+          fields: { status: 'delete' }
         }
       end
 
@@ -288,10 +284,7 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
         expect(response).to have_http_status(:unprocessable_entity)
         expect(json_response[:success]).to be(false)
 
-        # Verify no changes were made
-        pending_responses.each do |response|
-          expect(response.reload.status).to eq('pending')
-        end
+        expect(responses.map(&:reload)).to all(be_approved)
       end
     end
 
@@ -300,16 +293,13 @@ RSpec.describe 'Api::V1::Accounts::Captain::BulkActions', type: :request do
 
       it 'returns unauthorized status' do
         post "/api/v1/accounts/#{account.id}/captain/bulk_actions",
-             params: { type: 'AssistantResponse', ids: [1], fields: { status: 'approve' } },
+             params: { type: 'AssistantResponse', ids: [1], fields: { status: 'delete' } },
              headers: unauthorized_user.create_new_auth_token,
              as: :json
 
         expect(response).to have_http_status(:unauthorized)
 
-        # Verify no changes were made
-        pending_responses.each do |response|
-          expect(response.reload.status).to eq('pending')
-        end
+        expect(responses.map(&:reload)).to all(be_approved)
       end
     end
   end

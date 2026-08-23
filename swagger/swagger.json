@@ -5509,6 +5509,61 @@
         }
       }
     },
+    "/api/v1/accounts/{account_id}/conversations/pins": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        }
+      ],
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "list-pinned-conversations",
+        "summary": "List Pinned Conversations",
+        "description": "Lists the conversations the current agent pinned in this account",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "conversation_id": {
+                        "type": "number",
+                        "description": "The display id of the pinned conversation"
+                      },
+                      "pinned_at": {
+                        "type": "number",
+                        "description": "Unix timestamp of when the conversation was pinned"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/accounts/{account_id}/conversations/filter": {
       "parameters": [
         {
@@ -5735,6 +5790,129 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/conversations/{conversation_id}/pin": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/conversation_id"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "pin-a-conversation",
+        "summary": "Pin Conversation",
+        "description": "Pins the conversation to the top of the current agent's conversation list. Pins are personal and limited to 5 per agent per account.",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conversation_id": {
+                      "type": "number",
+                      "description": "The display id of the pinned conversation"
+                    },
+                    "pinned_at": {
+                      "type": "number",
+                      "description": "Unix timestamp of when the conversation was pinned"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Pin limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/conversations/{conversation_id}/unpin": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/account_id"
+        },
+        {
+          "$ref": "#/components/parameters/conversation_id"
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "unpin-a-conversation",
+        "summary": "Unpin Conversation",
+        "description": "Removes the current agent's pin from the conversation",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
           },
           "401": {
             "description": "Unauthorized",
@@ -6671,6 +6849,108 @@
           },
           "422": {
             "description": "Unprocessable Entity - cannot delete sent/failed message",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/accounts/{account_id}/branded_email_layout": {
+      "get": {
+        "tags": [
+          "Inboxes"
+        ],
+        "operationId": "getAccountBrandedEmailLayout",
+        "summary": "Get account branded email layout",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Get the account-scoped Liquid HTML layout used as the fallback for branded email replies.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/account_id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/branded_email_layout"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Inboxes"
+        ],
+        "operationId": "updateAccountBrandedEmailLayout",
+        "summary": "Update account branded email layout",
+        "security": [
+          {
+            "userApiKey": []
+          }
+        ],
+        "description": "Update or clear the account-scoped Liquid HTML layout used as the fallback for branded email replies.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/account_id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/account_branded_email_layout_payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/branded_email_layout"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -14161,6 +14441,13 @@
             ],
             "description": "Business name associated with the inbox"
           },
+          "branded_email_layout": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Liquid HTML layout for branded email replies. Available to administrators for Email inbox show/update responses."
+          },
           "hmac_mandatory": {
             "type": "boolean",
             "description": "Whether HMAC verification is mandatory"
@@ -14203,6 +14490,19 @@
               "null"
             ],
             "description": "Provider of the channel"
+          }
+        }
+      },
+      "branded_email_layout": {
+        "type": "object",
+        "properties": {
+          "branded_email_layout": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Account-scoped Liquid HTML layout for branded email replies.",
+            "example": "<html><body>{{ content_for_layout }}</body></html>"
           }
         }
       },
@@ -17772,6 +18072,15 @@
             "description": "Business name for outbound email replies.\n\nAvailable for: `Website` `Email`\n",
             "example": "My Business"
           },
+          "branded_email_layout": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 262144,
+            "description": "Liquid HTML layout for outbound email replies. Must include `{{ content_for_layout }}` and be 262,144 characters or shorter.\n\nAvailable for: `Email`\n",
+            "example": "<html><body>{{ content_for_layout }}</body></html>"
+          },
           "channel": {
             "anyOf": [
               {
@@ -17796,6 +18105,20 @@
                 "$ref": "#/components/schemas/inbox_update_sms_channel_payload"
               }
             ]
+          }
+        }
+      },
+      "account_branded_email_layout_payload": {
+        "type": "object",
+        "properties": {
+          "branded_email_layout": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 262144,
+            "description": "Account-scoped Liquid HTML layout for branded email replies. Maximum length is 262,144 characters. Blank or null removes the account override.",
+            "example": "<html><body>{{ content_for_layout }}</body></html>"
           }
         }
       },

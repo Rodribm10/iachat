@@ -36,6 +36,7 @@
 #  index_messages_on_created_at                         (created_at)
 #  index_messages_on_in_reply_to_id                     (in_reply_to_id)
 #  index_messages_on_inbox_id                           (inbox_id)
+#  index_messages_on_sender_and_created                 (sender_type,sender_id,created_at)
 #  index_messages_on_sender_type_and_sender_id          (sender_type,sender_id)
 #  index_messages_on_source_id                          (source_id)
 #
@@ -124,12 +125,13 @@ class Message < ApplicationRecord
   # [:referral] : Click-to-WhatsApp ad metadata (source ad, headline, ctwa_clid, ...) attached to the first message after an ad click
   # [:rich] : Structured WhatsApp "rich" message (template/interactive/buttons/list) with title/body/footer/buttons rendered as a card
   # [:deleted_by_contact] : The contact deleted/revoked the message on WhatsApp; we keep the content visible and only flag it
+  # [:pending_source_id] : Provider message id reserved before the send (Baileys), used to match the provider echo back to this row
 
   store :content_attributes, accessors: [:submitted_email, :items, :submitted_values, :email, :in_reply_to, :deleted,
                                          :external_created_at, :story_sender, :story_id, :external_error,
                                          :translations, :in_reply_to_external_id, :is_unsupported, :data,
                                          :is_reaction, :is_edited, :previous_content, :zapi_args, :referral, :rich,
-                                         :deleted_by_contact], coder: JSON
+                                         :deleted_by_contact, :pending_source_id], coder: JSON
 
   store :external_source_ids, accessors: [:slack], coder: JSON, prefix: :external_source_id
 
@@ -272,6 +274,23 @@ class Message < ApplicationRecord
 
   def reaction?
     ActiveModel::Type::Boolean.new.cast(content_attributes['is_reaction']) == true
+  end
+
+  def deleted?
+    ActiveModel::Type::Boolean.new.cast(content_attributes['deleted']) == true
+  end
+
+  # `content_attributes` is a single JSON column, so writing any of its store accessors from a stale
+  # object rewrites the whole hash and drops flags another request set in the meantime — e.g. `deleted`,
+  # written by the DELETE endpoint while an outgoing message was still in flight on the provider.
+  # Reloads the row under FOR UPDATE before writing, which also serializes with those concurrent writers.
+  def update_under_lock!(attributes)
+    # `lock!` refuses to run on a record with unsaved changes. Flush what the caller left dirty — a
+    # plain `update!` would have written it too — but never the stale `content_attributes` hash, since
+    # writing it back is the very thing this method exists to prevent.
+    restore_attributes(['content_attributes']) if content_attributes_changed?
+    save! if changed?
+    with_lock { update!(attributes) }
   end
 
   def valid_first_reply?

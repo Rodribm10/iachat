@@ -12,6 +12,8 @@ import ZapiWhatsapp from './ZapiWhatsapp.vue';
 import Wuzapi from './Wuzapi.vue';
 import Gowa from './Gowa.vue';
 import EvolutionGo from './EvolutionGo.vue';
+import { useAccount } from 'dashboard/composables/useAccount';
+import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 
 const props = defineProps({
   mode: {
@@ -30,6 +32,7 @@ const isConvertMode = computed(() => props.mode === 'convert');
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
+const { isCloudFeatureEnabled, isOnChatwootCloud } = useAccount();
 
 // Latched by the child once it triggers the post-success router.replace.
 // Suppresses rendering during the navigation tail so the parent doesn't
@@ -81,6 +84,15 @@ const INBOX_PROVIDER_TO_KEY = {
 const currentProviderKey = computed(() => {
   if (!props.inbox?.provider) return null;
   return INBOX_PROVIDER_TO_KEY[props.inbox.provider] || null;
+});
+
+const shouldShowWhatsappEmbeddedSignup = computed(() => {
+  return (
+    selectedProvider.value === PROVIDER_TYPES.WHATSAPP &&
+    hasEmbeddedSignupConfig.value &&
+    (!isOnChatwootCloud.value ||
+      isCloudFeatureEnabled(FEATURE_FLAGS.WHATSAPP_EMBEDDED_SIGNUP_FLOW))
+  );
 });
 
 const PROVIDER_CATALOG = computed(() => [
@@ -201,7 +213,8 @@ const selectProvider = providerValue => {
 const shouldShowCloudWhatsapp = provider => {
   return (
     provider === PROVIDER_TYPES.WHATSAPP_MANUAL ||
-    (provider === PROVIDER_TYPES.WHATSAPP && !hasEmbeddedSignupConfig.value)
+    (provider === PROVIDER_TYPES.WHATSAPP &&
+      !shouldShowWhatsappEmbeddedSignup.value)
   );
 };
 
@@ -248,12 +261,7 @@ const handleManualLinkClick = () => {
     <div v-else-if="showConfiguration">
       <div class="px-6 py-5 rounded-2xl border border-n-weak">
         <!-- Show embedded signup if app ID is configured -->
-        <div
-          v-if="
-            hasEmbeddedSignupConfig &&
-            selectedProvider === PROVIDER_TYPES.WHATSAPP
-          "
-        >
+        <div v-if="shouldShowWhatsappEmbeddedSignup">
           <WhatsappEmbeddedSignup
             :mode="mode"
             :inbox="inbox"

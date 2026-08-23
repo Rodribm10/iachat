@@ -51,6 +51,22 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(json_response['error']).to eq('Validation failed: Content is too long (maximum is 150000 characters)')
       end
 
+      it 'returns a customer-safe error when the database query is canceled' do
+        message_builder = instance_double(Messages::MessageBuilder)
+        allow(Messages::MessageBuilder).to receive(:new).and_return(message_builder)
+        allow(message_builder).to receive(:perform)
+          .and_raise(ActiveRecord::QueryCanceled, 'PG::QueryCanceled: ERROR: canceling statement due to statement timeout')
+
+        post api_v1_account_conversation_messages_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: { content: 'test-message', private: true },
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['error']).to eq(I18n.t('errors.database.query_canceled'))
+        expect(response.parsed_body['error']).not_to include('PG::QueryCanceled')
+      end
+
       it 'creates an outgoing text message with a specific bot sender' do
         agent_bot = create(:agent_bot)
         time_stamp = Time.now.utc.to_s
@@ -131,7 +147,13 @@ RSpec.describe 'Conversation Messages API', type: :request do
           expect(Conversations::ActivityMessageJob)
             .to(have_been_enqueued.at_least(:once)
               .with(conversation, { account_id: conversation.account_id, inbox_id: conversation.inbox_id, message_type: :activity,
-                                    content: 'System reopened the conversation due to a new incoming message.' }))
+                                    content: 'System reopened the conversation due to a new incoming message.',
+                                    content_attributes: {
+                                      activity: {
+                                        type: 'conversation_status_changed',
+                                        status: 'open'
+                                      }
+                                    } }))
         end
       end
     end
@@ -246,6 +268,20 @@ RSpec.describe 'Conversation Messages API', type: :request do
         expect(message.reload.content_attributes['bcc_emails']).to be_nil
       end
 
+      # The provider id reserved before an in-flight send is the only handle on the message once the
+      # send response is lost, so the delete must not wipe it along with the rest.
+      it 'keeps the reserved provider id while wiping the other content attributes' do
+        message.update!(content_attributes: message.content_attributes.merge('pending_source_id' => 'RESERVED_1'))
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{message.id}",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(message.reload.content_attributes['pending_source_id']).to eq 'RESERVED_1'
+        expect(message.content_attributes['bcc_emails']).to be_nil
+      end
+
       it 'deletes interactive messages' do
         interactive_message = create(
           :message, message_type: :outgoing, content: 'test', content_type: 'input_select',
@@ -302,23 +338,19 @@ RSpec.describe 'Conversation Messages API', type: :request do
                       )
                       .to_return(status: 200, body: '{}')
 
-        delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_with_source.id}",
-               headers: agent.create_new_auth_token,
-               as: :json
+        perform_enqueued_jobs(only: Messages::DeleteOnChannelJob) do
+          delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_with_source.id}",
+                 headers: agent.create_new_auth_token,
+                 as: :json
+        end
 
         expect(response).to have_http_status(:success)
         expect(message_with_source.reload.deleted).to be true
         expect(delete_stub).to have_been_requested
       end
 
-      it 'does not fail when channel delete_message raises an error' do
-        stub_request(:delete, delete_request_path)
-          .to_return(status: 400, body: 'Provider error')
-
-        stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
-          .to_return(status: 200)
-
-        allow(Rails.logger).to receive(:error)
+      it 'does not fail when the provider is unreachable' do
+        stub_request(:delete, delete_request_path).to_return(status: 400, body: 'Provider error')
 
         delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_with_source.id}",
                headers: agent.create_new_auth_token,
@@ -326,15 +358,19 @@ RSpec.describe 'Conversation Messages API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(message_with_source.reload.deleted).to be true
+        # the deletion is retried by the job, so a provider hiccup never fails the agent's request
+        expect(Messages::DeleteOnChannelJob).to have_been_enqueued.with(message_with_source.id)
       end
 
       it 'skips channel deletion when message has no source_id' do
         message_without_source = create(:message, account: account, conversation: whatsapp_conversation, inbox: whatsapp_inbox, source_id: nil)
         delete_stub = stub_request(:delete, delete_request_path).to_return(status: 200, body: '{}')
 
-        delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_without_source.id}",
-               headers: agent.create_new_auth_token,
-               as: :json
+        perform_enqueued_jobs(only: Messages::DeleteOnChannelJob) do
+          delete "/api/v1/accounts/#{account.id}/conversations/#{whatsapp_conversation.display_id}/messages/#{message_without_source.id}",
+                 headers: agent.create_new_auth_token,
+                 as: :json
+        end
 
         expect(response).to have_http_status(:success)
         expect(message_without_source.reload.deleted).to be true
@@ -357,6 +393,35 @@ RSpec.describe 'Conversation Messages API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(message_with_source.reload.deleted).to be true
+      end
+    end
+
+    context 'when the account blocks agent message deletion' do
+      let(:agent) { create(:user, account: account, role: :agent) }
+      let(:administrator) { create(:user, account: account, role: :administrator) }
+
+      before do
+        create(:inbox_member, inbox: conversation.inbox, user: agent)
+        create(:inbox_member, inbox: conversation.inbox, user: administrator)
+        account.update!(disable_agent_message_deletion: true)
+      end
+
+      it 'refuses the deletion for an agent' do
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{message.id}",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(message.reload.deleted).to be_falsey
+      end
+
+      it 'still allows an administrator to delete' do
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/#{message.id}",
+               headers: administrator.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(message.reload.deleted).to be true
       end
     end
   end
@@ -424,6 +489,22 @@ RSpec.describe 'Conversation Messages API', type: :request do
              as: :json
 
         expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it 'returns unprocessable_entity for deleted messages' do
+        deleted_failed = create(:message, account: account, message_type: :outgoing, status: :failed,
+                                          content: 'This message was deleted', content_attributes: { deleted: true })
+        create(:inbox_member, inbox: deleted_failed.conversation.inbox, user: agent)
+        clear_enqueued_jobs # drop the SendReplyJob queued by the message creation itself
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{deleted_failed.conversation.display_id}/messages/#{deleted_failed.id}/retry",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        # retrying would wipe content_attributes and push the placeholder to the contact
+        expect(deleted_failed.reload).to be_deleted
+        expect(SendReplyJob).not_to have_been_enqueued.with(deleted_failed.id)
       end
     end
 

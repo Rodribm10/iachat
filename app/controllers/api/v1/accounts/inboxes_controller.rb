@@ -2,7 +2,6 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   include Api::V1::InboxesHelper
   before_action :fetch_inbox, except: [:index, :create]
   before_action :fetch_agent_bot, only: [:set_agent_bot]
-  before_action :validate_limit, only: [:create]
   # we are already handling the authorization in fetch inbox
   # rubocop:disable Rails/LexicallyScopedActionFilter -- health is defined in WhatsappHealthManagement concern
   before_action :check_authorization, except: [:show, :health, :setup_channel_provider, :import_whatsapp_session]
@@ -49,13 +48,22 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
 
   def update
     captain_unit_param_present = params.key?(:captain_unit_id) || params.key?('captain_unit_id')
-    inbox_params = permitted_params.except(:channel, :csat_config, :captain_unit_id)
     captain_unit_id = permitted_params[:captain_unit_id] if captain_unit_param_present
-    inbox_params[:csat_config] = format_csat_config(permitted_params[:csat_config]) if permitted_params[:csat_config].present?
-    @inbox.update!(inbox_params)
-    sync_captain_unit_link(captain_unit_id) if captain_unit_param_present
-    update_inbox_working_hours
-    update_channel if channel_update_required?
+    continue_update = false
+
+    ActiveRecord::Base.transaction do
+      continue_update = update_branded_email_layout
+      raise ActiveRecord::Rollback unless continue_update
+
+      inbox_params = permitted_params.except(:channel, :csat_config, :captain_unit_id)
+      inbox_params[:csat_config] = format_csat_config(permitted_params[:csat_config]) if permitted_params[:csat_config].present?
+      @inbox.update!(inbox_params)
+      sync_captain_unit_link(captain_unit_id) if captain_unit_param_present
+      update_inbox_working_hours
+      update_channel if channel_update_required?
+    end
+
+    return unless continue_update
   end
 
   def agent_bot
@@ -231,8 +239,8 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
   end
 
   def reauthorize_and_update_channel(channel_attributes)
-    @inbox.channel.reauthorized! if @inbox.channel.respond_to?(:reauthorized!)
     @inbox.channel.update!(permitted_params(channel_attributes)[:channel])
+    @inbox.channel.reauthorized! if @inbox.channel.respond_to?(:reauthorized!)
   end
 
   def update_channel_feature_flags
@@ -262,6 +270,34 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
     formatted['template'] = config['template'] if config['template'].present?
   end
 
+  def update_branded_email_layout
+    return true unless params.key?(:branded_email_layout)
+
+    branded_email_layout = normalized_branded_email_layout
+
+    unless Current.account.feature_enabled?(:branded_email_templates)
+      return true if branded_email_layout.blank?
+
+      render_could_not_create_error('Branded email templates feature is not enabled')
+      return false
+    end
+
+    unless @inbox.email?
+      return true if branded_email_layout.blank?
+
+      render_could_not_create_error('Branded email layout is only supported for email inboxes')
+      return false
+    end
+
+    @inbox.update_branded_email_layout!(branded_email_layout)
+    true
+  rescue ActiveRecord::RecordInvalid => e
+    render_could_not_create_error(e.record.errors.full_messages.join(', '))
+    false
+  end
+
+  def normalized_branded_email_layout = params[:branded_email_layout] == 'null' ? nil : params[:branded_email_layout]
+
   def inbox_attributes
     [:name, :avatar, :greeting_enabled, :greeting_message, :enable_email_collect, :csat_survey_enabled,
      :enable_auto_assignment, :working_hours_enabled, :out_of_office_message, :timezone, :allow_messages_after_resolved,
@@ -269,6 +305,7 @@ class Api::V1::Accounts::InboxesController < Api::V1::Accounts::BaseController #
      :message_signature_enabled, :message_signature_default_name, :message_signature_day_name,
      :message_signature_night_even_name, :message_signature_night_odd_name,
      :message_signature_night_shift_start, :message_signature_night_shift_end,
+     :lock_to_single_conversation, :prevent_assignment_takeover, :portal_id, :sender_name_type, :business_name,
      { csat_config: [:display_type, :message, :button_text, :language,
                      { survey_rules: [:operator, { values: [] }],
                        template: [:name, :template_id, :friendly_name, :content_sid, :approval_sid,

@@ -1,12 +1,17 @@
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { INSTALLATION_TYPES } from 'dashboard/constants/installationTypes';
 import { PORTAL_PERMISSIONS } from 'dashboard/constants/permissions';
+import {
+  CONVERSATION_PERMISSIONS,
+  ROLES,
+} from 'dashboard/constants/permissions';
 import { frontendURL } from '../../../helper/URLHelper';
 
 import CaptainPageRouteView from './pages/CaptainPageRouteView.vue';
 import AssistantsIndexPage from './pages/AssistantsIndexPage.vue';
 import AssistantEmptyStateIndex from './assistants/Index.vue';
 
+import AssistantOverviewIndex from './assistants/overview/Index.vue';
 import AssistantSettingsIndex from './assistants/settings/Settings.vue';
 import AssistantInboxesIndex from './assistants/inboxes/Index.vue';
 import AssistantPlaygroundIndex from './assistants/playground/Index.vue';
@@ -16,6 +21,7 @@ import AssistantScenariosIndex from './assistants/scenarios/Index.vue';
 import DocumentsIndex from './documents/Index.vue';
 import ResponsesIndex from './responses/Index.vue';
 import ResponsesPendingIndex from './responses/Pending.vue';
+import FaqSuggestionsIndex from './responses/FaqSuggestions.vue';
 import CustomToolsIndex from './tools/Index.vue';
 import ReservationsIndex from './reservations/Index.vue';
 import RoletaIndex from './roleta/Index.vue';
@@ -33,6 +39,11 @@ const knowledgeBaseMeta = {
   permissions: ['administrator', 'agent', PORTAL_PERMISSIONS],
 };
 
+const faqSuggestionsMeta = {
+  ...meta,
+  permissions: [...ROLES, ...CONVERSATION_PERMISSIONS],
+};
+
 const metaCustomTools = {
   permissions: ['administrator', 'agent'],
   featureFlag: FEATURE_FLAGS.CAPTAIN_CUSTOM_TOOLS,
@@ -46,6 +57,12 @@ const metaV2 = {
 };
 
 const assistantRoutes = [
+  {
+    path: frontendURL('accounts/:accountId/captain/:assistantId/overview'),
+    component: AssistantOverviewIndex,
+    name: 'captain_assistants_overview_index',
+    meta,
+  },
   {
     path: frontendURL('accounts/:accountId/captain/:assistantId/faqs'),
     component: ResponsesIndex,
@@ -81,6 +98,14 @@ const assistantRoutes = [
     component: AssistantInboxesIndex,
     name: 'captain_assistants_inboxes_index',
     meta,
+  },
+  {
+    path: frontendURL(
+      'accounts/:accountId/captain/:assistantId/faqs/suggestions'
+    ),
+    component: FaqSuggestionsIndex,
+    name: 'captain_assistants_faq_suggestions',
+    meta: faqSuggestionsMeta,
   },
   {
     path: frontendURL('accounts/:accountId/captain/:assistantId/faqs/pending'),
@@ -139,7 +164,7 @@ export const routes = [
       return {
         name: 'captain_assistants_index',
         params: {
-          navigationPath: 'captain_assistants_responses_index',
+          navigationPath: 'captain_assistants_overview_index',
           ...to.params,
         },
       };

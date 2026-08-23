@@ -7,6 +7,7 @@ import AddCannedModal from 'dashboard/routes/dashboard/settings/canned/AddCanned
 import CreateResponseDialog from 'dashboard/components-next/captain/pageComponents/response/CreateResponseDialog.vue';
 import { useSnakeCase } from 'dashboard/composables/useTransformKeys';
 import { copyTextToClipboard } from 'shared/helpers/clipboard';
+import { parseAPIErrorResponse } from 'dashboard/store/utils/api';
 import { conversationUrl, frontendURL } from '../../../helper/URLHelper';
 import {
   ACCOUNT_EVENTS,
@@ -17,6 +18,7 @@ import { useTrack } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import Editor from 'dashboard/components-next/Editor/Editor.vue';
 import { useUISettings } from 'dashboard/composables/useUISettings';
+import ReportCaptainMessageDialog from './ReportCaptainMessageDialog.vue';
 
 const FAQ_QUESTION_MAX_LENGTH = 255;
 
@@ -28,6 +30,7 @@ export default {
     ContextMenu,
     NextButton,
     Editor,
+    ReportCaptainMessageDialog,
   },
   props: {
     message: {
@@ -166,16 +169,20 @@ export default {
     handleClose(e) {
       this.$emit('close', e);
     },
-    handleTranslate() {
+    async handleTranslate() {
       const { locale: accountLocale } = this.getAccount(this.currentAccountId);
       const agentLocale = this.getUISettings?.locale;
       const targetLanguage = agentLocale || accountLocale || 'en';
-      this.$store.dispatch('translateMessage', {
-        conversationId: this.conversationId,
-        messageId: this.messageId,
-        targetLanguage,
-      });
-      useTrack(CONVERSATION_EVENTS.TRANSLATE_A_MESSAGE);
+      try {
+        await this.$store.dispatch('translateMessage', {
+          conversationId: this.conversationId,
+          messageId: this.messageId,
+          targetLanguage,
+        });
+        useTrack(CONVERSATION_EVENTS.TRANSLATE_A_MESSAGE);
+      } catch (error) {
+        useAlert(parseAPIErrorResponse(error));
+      }
       this.handleClose();
     },
     handleReplyTo() {
@@ -234,6 +241,10 @@ export default {
       } finally {
         this.isEditingMessage = false;
       }
+    },
+    openReportDialog() {
+      this.handleClose();
+      this.$refs.reportDialog?.open();
     },
   },
 };
@@ -394,6 +405,16 @@ export default {
           variant="icon"
           @click.stop="openEditModal"
         />
+        <hr v-if="enabledOptions['report']" />
+        <MenuItem
+          v-if="enabledOptions['report']"
+          :option="{
+            icon: 'warning',
+            label: $t('CONVERSATION.CONTEXT_MENU.REPORT_MESSAGE.LABEL'),
+          }"
+          variant="icon"
+          @click.stop="openReportDialog"
+        />
         <hr v-if="enabledOptions['delete']" />
         <MenuItem
           v-if="enabledOptions['delete']"
@@ -406,6 +427,11 @@ export default {
         />
       </div>
     </ContextMenu>
+    <ReportCaptainMessageDialog
+      v-if="enabledOptions['report']"
+      ref="reportDialog"
+      :message-id="messageId"
+    />
   </div>
 </template>
 

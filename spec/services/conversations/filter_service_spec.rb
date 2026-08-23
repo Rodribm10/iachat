@@ -231,6 +231,24 @@ describe Conversations::FilterService do
         expect(result[:count][:all_count]).to be 2
       end
 
+      it 'filters conversations by display_id substring' do
+        conversation = create(:conversation, account: account, inbox: inbox, assignee: user_1)
+        create(:conversation, account: account, inbox: inbox, assignee: user_1)
+
+        params[:payload] = [{
+          attribute_key: 'display_id',
+          filter_operator: 'contains',
+          values: [conversation.display_id.to_s],
+          query_operator: nil,
+          custom_attribute_type: ''
+        }.with_indifferent_access]
+
+        result = filter_service.new(params, user_1, account).perform
+
+        expect(result[:count][:all_count]).to eq(1)
+        expect(result[:conversations].pluck(:id)).to contain_exactly(conversation.id)
+      end
+
       it 'filters items with does not contain filter operator with values being an array' do
         params[:payload] = [{
           attribute_key: 'browser_language',
@@ -337,6 +355,48 @@ describe Conversations::FilterService do
 
         expect { filter_service.new(params, user_1, account).perform }.to raise_error(CustomExceptions::CustomFilter::InvalidQueryOperator)
       end
+    end
+  end
+
+  describe '#perform with pinned conversations' do
+    let!(:params) { { payload: [], page: 1 } }
+    let(:pinned_conversation) { user_2_assigned_conversation }
+
+    before do
+      # Oldest conversation gets the oldest activity, so without a pin it always sorts last.
+      conversations = account.conversations.order(:created_at).to_a
+      conversations.each_with_index do |conversation, index|
+        conversation.update_columns(last_activity_at: (conversations.length - index).minutes.ago) # rubocop:disable Rails/SkipsModelValidations
+      end
+      create(:conversation_pin, conversation: pinned_conversation, user: user_1, account: account)
+    end
+
+    it 'puts the pinned conversation first for the agent who pinned it' do
+      result = filter_service.new(params, user_1, account).perform
+
+      expect(result[:conversations].first.id).to eq(pinned_conversation.id)
+    end
+
+    it 'keeps the default order for every other agent' do
+      result = filter_service.new(params, user_2, account).perform
+
+      expect(result[:conversations].last.id).to eq(pinned_conversation.id)
+    end
+
+    it 'does not change the conversation counts' do
+      counts_with_pin = filter_service.new(params, user_1, account).perform[:count]
+      ConversationPin.destroy_all
+
+      expect(filter_service.new(params, user_1, account).perform[:count]).to eq(counts_with_pin)
+    end
+
+    it 'still applies the filters' do
+      params[:payload] = [{ attribute_key: 'status', filter_operator: 'not_equal_to', values: %w[open],
+                            query_operator: nil, custom_attribute_type: '' }.with_indifferent_access]
+
+      result = filter_service.new(params, user_1, account).perform
+
+      expect(result[:conversations].map(&:id)).not_to include(pinned_conversation.id)
     end
   end
 
@@ -466,6 +526,62 @@ describe Conversations::FilterService do
         ]
         result = filter_service.new(params, user_1, account).perform
         expect(result[:conversations].length).to be 1
+      end
+
+      it 'filters conversations where the custom attribute is present' do
+        params[:payload] = [
+          {
+            attribute_key: 'conversation_type',
+            filter_operator: 'is_present',
+            values: [],
+            query_operator: nil,
+            custom_attribute_type: ''
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(params, user_1, account).perform
+
+        expect(result[:conversations].pluck(:id)).to contain_exactly(en_conversation_2.id, user_2_assigned_conversation.id)
+      end
+
+      it 'filters conversations where the custom attribute is not present' do
+        params[:payload] = [
+          {
+            attribute_key: 'conversation_type',
+            filter_operator: 'is_not_present',
+            values: [],
+            query_operator: nil,
+            custom_attribute_type: ''
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(params, user_1, account).perform
+
+        conversation_ids = result[:conversations].pluck(:id)
+        expect(conversation_ids).to include(en_conversation_1.id)
+        expect(conversation_ids).not_to include(en_conversation_2.id, user_2_assigned_conversation.id)
+      end
+
+      it 'filters conversations where the custom attribute is not present combined with another condition' do
+        params[:payload] = [
+          {
+            attribute_key: 'conversation_type',
+            filter_operator: 'is_not_present',
+            values: [],
+            query_operator: 'AND',
+            custom_attribute_type: ''
+          }.with_indifferent_access,
+          {
+            attribute_key: 'status',
+            filter_operator: 'equal_to',
+            values: ['pending'],
+            query_operator: nil
+          }.with_indifferent_access
+        ]
+
+        result = filter_service.new(params, user_1, account).perform
+
+        expect(result[:conversations].pluck(:id)).to contain_exactly(en_conversation_1.id)
       end
     end
   end

@@ -10,6 +10,12 @@ RSpec.describe Inbox do
     it { is_expected.to validate_presence_of(:name) }
   end
 
+  describe 'prevent_assignment_takeover' do
+    it 'is opt-in, so existing inboxes keep the last-write-wins behaviour' do
+      expect(create(:inbox).prevent_assignment_takeover).to be(false)
+    end
+  end
+
   describe 'associations' do
     it { is_expected.to belong_to(:account) }
 
@@ -39,6 +45,34 @@ RSpec.describe Inbox do
   describe 'concerns' do
     it_behaves_like 'out_of_offisable'
     it_behaves_like 'avatarable'
+  end
+
+  describe 'account teardown' do
+    it 'destroys an orphaned inbox after its account has been deleted' do
+      account = create(:account)
+      inbox = create(:inbox, account: account)
+      account.delete
+
+      orphaned_inbox = described_class.find(inbox.id)
+
+      expect { orphaned_inbox.destroy! }.not_to raise_error
+    end
+  end
+
+  describe 'filtered unread count invalidation' do
+    let(:account) { create(:account) }
+    let(:inbox) { create(:inbox, account: account) }
+    let(:store) { Conversations::UnreadCounts::FilteredCountStore }
+
+    before do
+      account.enable_features!(:unread_count_for_filters)
+    end
+
+    it 'invalidates saved folder snapshots when destroyed' do
+      expect do
+        inbox.destroy!
+      end.to change { store.conversation_version(account.id) }.by(1)
+    end
   end
 
   describe '#add_members' do

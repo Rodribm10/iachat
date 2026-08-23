@@ -4,6 +4,14 @@ class Captain::Llm::ConversationFaqService < Llm::BaseAiService
   DISTANCE_THRESHOLD = 0.3
   MAX_JUDGE_NEIGHBOURS = 5
 
+  # O job do upstream (ConversationFaqJob) usa isto pra montar a chave do mutex.
+  # Mantido aqui pra o ciclo de aprendizado do fork continuar rodando por dentro
+  # do job, que traz o lock e as checagens de conversa resolvida.
+  def self.language_for(conversation)
+    language = conversation.language.presence || conversation.account.locale.presence || I18n.default_locale.to_s
+    language.to_s.tr('-', '_').split('_').first.downcase
+  end
+
   def initialize(assistant, conversation)
     super()
     @assistant = assistant
@@ -13,6 +21,12 @@ class Captain::Llm::ConversationFaqService < Llm::BaseAiService
 
   # Generates and deduplicates FAQs from conversation content
   # Skips processing if there was no human interaction
+  # Nome que o ConversationFaqJob (upstream) chama. Aqui ele cai no ciclo do
+  # fork — dedup, juiz e quarentena — em vez do pipeline de sugestoes deles.
+  def generate_suggestions
+    generate_and_deduplicate
+  end
+
   def generate_and_deduplicate
     return [] if no_human_interaction?
     return [] unless human_answered_after_handoff?

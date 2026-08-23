@@ -1,15 +1,13 @@
 import advancedFilters from './advancedFilters.json';
-import aggressiveBanner from './aggressiveBanner.json';
-import groups from './groups.json';
 import agentBots from './agentBots.json';
 import agentMgmt from './agentMgmt.json';
 import attributesMgmt from './attributesMgmt.json';
 import auditLogs from './auditLogs.json';
 import automation from './automation.json';
 import bulkActions from './bulkActions.json';
+import calls from './calls.json';
 import campaign from './campaign.json';
 import cannedMgmt from './cannedMgmt.json';
-import captain from './captain.json';
 import chatlist from './chatlist.json';
 import companies from './companies.json';
 import components from './components.json';
@@ -27,9 +25,6 @@ import inbox from './inbox.json';
 import inboxMgmt from './inboxMgmt.json';
 import integrationApps from './integrationApps.json';
 import integrations from './integrations.json';
-import jasmine from './jasmine.json';
-import internalChat from './internalChat.json';
-import kanban from './kanban.json';
 import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
 import macros from './macros.json';
@@ -51,17 +46,15 @@ import yearInReview from './yearInReview.json';
 
 export default {
   ...advancedFilters,
-  ...aggressiveBanner,
-  ...groups,
   ...agentBots,
   ...agentMgmt,
   ...attributesMgmt,
   ...auditLogs,
   ...automation,
   ...bulkActions,
+  ...calls,
   ...campaign,
   ...cannedMgmt,
-  ...captain,
   ...chatlist,
   ...companies,
   ...components,
@@ -79,9 +72,6 @@ export default {
   ...inboxMgmt,
   ...integrationApps,
   ...integrations,
-  ...jasmine,
-  ...internalChat,
-  ...kanban,
   ...labelsMgmt,
   ...login,
   ...macros,

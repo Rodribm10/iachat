@@ -7,10 +7,41 @@ describe ActionCableListener do
   let!(:agent) { create(:user, account: account, role: :agent) }
   let!(:conversation) { create(:conversation, account: account, inbox: inbox, assignee: agent) }
 
+  # Typing payloads reach the contact, so they ship the contact-sized hash.
+  # Building the expectation from the same allowlist the listener uses keeps
+  # this honest: changing CONTACT_PUSH_KEYS updates both sides at once.
+  let(:redacted_conversation_data) do
+    conversation.push_event_data.slice(*Conversations::EventDataPresenter::CONTACT_PUSH_KEYS)
+  end
+
   before do
     create(:inbox_member, inbox: inbox, user: agent)
     Current.user = nil
     Current.account = nil
+  end
+
+  describe '#account_cache_invalidated' do
+    let!(:event) do
+      Events::Base.new(
+        :'account.cache_invalidated',
+        Time.zone.now,
+        account: account,
+        cache_keys: account.cache_keys
+      )
+    end
+
+    it 'sends cache invalidation to account agents and admins' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        a_collection_containing_exactly(agent.pubsub_token, admin.pubsub_token),
+        'account.cache_invalidated',
+        {
+          cache_keys: account.cache_keys,
+          account_id: account.id
+        }
+      )
+
+      listener.account_cache_invalidated(event)
+    end
   end
 
   describe '#message_created' do
@@ -65,7 +96,7 @@ describe ActionCableListener do
         a_collection_containing_exactly(
           admin.pubsub_token, conversation.contact_inbox.pubsub_token
         ),
-        'conversation.typing_on', { conversation: conversation.push_event_data,
+        'conversation.typing_on', { conversation: redacted_conversation_data,
                                     user: agent.push_event_data,
                                     account_id: account.id,
                                     is_private: false }
@@ -85,7 +116,7 @@ describe ActionCableListener do
         a_collection_containing_exactly(
           admin.pubsub_token, agent.pubsub_token
         ),
-        'conversation.typing_on', { conversation: conversation.push_event_data,
+        'conversation.typing_on', { conversation: redacted_conversation_data,
                                     user: conversation.contact.push_event_data,
                                     account_id: account.id,
                                     is_private: false }
@@ -105,7 +136,7 @@ describe ActionCableListener do
         a_collection_containing_exactly(
           admin.pubsub_token, agent.pubsub_token, conversation.contact_inbox.pubsub_token
         ),
-        'conversation.typing_on', { conversation: conversation.push_event_data,
+        'conversation.typing_on', { conversation: redacted_conversation_data,
                                     user: agent_bot.push_event_data,
                                     account_id: account.id,
                                     is_private: false }
@@ -125,7 +156,7 @@ describe ActionCableListener do
         a_collection_containing_exactly(
           admin.pubsub_token, conversation.contact_inbox.pubsub_token
         ),
-        'conversation.typing_off', { conversation: conversation.push_event_data,
+        'conversation.typing_off', { conversation: redacted_conversation_data,
                                      user: agent.push_event_data,
                                      account_id: account.id,
                                      is_private: false }
@@ -147,6 +178,67 @@ describe ActionCableListener do
         contact_data
       )
       listener.contact_deleted(event)
+    end
+  end
+
+  describe '#conversation_pinned' do
+    let(:pinned_at) { Time.zone.now.to_f }
+    let(:pin_data) do
+      {
+        account_id: account.id,
+        user_id: agent.id,
+        conversation_id: conversation.display_id,
+        pinned_at: pinned_at
+      }
+    end
+    let!(:event) { Events::Base.new(:'conversation.pinned', Time.zone.now, conversation_pin: pin_data) }
+
+    it 'sends the message only to the agent who pinned the conversation' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'conversation.pinned',
+        {
+          account_id: account.id,
+          conversation_id: conversation.display_id,
+          pinned_at: pinned_at
+        }
+      )
+
+      listener.conversation_pinned(event)
+    end
+
+    it 'does not broadcast when the user is gone' do
+      event = Events::Base.new(:'conversation.pinned', Time.zone.now, conversation_pin: pin_data.merge(user_id: 0))
+
+      expect(ActionCableBroadcastJob).not_to receive(:perform_later)
+
+      listener.conversation_pinned(event)
+    end
+  end
+
+  describe '#conversation_unpinned' do
+    let(:pin_data) do
+      {
+        account_id: account.id,
+        user_id: agent.id,
+        conversation_id: conversation.display_id,
+        pinned_at: Time.zone.now.to_f
+      }
+    end
+    let!(:event) { Events::Base.new(:'conversation.unpinned', Time.zone.now, conversation_pin: pin_data) }
+
+    it 'sends the message only to the agent who unpinned the conversation' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [agent.pubsub_token],
+        'conversation.unpinned',
+        {
+          account_id: account.id,
+          conversation_id: conversation.display_id,
+          pinned_at: pin_data[:pinned_at]
+        }
+      )
+
+      listener.conversation_unpinned(event)
     end
   end
 
@@ -207,15 +299,28 @@ describe ActionCableListener do
 
     before do
       conversation.add_labels(['support'])
+      # Agents and the contact now get one broadcast each. Every example below
+      # pins exactly one of the two, so the other still has to be allowed
+      # through or it trips the constrained expectation.
+      allow(ActionCableBroadcastJob).to receive(:perform_later)
     end
 
     it 'sends update to inbox members' do
       expect(conversation.inbox.reload.inbox_members.count).to eq(1)
 
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
-        [agent.pubsub_token, admin.pubsub_token, conversation.contact_inbox.pubsub_token],
+        [agent.pubsub_token, admin.pubsub_token],
         'conversation.updated',
         conversation.push_event_data.merge(account_id: account.id)
+      )
+      listener.conversation_updated(event)
+    end
+
+    it 'sends the contact its own broadcast built from the allowlist' do
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [conversation.contact_inbox.pubsub_token],
+        'conversation.updated',
+        redacted_conversation_data.merge(account_id: account.id)
       )
       listener.conversation_updated(event)
     end
@@ -224,7 +329,7 @@ describe ActionCableListener do
       expect(conversation.reload.push_event_data[:labels]).to eq(conversation.labels.pluck(:name))
 
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
-        [agent.pubsub_token, admin.pubsub_token, conversation.contact_inbox.pubsub_token],
+        [agent.pubsub_token, admin.pubsub_token],
         'conversation.updated',
         conversation.push_event_data.merge(account_id: account.id)
       )
@@ -236,11 +341,114 @@ describe ActionCableListener do
       tagged_event = Events::Base.new(event_name, Time.zone.now, conversation: conversation, broadcast_metadata: metadata)
 
       expect(ActionCableBroadcastJob).to receive(:perform_later).with(
-        [agent.pubsub_token, admin.pubsub_token, conversation.contact_inbox.pubsub_token],
+        [agent.pubsub_token, admin.pubsub_token],
         'conversation.updated',
         conversation.push_event_data.merge(account_id: account.id, event_metadata: metadata)
       )
       listener.conversation_updated(tagged_event)
+    end
+
+    # The contact still needs the event (the widget refreshes its own state off
+    # it), so the fix is a narrower payload, not a dropped broadcast.
+    it 'still reaches the contact when metadata is present' do
+      metadata = { source: 'reaction_toggle' }
+      tagged_event = Events::Base.new(event_name, Time.zone.now, conversation: conversation, broadcast_metadata: metadata)
+
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        [conversation.contact_inbox.pubsub_token],
+        'conversation.updated',
+        redacted_conversation_data.merge(account_id: account.id, event_metadata: metadata)
+      )
+      listener.conversation_updated(tagged_event)
+    end
+  end
+
+  # The bug this guards: `last_non_activity_message` filters `message_type` but
+  # not `private`, so a trailing private note is exactly what it resolves to —
+  # and these three events broadcast to `contact_inbox_tokens`. Assert on the
+  # note's literal content so the example fails loudly if the payload is ever
+  # re-unified, whatever key the content ends up under.
+  #
+  # The `agent context` example below is the general guard: the private note is
+  # only the leak that was found first, and asserting on the allowlist catches
+  # the next field someone adds to `push_data` without asserting on each by name.
+  describe 'private note leakage to the contact' do
+    let(:secret) { 'Internal only: customer has an overdue invoice' }
+    let(:contact_token) { conversation.contact_inbox.pubsub_token }
+
+    before do
+      create(:message, conversation: conversation, account: account, inbox: inbox,
+                       message_type: :outgoing, private: true, content: secret)
+    end
+
+    it 'keeps the private note out of every contact-bound conversation payload' do
+      payloads = []
+      allow(ActionCableBroadcastJob).to receive(:perform_later) do |tokens, _event, payload|
+        payloads << payload if tokens.include?(contact_token)
+      end
+
+      listener.conversation_created(Events::Base.new(:'conversation.created', Time.zone.now, conversation: conversation))
+      listener.conversation_status_changed(Events::Base.new(:'conversation.status_changed', Time.zone.now, conversation: conversation))
+      listener.conversation_updated(Events::Base.new(:'conversation.updated', Time.zone.now, conversation: conversation))
+      # All three typing events share `typing_conversation_data`, so all three
+      # belong here — they are also the highest-frequency vector, firing per
+      # keystroke rather than per status change.
+      listener.conversation_typing_on(Events::Base.new(:'conversation.typing_on', Time.zone.now,
+                                                       conversation: conversation, user: agent, is_private: true))
+      listener.conversation_recording(Events::Base.new(:'conversation.recording', Time.zone.now,
+                                                       conversation: conversation, user: agent, is_private: true))
+      listener.conversation_typing_off(Events::Base.new(:'conversation.typing_off', Time.zone.now,
+                                                        conversation: conversation, user: agent, is_private: true))
+
+      expect(payloads.size).to eq(6)
+      expect(payloads.to_s).not_to include(secret)
+    end
+
+    # The general guard, and the whole point of the allowlist. It asserts on the
+    # SHAPE of the contact payload instead of on any one field, so the next key
+    # added to `push_data` — CE, Enterprise or Pro — fails here rather than
+    # shipping to the contact's browser. `last_non_activity_message` and Pro's
+    # `kanban_task` both got in because the previous denylist only knew about
+    # the fields someone had remembered to name.
+    it 'never sends the contact a key outside the allowlist' do
+      keys = []
+      allow(ActionCableBroadcastJob).to receive(:perform_later) do |tokens, _event, payload|
+        keys.concat(payload.keys) if tokens.include?(contact_token)
+      end
+
+      listener.conversation_created(Events::Base.new(:'conversation.created', Time.zone.now, conversation: conversation))
+      listener.conversation_status_changed(Events::Base.new(:'conversation.status_changed', Time.zone.now, conversation: conversation))
+      listener.conversation_updated(Events::Base.new(:'conversation.updated', Time.zone.now, conversation: conversation))
+
+      allowed = Conversations::EventDataPresenter::CONTACT_PUSH_KEYS +
+                Conversations::EventDataPresenter::CONTACT_SAFE_EVENT_KEYS +
+                %i[account_id]
+      expect(keys.uniq - allowed).to be_empty
+    end
+
+    it 'keeps the operational fields agents work with out of the contact copy' do
+      conversation.update!(custom_attributes: { internal_score: 'high risk' }, priority: 'urgent')
+      conversation.add_labels(['inadimplente'])
+
+      payload = nil
+      allow(ActionCableBroadcastJob).to receive(:perform_later) do |tokens, _event, data|
+        payload = data if tokens.include?(contact_token)
+      end
+      listener.conversation_updated(Events::Base.new(:'conversation.updated', Time.zone.now, conversation: conversation))
+
+      expect(payload.keys).not_to include(:labels, :custom_attributes, :priority, :meta, :additional_attributes)
+      expect(payload.to_s).not_to include('inadimplente', 'high risk')
+    end
+
+    it 'still gives the agents the private note as the chat list preview' do
+      allow(ActionCableBroadcastJob).to receive(:perform_later)
+      expect(ActionCableBroadcastJob).to receive(:perform_later).with(
+        a_collection_including(agent.pubsub_token),
+        'conversation.updated',
+        hash_including(last_non_activity_message: hash_including(content: secret))
+      )
+
+      listener.conversation_updated(Events::Base.new(:'conversation.updated', Time.zone.now, conversation: conversation))
     end
   end
 

@@ -1,14 +1,13 @@
 <!-- eslint-disable vue/v-slot-style -->
 <script>
 import { mapGetters } from 'vuex';
-import { useAlert } from 'dashboard/composables';
 import { useAgentsList } from 'dashboard/composables/useAgentsList';
 import ContactDetailsItem from './ContactDetailsItem.vue';
 import MultiselectDropdown from 'shared/components/ui/MultiselectDropdown.vue';
 import ConversationLabels from './labels/LabelBox.vue';
 import { CONVERSATION_PRIORITY } from '../../../../shared/constants/messages';
 import { CONVERSATION_EVENTS } from '../../../helper/AnalyticsHelper/events';
-import { useTrack } from 'dashboard/composables';
+import { useAlert, useTrack, useAssignmentError } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
 export default {
@@ -25,7 +24,7 @@ export default {
     },
   },
   setup() {
-    const { agentsList } = useAgentsList();
+    const { agentsList } = useAgentsList(true, { includeAgentBots: true });
     return {
       agentsList,
     };
@@ -81,37 +80,45 @@ export default {
     },
     assignedAgent: {
       get() {
-        return this.currentChat.meta.assignee;
+        const assignee = this.currentChat.meta.assignee;
+        return (
+          assignee && {
+            ...assignee,
+            assignee_type: this.currentChat.meta.assignee_type || 'User',
+          }
+        );
       },
-      set(agent) {
-        const agentId = agent ? agent.id : null;
-        this.$store.dispatch('setCurrentChatAssignee', {
-          conversationId: this.currentChat.id,
-          assignee: agent,
-        });
-        this.$store
-          .dispatch('assignAgent', {
+      async set(agent) {
+        const assigneeType = agent ? agent.assignee_type || 'User' : null;
+        try {
+          await this.$store.dispatch('assignAgent', {
             conversationId: this.currentChat.id,
-            agentId,
-          })
-          .then(() => {
-            useAlert(this.$t('CONVERSATION.CHANGE_AGENT'));
+            assignee: agent,
+            assigneeType,
           });
+          useAlert(this.$t('CONVERSATION.CHANGE_AGENT'));
+        } catch (error) {
+          useAssignmentError(
+            error,
+            this.$t('CONVERSATION.CHANGE_AGENT_FAILED')
+          );
+        }
       },
     },
     assignedTeam: {
       get() {
         return this.currentChat.meta.team;
       },
-      set(team) {
-        const conversationId = this.currentChat.id;
-        const teamId = team ? team.id : 0;
-        this.$store.dispatch('setCurrentChatTeam', { team, conversationId });
-        this.$store
-          .dispatch('assignTeam', { conversationId, teamId })
-          .then(() => {
-            useAlert(this.$t('CONVERSATION.CHANGE_TEAM'));
+      async set(team) {
+        try {
+          await this.$store.dispatch('assignTeam', {
+            conversationId: this.currentChat.id,
+            team,
           });
+          useAlert(this.$t('CONVERSATION.CHANGE_TEAM'));
+        } catch (error) {
+          useAssignmentError(error, this.$t('CONVERSATION.CHANGE_TEAM_FAILED'));
+        }
       },
     },
     assignedPriority: {
@@ -152,7 +159,10 @@ export default {
       if (!this.assignedAgent) {
         return true;
       }
-      if (this.assignedAgent.id !== this.currentUser.id) {
+      if (
+        this.assignedAgent.id !== this.currentUser.id ||
+        (this.assignedAgent.assignee_type || 'User') !== 'User'
+      ) {
         return true;
       }
       return false;
@@ -183,7 +193,11 @@ export default {
       this.assignedAgent = selfAssign;
     },
     onClickAssignAgent(selectedItem) {
-      if (this.assignedAgent && this.assignedAgent.id === selectedItem.id) {
+      if (
+        this.assignedAgent?.id === selectedItem.id &&
+        (this.assignedAgent?.assignee_type || 'User') ===
+          (selectedItem.assignee_type || 'User')
+      ) {
         this.assignedAgent = null;
       } else {
         this.assignedAgent = selectedItem;
@@ -252,6 +266,7 @@ export default {
       <MultiselectDropdown
         :options="teamsList"
         :selected-item="assignedTeam"
+        show-emoji-icon
         :multiselector-title="$t('AGENT_MGMT.MULTI_SELECTOR.TITLE.TEAM')"
         :multiselector-placeholder="$t('AGENT_MGMT.MULTI_SELECTOR.PLACEHOLDER')"
         :no-search-result="

@@ -8,24 +8,7 @@ import FeatureSpotlight from 'dashboard/components-next/feature-spotlight/Featur
 import { responsesList } from 'dashboard/components-next/captain/pageComponents/emptyStates/captainEmptyStateContent.js';
 import { PORTAL_PERMISSIONS } from 'dashboard/constants/permissions';
 
-import { computed } from 'vue';
-
-const props = defineProps({
-  variant: {
-    type: String,
-    default: 'approved',
-    validator: value => ['approved', 'pending'].includes(value),
-  },
-  hasActiveFilters: {
-    type: Boolean,
-    default: false,
-  },
-});
-
-const emit = defineEmits(['click', 'clearFilters']);
-
-const isApproved = computed(() => props.variant === 'approved');
-const isPending = computed(() => props.variant === 'pending');
+const emit = defineEmits(['click']);
 
 const { isOnChatwootCloud } = useAccount();
 const { replaceInstallationName } = useBranding();
@@ -34,15 +17,10 @@ const responseManagePermissions = ['administrator', PORTAL_PERMISSIONS];
 const onClick = () => {
   emit('click');
 };
-
-const onClearFilters = () => {
-  emit('clearFilters');
-};
 </script>
 
 <template>
   <FeatureSpotlight
-    v-if="isApproved"
     :title="$t('CAPTAIN.RESPONSES.EMPTY_STATE.FEATURE_SPOTLIGHT.TITLE')"
     :note="$t('CAPTAIN.RESPONSES.EMPTY_STATE.FEATURE_SPOTLIGHT.NOTE')"
     fallback-thumbnail="/assets/images/dashboard/captain/faqs-light.svg"
@@ -61,7 +39,7 @@ const onClearFilters = () => {
     :action-perms="responseManagePermissions"
     :show-backdrop="isApproved"
   >
-    <template v-if="isApproved" #empty-state-item>
+    <template #empty-state-item>
       <div class="grid grid-cols-1 gap-4 p-px overflow-hidden">
         <ResponseCard
           v-for="(response, index) in responsesList.slice(0, 5)"
@@ -79,17 +57,9 @@ const onClearFilters = () => {
     <template #actions>
       <div class="flex flex-col items-center gap-3">
         <Button
-          v-if="isApproved"
           :label="$t('CAPTAIN.RESPONSES.ADD_NEW')"
           icon="i-lucide-plus"
           @click="onClick"
-        />
-        <Button
-          v-else-if="isPending && hasActiveFilters"
-          :label="$t('CAPTAIN.RESPONSES.EMPTY_STATE.CLEAR_SEARCH')"
-          variant="link"
-          size="sm"
-          @click="onClearFilters"
         />
       </div>
     </template>

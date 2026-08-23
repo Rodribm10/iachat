@@ -30,7 +30,7 @@ import TeleportWithDirection from 'dashboard/components-next/TeleportWithDirecti
 import ConversationResolveAttributesModal from 'dashboard/components-next/ConversationWorkflow/ConversationResolveAttributesModal.vue';
 
 import { useUISettings } from 'dashboard/composables/useUISettings';
-import { useAlert } from 'dashboard/composables';
+import { useAlert, useAssignmentError } from 'dashboard/composables';
 import { useBulkActions } from 'dashboard/composables/chatlist/useBulkActions';
 import { useFilter } from 'shared/composables/useFilter';
 import { useTrack } from 'dashboard/composables';
@@ -111,6 +111,7 @@ const allChatList = useMapGetter('getAllStatusChats');
 const unAssignedChatsList = useMapGetter('getUnAssignedChats');
 const participatingChatsList = useMapGetter('getParticipatingChats');
 const chatListLoading = useMapGetter('getChatListLoadingStatus');
+const pinnedAtById = useMapGetter('conversationPins/getRecords');
 const activeInbox = useMapGetter('getSelectedInbox');
 const conversationStats = useMapGetter('conversationStats/getStats');
 const appliedFilters = useMapGetter('getAppliedConversationFiltersV2');
@@ -347,6 +348,13 @@ function filterByAssigneeTab(conversations) {
 
 function sortByUnreadStatus(conversations) {
   return [...conversations].sort((a, b) => {
+    // Pinned conversations lead this sort too, mirroring what every other sort option does.
+    const pinnedAtA = pinnedAtById.value[a.id];
+    const pinnedAtB = pinnedAtById.value[b.id];
+    if (pinnedAtA && pinnedAtB) return pinnedAtB - pinnedAtA;
+    if (pinnedAtA) return -1;
+    if (pinnedAtB) return 1;
+
     const unreadCountDiff = (b.unread_count || 0) - (a.unread_count || 0);
     if (unreadCountDiff !== 0) return unreadCountDiff;
 
@@ -719,6 +727,18 @@ function redirectToConversationList() {
   );
 }
 
+async function togglePin(conversationId) {
+  const isPinned = Boolean(pinnedAtById.value[conversationId]);
+  try {
+    await store.dispatch(
+      isPinned ? 'conversationPins/unpin' : 'conversationPins/pin',
+      conversationId
+    );
+  } catch (error) {
+    useAlert(error?.message ?? t('CONVERSATION.PIN.ERROR'));
+  }
+}
+
 async function assignPriority(priority, conversationId = null) {
   store.dispatch('setCurrentChatPriority', {
     priority,
@@ -760,10 +780,7 @@ async function markAsRead(conversationId) {
 
 async function onAssignTeam(team, conversationId = null) {
   try {
-    await store.dispatch('assignTeam', {
-      conversationId,
-      teamId: team.id,
-    });
+    await store.dispatch('assignTeam', { conversationId, team });
     useAlert(
       t('CONVERSATION.CARD_CONTEXT_MENU.API.TEAM_ASSIGNMENT.SUCCESFUL', {
         team: team.name,
@@ -771,7 +788,10 @@ async function onAssignTeam(team, conversationId = null) {
       })
     );
   } catch (error) {
-    useAlert(t('CONVERSATION.CARD_CONTEXT_MENU.API.TEAM_ASSIGNMENT.FAILED'));
+    useAssignmentError(
+      error,
+      t('CONVERSATION.CARD_CONTEXT_MENU.API.TEAM_ASSIGNMENT.FAILED')
+    );
   }
 }
 
@@ -791,9 +811,12 @@ function toggleConversationStatus(
     payload.customAttributes = customAttributes;
   }
 
-  store.dispatch('toggleStatus', payload).then(() => {
-    useAlert(t('CONVERSATION.CHANGE_STATUS'));
-  });
+  store
+    .dispatch('toggleStatus', payload)
+    .then(() => useAlert(t('CONVERSATION.CHANGE_STATUS')))
+    .catch(error =>
+      useAssignmentError(error, t('CONVERSATION.CHANGE_STATUS_FAILED'))
+    );
 }
 
 function handleResolveConversation(conversationId, status, snoozedUntil) {
@@ -921,6 +944,7 @@ provide('updateConversationStatus', handleResolveConversation);
 provide('markAsUnread', markAsUnread);
 provide('markAsRead', markAsRead);
 provide('assignPriority', assignPriority);
+provide('togglePin', togglePin);
 provide('isConversationSelected', isConversationSelected);
 provide('deleteConversation', handleDelete);
 

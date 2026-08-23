@@ -69,6 +69,14 @@ class Conversation < ApplicationRecord
   include PushDataHelper
   include ConversationMuteHelpers
 
+  CONVERSATION_UPDATED_ADDITIONAL_ATTRIBUTE_KEYS = %w[conversation_language].freeze
+  FILTERED_UNREAD_COUNT_ADDITIONAL_ATTRIBUTE_KEYS = %w[browser_language conversation_language mail_subject referer].freeze
+  FILTERED_UNREAD_COUNT_UPDATE_KEYS = %w[
+    cached_label_list campaign_id custom_attributes first_reply_created_at label_list last_activity_at priority snoozed_until waiting_since
+  ].freeze
+  private_constant :CONVERSATION_UPDATED_ADDITIONAL_ATTRIBUTE_KEYS, :FILTERED_UNREAD_COUNT_ADDITIONAL_ATTRIBUTE_KEYS,
+                   :FILTERED_UNREAD_COUNT_UPDATE_KEYS
+
   validates :account_id, presence: true
   validates :inbox_id, presence: true
   validates :contact_id, presence: true
@@ -101,6 +109,18 @@ class Conversation < ApplicationRecord
     open.where('last_activity_at < ?', Time.now.utc - auto_resolve_after.minutes)
   }
 
+  # Puts the conversations the given user pinned first, most recently pinned on top. The join is kept as a
+  # literal SQL string (with the table name spelled out in the ON clause) so Rails does not promote it to an
+  # eager load, and the unique index on [user_id, conversation_id] keeps it 1:0..1, so no row is duplicated.
+  scope :pinned_first_for, lambda { |user|
+    joins(
+      sanitize_sql_array(
+        ['LEFT OUTER JOIN conversation_pins ON conversation_pins.conversation_id = conversations.id AND conversation_pins.user_id = ?',
+         user.id]
+      )
+    ).order(Arel.sql('conversation_pins.created_at DESC NULLS LAST'))
+  }
+
   scope :last_user_message_at, lambda {
     joins(
       "INNER JOIN (#{last_messaged_conversations.to_sql}) AS grouped_conversations
@@ -121,6 +141,7 @@ class Conversation < ApplicationRecord
   has_many :messages, dependent: :destroy_async, autosave: true
   has_one :csat_survey_response, dependent: :destroy_async
   has_many :conversation_participants, dependent: :destroy_async
+  has_many :conversation_pins, dependent: :destroy_async
   has_many :notifications, as: :primary_actor, dependent: :destroy_async
   has_many :attachments, through: :messages
   has_many :reporting_events, dependent: :destroy_async
@@ -161,11 +182,53 @@ class Conversation < ApplicationRecord
     messages.where(account_id: account_id)&.incoming&.last
   end
 
+  # Seeds `currentChat.messages` in the dashboard AND doubles as the `before`
+  # cursor in setActiveChat → fetchPreviousMessages, where MessageFinder pages
+  # with `id < before`. It must therefore be the newest message the dashboard
+  # renders. Filtering by `message_type` or `private` here silently hides every
+  # message created after the one we pick — that is how activity messages
+  # ("Conversation was marked resolved by ...") vanished from the history.
+  # Chat list previews use `last_non_activity_message`: keep the two separate.
+  # Agent-facing payloads only — the cable broadcast reaches the contact too and
+  # keeps its own narrower query (see EventDataPresenter#push_messages).
+  # The `id` tie-break is load-bearing: pagination compares ids, so on a
+  # `created_at` tie the cursor has to be the highest id or the rows between
+  # them fall through the same crack. Imports write second-precision
+  # timestamps in bulk (DataImports::Intercom::Importer), so ties are real.
+  def dashboard_seed_message
+    messages.where(account_id: account_id)
+            .hide_removed_reactions
+            .includes([{ attachments: [{ file_attachment: [:blob] }] }])
+            .reorder(created_at: :desc, id: :desc)
+            .first
+  end
+
+  # Drives the chat list preview, which must never read "Conversation was
+  # marked resolved by ...". Unlike `dashboard_seed_message`, skipping activity
+  # messages here is intentional.
+  def last_non_activity_message
+    messages.where(account_id: account_id)
+            .non_activity_messages
+            .hide_removed_reactions
+            .includes([{ attachments: [{ file_attachment: [:blob] }] }])
+            .reorder(created_at: :desc, id: :desc)
+            .first
+  end
+
   def toggle_status
     # FIXME: implement state machine with aasm
-    self.status = open? ? :resolved : :open
-    self.status = :open if pending? || snoozed?
+    self.status = toggled_status
     save # rubocop:disable Rails/SaveBang
+  end
+
+  # The status a toggle lands on, without writing it. Callers that have another
+  # change to make in the same save need this: `previous_changes` only carries
+  # the last save, and every status callback reads `saved_change_to_status?`
+  # from it.
+  def toggled_status
+    return :open if pending? || snoozed?
+
+    open? ? :resolved : :open
   end
 
   def toggle_priority(priority = nil)
@@ -175,6 +238,7 @@ class Conversation < ApplicationRecord
 
   def bot_handoff!
     update!(waiting_since: Time.current) if waiting_since.blank?
+    self.assignee_agent_bot = nil
     open!
     dispatcher_dispatch(CONVERSATION_BOT_HANDOFF)
   end
@@ -255,8 +319,10 @@ class Conversation < ApplicationRecord
 
   def execute_after_update_commit_callbacks
     handle_resolved_status_change
+    unpin_for_everyone_on_resolve
     notify_status_change
     create_activity
+    invalidate_filtered_unread_count_conversation
     notify_conversation_updation
   end
 
@@ -267,6 +333,13 @@ class Conversation < ApplicationRecord
     # rubocop:disable Rails/SkipsModelValidations
     update_column(:waiting_since, nil)
     # rubocop:enable Rails/SkipsModelValidations
+  end
+
+  # A resolved conversation leaves the agent's open list, so it should not keep occupying one of their pin slots.
+  def unpin_for_everyone_on_resolve
+    return unless saved_change_to_status? && resolved?
+
+    conversation_pins.destroy_all
   end
 
   def ensure_snooze_until_reset
@@ -292,13 +365,19 @@ class Conversation < ApplicationRecord
 
     return handle_campaign_status if campaign.present?
 
-    # TODO: make this an inbox config instead of assuming bot conversations should start as pending
-    self.status = :pending if inbox.active_bot?
+    set_active_bot_conversation if inbox.active_bot?
   end
 
   def handle_campaign_status
-    # If campaign has no sender (bot-initiated) and inbox has active bot, let bot handle it
-    self.status = :pending if campaign.sender_id.nil? && inbox.active_bot?
+    set_active_bot_conversation if campaign.sender_id.nil? && inbox.active_bot?
+  end
+
+  def set_active_bot_conversation
+    # TODO: make this an inbox config instead of assuming bot conversations should start as pending
+    self.status = :pending
+    return unless inbox.agent_bot_inbox&.active? && assignee_id.blank?
+
+    self.assignee_agent_bot = inbox.agent_bot
   end
 
   def notify_conversation_creation
@@ -323,10 +402,23 @@ class Conversation < ApplicationRecord
   end
 
   def allowed_keys?
-    (
-      previous_changes.keys.intersect?(list_of_keys) ||
-      (previous_changes['additional_attributes'].present? && previous_changes['additional_attributes'][1].keys.intersect?(%w[conversation_language]))
-    )
+    previous_changes.keys.intersect?(list_of_keys) ||
+      additional_attributes_changed?(CONVERSATION_UPDATED_ADDITIONAL_ATTRIBUTE_KEYS)
+  end
+
+  def invalidate_filtered_unread_count_conversation
+    return unless filtered_unread_count_update?
+
+    ::Conversations::UnreadCounts::FilteredCountInvalidator.new(account).conversation_changed!
+  end
+
+  def filtered_unread_count_update?
+    previous_changes.keys.intersect?(FILTERED_UNREAD_COUNT_UPDATE_KEYS) ||
+      additional_attributes_changed?(FILTERED_UNREAD_COUNT_ADDITIONAL_ATTRIBUTE_KEYS)
+  end
+
+  def additional_attributes_changed?(keys)
+    Array(previous_changes['additional_attributes']).compact.any? { |attributes| attributes.keys.intersect?(keys) }
   end
 
   def load_attributes_created_by_db_triggers

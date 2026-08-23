@@ -19,7 +19,8 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
     request_body = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual', # Only individual messages supported (not group messages)
-      to: phone_number,
+      # BSUID -> `recipient`; phone number -> `to` (see recipient_params in the base provider).
+      **recipient_params(phone_number),
       type: 'template',
       template: template_body
     }
@@ -42,7 +43,11 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
 
   def fetch_whatsapp_templates(url)
     response = HTTParty.get(url)
-    return [] unless response.success?
+    unless response.success?
+      Rails.logger.warn "[WHATSAPP] Template sync failed for account #{whatsapp_channel.account_id} " \
+                        "inbox #{whatsapp_channel.inbox&.id}: #{response.code} #{error_message(response)}"
+      return []
+    end
 
     next_url = next_url(response)
 
@@ -56,8 +61,17 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
   end
 
   def validate_provider_config?
-    response = HTTParty.get("#{business_account_path}/message_templates?access_token=#{whatsapp_channel.provider_config['api_key']}")
-    response.success?
+    config = whatsapp_channel.provider_config
+    response = HTTParty.get("#{business_account_path}/message_templates?access_token=#{config['api_key']}")
+    return log_transfer_failure('waba_or_token_check', response) unless response.success?
+    # The templates check only proves the WABA/token pair, so verify the phone_number_id belongs to this WABA when it changes.
+    return true unless whatsapp_channel.provider_config_changed?
+
+    phone_response = HTTParty.get("#{business_account_path}/phone_numbers?fields=id&limit=100&access_token=#{config['api_key']}")
+    ids = phone_response.parsed_response.is_a?(Hash) ? Array(phone_response.parsed_response['data']) : []
+    return true if phone_response.success? && ids.any? { |number| number['id'] == config['phone_number_id'].to_s }
+
+    log_transfer_failure('phone_number_id_check', phone_response)
   end
 
   def api_headers
@@ -79,6 +93,30 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
 
   def media_url(media_id)
     "#{api_base_path}/v13.0/#{media_id}"
+  end
+
+  # Uploads a file to the WhatsApp media store and returns its id, which can then be used in place of a
+  # `link` anywhere the API takes media. Meta keeps the upload for 30 days.
+  # https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media#upload-media
+  #
+  # This is the one call that does not go through HTTParty: its multipart bodies are streamed with
+  # chunked encoding, and the Graph API answers "(#100) The parameter file is required" to those.
+  # Net::HTTP sends a Content-Length, which is what the endpoint expects.
+  def upload_media(file, content_type)
+    uri = URI.parse("#{phone_id_path('v24.0')}/media")
+    request = Net::HTTP::Post.new(uri)
+    request['Authorization'] = "Bearer #{whatsapp_channel.provider_config['api_key']}"
+    request.set_form(
+      [
+        %w[messaging_product whatsapp],
+        ['type', content_type],
+        ['file', file, { filename: File.basename(file.path), content_type: content_type }]
+      ],
+      'multipart/form-data'
+    )
+
+    response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') { |http| http.request(request) }
+    parse_upload_response(response)
   end
 
   def toggle_typing_status(typing_status, last_message:, **)
@@ -121,6 +159,16 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
 
   private
 
+  # Only saves dropping the embedded_signup source marker are transfer attempts; creation/rotation failures are setup errors. Returns false.
+  def log_transfer_failure(check, response)
+    return false unless whatsapp_channel.embedded_to_manual_transfer_pending?
+
+    error_message = response.parsed_response.is_a?(Hash) ? response.parsed_response.dig('error', 'message') : nil
+    Rails.logger.warn("[WHATSAPP_EMBEDDED_TO_MANUAL] failure account_id=#{whatsapp_channel.account_id} channel_id=#{whatsapp_channel.id} " \
+                      "check=#{check} http_status=#{response.code} meta_error=#{error_message}")
+    false
+  end
+
   def csat_template_service
     @csat_template_service ||= Whatsapp::CsatTemplateService.new(whatsapp_channel)
   end
@@ -145,7 +193,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
       body: {
         messaging_product: 'whatsapp',
         context: whatsapp_reply_context(message),
-        to: phone_number,
+        **recipient_params(phone_number),
         text: { body: message.outgoing_content },
         type: 'text'
       }.to_json
@@ -164,7 +212,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
       body: {
         :messaging_product => 'whatsapp',
         :context => whatsapp_reply_context(message),
-        'to' => phone_number,
+        **recipient_params(phone_number),
         'type' => type,
         type.to_s => type_content
       }.to_json
@@ -175,7 +223,34 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
 
   def error_message(response)
     # https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes/#sample-response
-    response.parsed_response&.dig('error', 'message')
+    response.parsed_response.dig('error', 'message') if response.parsed_response.is_a?(Hash)
+  end
+
+  def parse_upload_response(response)
+    body = parse_json(response.body)
+    return body['id'] if body['id'].present?
+
+    error = body['error'] || {}
+    # An API having a bad minute is not a file it refuses. Answering with MediaUploadError would be
+    # indistinguishable from a rejected file and would fail the message for good; letting these through
+    # keeps Sidekiq's retry. The HTTP status alone can't tell the two apart, because Graph reports
+    # throttling and other transient conditions inside a 400 envelope flagged `is_transient`.
+    response.value if transient_upload_error?(response, error)
+
+    # The generic `error.message` for a rejected upload is just "(#100) Invalid parameter"; the reason
+    # an agent can act on ("File Too Large", unsupported format) is in `error_data.details`.
+    raise CustomExceptions::Whatsapp::MediaUploadError,
+          "Media upload failed: #{error.dig('error_data', 'details') || error['message'] || "HTTP #{response.code}"}"
+  end
+
+  def transient_upload_error?(response, error)
+    response.code == '429' || response.is_a?(Net::HTTPServerError) || error['is_transient'] == true
+  end
+
+  def parse_json(body)
+    JSON.parse(body.to_s)
+  rescue JSON::ParserError
+    {}
   end
 
   def voice_message?(type, attachment)
@@ -247,7 +322,7 @@ class Whatsapp::Providers::WhatsappCloudService < Whatsapp::Providers::BaseServi
       headers: api_headers,
       body: {
         messaging_product: 'whatsapp',
-        to: phone_number,
+        **recipient_params(phone_number),
         interactive: payload,
         type: 'interactive'
       }.to_json

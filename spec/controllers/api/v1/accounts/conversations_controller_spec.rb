@@ -48,8 +48,52 @@ RSpec.describe 'Conversations API', type: :request do
             headers: agent.create_new_auth_token,
             as: :json
 
-        body = JSON.parse(response.body, symbolize_names: true)
-        expect(body[:data][:payload].first[:messages].first[:id]).to eq(private_note.id)
+        payload = JSON.parse(response.body, symbolize_names: true)[:data][:payload].first
+        expect(payload[:messages].first[:id]).to eq(private_note.id)
+        # The card preview shows private notes too — only activity messages are
+        # filtered out of `last_non_activity_message`.
+        expect(payload[:last_non_activity_message][:id]).to eq(private_note.id)
+      end
+
+      # Regression (#350): the seed is the `before` cursor and pages with
+      # `id < before`, so filtering activity messages out of it hid every
+      # status/assignment change created after the last regular message. The
+      # card preview reads `last_non_activity_message`, which is a separate
+      # query — do not collapse the two again.
+      it 'seeds the latest message even when it is an activity message, without leaking it into the preview' do
+        message = create(:message, conversation: conversation, account: account)
+        activity = create(:message, conversation: conversation, account: account, message_type: :activity,
+                                    content: 'Conversation was marked resolved by John')
+
+        get "/api/v1/accounts/#{account.id}/conversations",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        payload = JSON.parse(response.body, symbolize_names: true)[:data][:payload].first
+        expect(payload[:messages].first[:id]).to eq(activity.id)
+        expect(payload[:last_non_activity_message][:id]).to eq(message.id)
+      end
+
+      # Regression (#350): the seed and the message pagination have to line up.
+      # This walks the exact path the dashboard takes on cold open — read the
+      # seed from the list, then page with it as the `before` cursor.
+      it 'reaches every activity message through the seed cursor' do
+        create(:message, conversation: conversation, account: account)
+        activity = create(:message, conversation: conversation, account: account, message_type: :activity,
+                                    content: 'Conversation was marked resolved by John')
+
+        get "/api/v1/accounts/#{account.id}/conversations",
+            headers: agent.create_new_auth_token,
+            as: :json
+        seed = JSON.parse(response.body, symbolize_names: true)[:data][:payload].first[:messages]
+
+        get "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages",
+            params: { before: seed.first[:id] },
+            headers: agent.create_new_auth_token,
+            as: :json
+        paginated = JSON.parse(response.body, symbolize_names: true)[:payload]
+
+        expect(seed.pluck(:id) + paginated.pluck(:id)).to include(activity.id)
       end
 
       it 'returns conversations with empty messages array for conversations with out messages' do
@@ -175,6 +219,28 @@ RSpec.describe 'Conversations API', type: :request do
 
           expect(response).to have_http_status(:success)
           expect(response.parsed_body['payload']['teams']).to eq(team.id.to_s => 1)
+        end
+
+        it 'returns filtered unread counts when the filtered count feature is enabled' do
+          account.enable_features!(:unread_count_for_filters)
+          allow(Conversations::UnreadCounts::FilteredCountInstrumentation).to receive(:summarize_request) do |**_attributes, &block|
+            block.call
+          end
+          mentioned = create_unread_conversation(account: account, inbox: visible_inbox)
+          create(:mention, account: account, conversation: mentioned, user: agent)
+
+          get "/api/v1/accounts/#{account.id}/conversations/unread_counts",
+              headers: agent.create_new_auth_token,
+              as: :json
+
+          expect(response).to have_http_status(:success)
+          expect(response.parsed_body['payload']).to include(
+            'mentions_count' => 1,
+            'participating_count' => 0,
+            'unattended_count' => 1,
+            'folders' => {}
+          )
+          expect(Conversations::UnreadCounts::FilteredCountInstrumentation).to have_received(:summarize_request).with(account_id: account.id)
         end
       end
 
@@ -561,15 +627,17 @@ RSpec.describe 'Conversations API', type: :request do
         expect(conversation.reload.assignee_id).to eq(agent.id)
       end
 
-      it 'disbale self assign if admin changes the conversation status to open' do
-        conversation.update!(status: 'pending')
-        conversation.update!(assignee_id: nil)
+      it 'does not self assign and clears the agent bot owner if admin changes the conversation status to open' do
+        conversation.update!(status: 'pending', assignee: nil, assignee_agent_bot: agent_bot)
+
         post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_status",
              headers: administrator.create_new_auth_token,
              as: :json
+
         expect(response).to have_http_status(:success)
         expect(conversation.reload.status).to eq('open')
         expect(conversation.reload.assignee_id).not_to eq(administrator.id)
+        expect(conversation.reload.assignee_agent_bot).to be_nil
       end
 
       it 'toggles the conversation status to specific status when parameter is passed' do
@@ -595,6 +663,49 @@ RSpec.describe 'Conversations API', type: :request do
         expect(response).to have_http_status(:success)
         expect(conversation.reload.status).to eq('snoozed')
         expect(conversation.reload.snoozed_until.to_i).to eq(snoozed_until)
+      end
+
+      # Reopening self-assigns via `handle_human_open`, which is a second claim
+      # path that bypasses Conversations::AssignmentService entirely.
+      it 'answers 409 when reopening a conversation assigned to another agent' do
+        owner = create(:user, account: account, role: :agent)
+        create(:inbox_member, inbox: conversation.inbox, user: owner)
+        conversation.update!(status: 'resolved', assignee: owner)
+        conversation.inbox.update!(prevent_assignment_takeover: true)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_status",
+             headers: agent.create_new_auth_token,
+             params: { status: 'open' },
+             as: :json
+
+        expect(response).to have_http_status(:conflict)
+        expect(response.parsed_body['agent_name']).to eq(owner.available_name)
+        expect(conversation.reload.assignee).to eq(owner)
+        # The status change and the self-assignment are separate saves; a refused
+        # request must not leave the conversation reopened behind the 409.
+        expect(conversation.reload.status).to eq('resolved')
+      end
+
+      # Regression: reopening self-assigns the agent, and that used to be a
+      # second save. `previous_changes` only carries the last save, so the
+      # status callbacks (reopen activity message, automations, reporting) went
+      # silent. Both changes have to land in one save.
+      it 'still reports the status change when reopening self-assigns the agent' do
+        conversation.update!(status: 'resolved', assignee: nil)
+        # Stubbed after the setup, which is itself a status change.
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/toggle_status",
+             headers: agent.create_new_auth_token,
+             params: { status: 'open' },
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.reload.assignee).to eq(agent)
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Events::Types::CONVERSATION_STATUS_CHANGED, kind_of(Time), hash_including(conversation: conversation))
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch)
+          .with(Events::Types::CONVERSATION_OPENED, kind_of(Time), hash_including(conversation: conversation))
       end
     end
 
@@ -883,6 +994,59 @@ RSpec.describe 'Conversations API', type: :request do
         Conversations::UnreadCounts::Store.clear_account!(account.id)
       end
 
+      it 'refreshes unread count cache before invalidating filtered counts when conversation is marked read' do
+        account.enable_features!(:conversation_unread_counts, :unread_count_for_filters)
+        conversation.update!(agent_last_seen_at: 1.hour.ago)
+        create(:message, account: account, inbox: conversation.inbox, conversation: conversation, message_type: :incoming, created_at: 5.minutes.ago)
+        notifier = instance_double(Conversations::UnreadCounts::Notifier)
+        invalidator = instance_double(Conversations::UnreadCounts::FilteredCountInvalidator)
+
+        allow(Conversations::UnreadCounts::Notifier).to receive(:new).with(conversation).and_return(notifier)
+        allow(Conversations::UnreadCounts::FilteredCountInvalidator).to receive(:new).with(account).and_return(invalidator)
+        expect(notifier).to receive(:perform).ordered.and_return(true)
+        expect(invalidator).to receive(:conversation_changed!).ordered.and_return(true)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'invalidates filtered unread counts when conversation is marked read' do
+        conversation.update!(agent_last_seen_at: 1.hour.ago)
+        create(:message, account: account, inbox: conversation.inbox, conversation: conversation, message_type: :incoming, created_at: 5.minutes.ago)
+        account.enable_features!(:unread_count_for_filters)
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+               headers: agent.create_new_auth_token,
+               as: :json
+        end.to change { Conversations::UnreadCounts::FilteredCountStore.conversation_version(account.id) }.by(1)
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'notifies clients when marking read only affects filtered counts' do
+        account.enable_features!(:conversation_unread_counts, :unread_count_for_filters)
+        conversation.update!(agent_last_seen_at: 1.hour.ago)
+        create(:message, account: account, inbox: conversation.inbox, conversation: conversation, message_type: :incoming, created_at: 5.minutes.ago)
+        allow(Conversations::UnreadCounts::Refresher).to receive(:new).and_return(
+          instance_double(Conversations::UnreadCounts::Refresher, perform: false)
+        )
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch).with(
+          'conversation.unread_count_changed',
+          kind_of(Time),
+          conversation: conversation
+        )
+      end
+
       it 'updates both if one timestamp is old even when the other is recent' do
         conversation.update!(assignee_id: agent.id, agent_last_seen_at: 2.hours.ago, assignee_last_seen_at: 30.minutes.ago)
         # Ensure all messages are older than assignee_last_seen_at (no unread messages)
@@ -1011,6 +1175,263 @@ RSpec.describe 'Conversations API', type: :request do
         expect(Conversations::UnreadCounts::Store.counts_for_keys([inbox_key])).to eq(inbox_key => 1)
       ensure
         Conversations::UnreadCounts::Store.clear_account!(account.id)
+      end
+
+      it 'refreshes unread count cache before invalidating filtered counts when conversation is marked unread' do
+        account.enable_features!(:conversation_unread_counts, :unread_count_for_filters)
+        conversation.update!(agent_last_seen_at: 1.minute.from_now, assignee_last_seen_at: 1.minute.from_now)
+        notifier = instance_double(Conversations::UnreadCounts::Notifier)
+        invalidator = instance_double(Conversations::UnreadCounts::FilteredCountInvalidator)
+
+        allow(Conversations::UnreadCounts::Notifier).to receive(:new).with(conversation).and_return(notifier)
+        allow(Conversations::UnreadCounts::FilteredCountInvalidator).to receive(:new).with(account).and_return(invalidator)
+        expect(notifier).to receive(:perform).ordered.and_return(true)
+        expect(invalidator).to receive(:conversation_changed!).ordered.and_return(true)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unread",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'invalidates filtered unread counts when conversation is marked unread' do
+        conversation.update!(agent_last_seen_at: 1.minute.from_now, assignee_last_seen_at: 1.minute.from_now)
+        account.enable_features!(:unread_count_for_filters)
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unread",
+               headers: agent.create_new_auth_token,
+               as: :json
+        end.to change { Conversations::UnreadCounts::FilteredCountStore.conversation_version(account.id) }.by(1)
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'notifies clients when marking unread only affects filtered counts' do
+        account.enable_features!(:conversation_unread_counts, :unread_count_for_filters)
+        conversation.update!(agent_last_seen_at: 1.minute.from_now, assignee_last_seen_at: 1.minute.from_now)
+        allow(Conversations::UnreadCounts::Refresher).to receive(:new).and_return(
+          instance_double(Conversations::UnreadCounts::Refresher, perform: false)
+        )
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unread",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch).with(
+          'conversation.unread_count_changed',
+          kind_of(Time),
+          conversation: conversation
+        )
+      end
+    end
+  end
+
+  describe 'POST /api/v1/accounts/{account.id}/conversations/:id/pin' do
+    let(:conversation) { create(:conversation, account: account) }
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/pin"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when the agent has no access to the conversation' do
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/pin",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an agent bot' do
+      let(:agent_bot) { create(:agent_bot, account: account) }
+
+      before { create(:agent_bot_inbox, inbox: conversation.inbox, agent_bot: agent_bot) }
+
+      it 'returns unauthorized' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/pin",
+             headers: { api_access_token: agent_bot.access_token.token },
+             as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      before { create(:inbox_member, user: agent, inbox: conversation.inbox) }
+
+      it 'pins the conversation for the current agent' do
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/pin",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body['conversation_id']).to eq(conversation.display_id)
+        expect(response.parsed_body['pinned_at']).to be_present
+        expect(conversation.conversation_pins.pluck(:user_id)).to eq([agent.id])
+      end
+
+      it 'is idempotent' do
+        2.times do
+          post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/pin",
+               headers: agent.create_new_auth_token,
+               as: :json
+        end
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.conversation_pins.count).to eq(1)
+      end
+
+      it 'returns unprocessable entity for a resolved conversation' do
+        conversation.update!(status: :resolved)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/pin",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to eq('A resolved conversation cannot be pinned.')
+      end
+
+      it 'returns unprocessable entity when the limit is reached' do
+        pinned_inbox = create(:inbox, account: account, enable_auto_assignment: false)
+        create(:inbox_member, user: agent, inbox: pinned_inbox)
+        ConversationPin::MAX_PER_USER.times do
+          pinned = create(:conversation, account: account, inbox: pinned_inbox)
+          create(:conversation_pin, conversation: pinned, user: agent, account: account)
+        end
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/pin",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.parsed_body['message']).to eq("You can pin up to #{ConversationPin::MAX_PER_USER} conversations.")
+      end
+    end
+  end
+
+  describe 'DELETE /api/v1/accounts/{account.id}/conversations/:id/unpin' do
+    let(:conversation) { create(:conversation, account: account) }
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unpin"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      before { create(:inbox_member, user: agent, inbox: conversation.inbox) }
+
+      it 'removes only the pin of the current agent' do
+        other_agent = create(:user, account: account, role: :agent)
+        create(:inbox_member, user: other_agent, inbox: conversation.inbox)
+        create(:conversation_pin, conversation: conversation, user: agent, account: account)
+        create(:conversation_pin, conversation: conversation, user: other_agent, account: account)
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unpin",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.conversation_pins.pluck(:user_id)).to eq([other_agent.id])
+      end
+
+      it 'succeeds when the conversation is not pinned' do
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unpin",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+      end
+
+      it 'still removes the pin after the agent loses access to the inbox' do
+        create(:conversation_pin, conversation: conversation, user: agent, account: account)
+        agent.inbox_members.destroy_all
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unpin",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(conversation.conversation_pins.count).to eq(0)
+      end
+
+      it 'does not remove the pin of another agent' do
+        other_agent = create(:user, account: account, role: :agent)
+        create(:inbox_member, user: other_agent, inbox: conversation.inbox)
+        create(:conversation_pin, conversation: conversation, user: other_agent, account: account)
+
+        delete "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/unpin",
+               headers: agent.create_new_auth_token,
+               as: :json
+
+        expect(conversation.conversation_pins.pluck(:user_id)).to eq([other_agent.id])
+      end
+    end
+  end
+
+  describe 'GET /api/v1/accounts/{account.id}/conversations/pins' do
+    let(:conversation) { create(:conversation, account: account) }
+    let(:agent) { create(:user, account: account, role: :agent) }
+
+    context 'when it is an unauthenticated user' do
+      it 'returns unauthorized' do
+        get "/api/v1/accounts/#{account.id}/conversations/pins"
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    context 'when it is an authenticated user' do
+      before { create(:inbox_member, user: agent, inbox: conversation.inbox) }
+
+      it 'returns the pins of the current agent in the current account' do
+        pin = create(:conversation_pin, conversation: conversation, user: agent, account: account)
+        other_agent = create(:user, account: account, role: :agent)
+        other_conversation = create(:conversation, account: account)
+        create(:inbox_member, user: other_agent, inbox: other_conversation.inbox)
+        create(:conversation_pin, conversation: other_conversation, user: other_agent, account: account)
+
+        get "/api/v1/accounts/#{account.id}/conversations/pins",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to eq([{ 'conversation_id' => conversation.display_id, 'pinned_at' => pin.created_at.to_f }])
+      end
+
+      it 'skips a pin whose conversation is already gone' do
+        create(:conversation_pin, conversation: conversation, user: agent, account: account)
+        # `dependent: :destroy_async` leaves the pins behind until the job runs.
+        Conversation.where(id: conversation.id).delete_all
+
+        get "/api/v1/accounts/#{account.id}/conversations/pins",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to eq([])
+      end
+
+      it 'returns an empty list when nothing is pinned' do
+        get "/api/v1/accounts/#{account.id}/conversations/pins",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.parsed_body).to eq([])
       end
     end
   end

@@ -97,7 +97,10 @@ const hasMultipleInboxes = computed(
   () => store.getters['inboxes/getInboxes'].length > 1
 );
 
-const hasSlaPolicyId = computed(() => props.chat?.sla_policy_id);
+const hasSlaPolicyId = computed(
+  () => props.chat?.applied_sla?.id && !currentContact.value?.blocked
+);
+
 const reservationMarker = computed(() => props.chat?.reservation_marker || {});
 const hasReservationMarker = computed(() => reservationMarker.value?.visible);
 

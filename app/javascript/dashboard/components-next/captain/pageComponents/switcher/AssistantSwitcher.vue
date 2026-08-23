@@ -25,16 +25,6 @@ const isAssistantActive = assistant => {
 
 const fetchDataForRoute = async (routeName, assistantId) => {
   const dataFetchMap = {
-    captain_assistants_responses_index: async () => {
-      await store.dispatch('captainResponses/get', { assistantId });
-      await store.dispatch('captainResponses/fetchPendingCount', assistantId);
-    },
-    captain_assistants_responses_pending: async () => {
-      await store.dispatch('captainResponses/get', {
-        assistantId,
-        status: 'pending',
-      });
-    },
     captain_assistants_documents_index: async () => {
       await store.dispatch('captainDocuments/get', { assistantId });
     },
@@ -66,7 +56,7 @@ const handleAssistantChange = async assistant => {
 
   const currentRouteName = route.name;
   const targetRouteName =
-    currentRouteName || 'captain_assistants_responses_index';
+    currentRouteName || 'captain_assistants_overview_index';
 
   await fetchDataForRoute(targetRouteName, assistant.id);
 
@@ -89,7 +79,7 @@ const openCreateAssistantDialog = () => {
 
 <template>
   <div
-    class="pt-5 pb-3 bg-n-alpha-3 backdrop-blur-[100px] outline outline-n-container outline-1 z-50 absolute w-[27.5rem] rounded-xl shadow-md flex flex-col gap-4"
+    class="pt-5 bg-n-alpha-3 backdrop-blur-[100px] outline outline-n-container outline-1 z-50 absolute w-[27.5rem] max-h-96 rounded-xl shadow-md flex flex-col gap-4"
   >
     <div
       class="flex items-center justify-between gap-4 px-6 pb-3 border-b border-n-alpha-2"
@@ -117,7 +107,10 @@ const openCreateAssistantDialog = () => {
         />
       </Policy>
     </div>
-    <div v-if="assistants.length > 0" class="flex flex-col gap-2 px-4">
+    <div
+      v-if="assistants.length > 0"
+      class="flex flex-col flex-1 min-h-0 gap-2 px-4 pb-3 overflow-y-auto overscroll-contain"
+    >
       <Button
         v-for="assistant in assistants"
         :key="assistant.id"

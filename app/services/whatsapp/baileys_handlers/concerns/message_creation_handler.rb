@@ -6,15 +6,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
   def build_and_save_message(conversation:, sender:, attach_media: false)
     return build_and_save_contact_messages(conversation: conversation, sender: sender) if message_type == 'contact'
 
-    @message = conversation.messages.build(
-      content: message_content,
-      account_id: inbox.account_id,
-      inbox_id: inbox.id,
-      source_id: raw_message_id,
-      sender: incoming? ? sender : nil,
-      message_type: incoming? ? :incoming : :outgoing,
-      content_attributes: build_message_content_attributes
-    )
+    @message = conversation.messages.build(content: message_content, **webhook_message_attributes(sender))
 
     attach_media_to_message if attach_media
     attach_location_to_message if message_type == 'location'
@@ -24,6 +16,54 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
     inbox.channel.received_messages([@message], conversation) if incoming?
 
     @message
+  end
+
+  # Columns shared by every message built from the current webhook: an incoming message keeps its
+  # sender, while a message the session sent (echoed back by WhatsApp) is stored sender-less.
+  def webhook_message_attributes(sender)
+    {
+      account_id: inbox.account_id,
+      inbox_id: inbox.id,
+      source_id: raw_message_id,
+      sender: incoming? ? sender : nil,
+      message_type: incoming? ? :incoming : :outgoing,
+      content_attributes: build_message_content_attributes
+    }
+  end
+
+  # WhatsApp echoes back every message the session sends, including the ones Chatwoot itself
+  # dispatched. Those echoes are normally recognized by `source_id`, which is only written from the
+  # send response — when that response is lost and the job retries, the echo carries an id Chatwoot
+  # never saw and would be stored as a new sender-less outgoing message, rendered as if an agent had
+  # replied from the phone. Baileys sends reserve their WhatsApp id before the request
+  # (`reserve_source_id`), so match on that instead and just fill in the `source_id` the response
+  # never delivered.
+  #
+  # Runs before the conversation is picked: a delayed echo whose original thread was resolved
+  # meanwhile would otherwise reopen it or open a stray new one just to hold a message that is
+  # already stored. The lookup spans every conversation the contact has in this inbox, since that
+  # is where the sent message can be, and answers with the conversation actually holding it.
+  def confirm_reserved_outgoing_message(contact)
+    return false if incoming?
+
+    reserved = Message.where(conversation_id: contact.conversations.where(inbox_id: inbox.id).select(:id))
+                      .where(message_type: :outgoing)
+                      .where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' = ?", raw_message_id)
+                      .first
+    return false if reserved.nil?
+
+    confirm_source_id(reserved) if reserved.source_id.blank?
+    @message = reserved
+    @conversation = reserved.conversation
+    true
+  end
+
+  # Mirrors Whatsapp::SendOnWhatsappService#persist_source_id: the id the send never got to store is
+  # what a revoke needs, so a message deleted while that send was in flight can only be taken off the
+  # contact's phone once this echo supplies it.
+  def confirm_source_id(reserved)
+    reserved.update_under_lock!(source_id: raw_message_id)
+    ::Messages::DeleteOnChannelJob.perform_later(reserved.id) if reserved.deleted?
   end
 
   # Mirrors the Cloud provider (create_contact_messages): one message per shared
@@ -39,11 +79,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
     fields = baileys_contact_fields(contact)
     return if fields[:phone].blank? && fields[:name].blank?
 
-    message = conversation.messages.build(
-      content: baileys_contact_line(contact), account_id: inbox.account_id, inbox_id: inbox.id,
-      source_id: raw_message_id, sender: incoming? ? sender : nil,
-      message_type: incoming? ? :incoming : :outgoing, content_attributes: build_message_content_attributes
-    )
+    message = conversation.messages.build(content: baileys_contact_line(contact), **webhook_message_attributes(sender))
     attach_contact_card(message, fields)
     message.save!
     message
@@ -72,7 +108,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
   # flow could have picked (or created) a different one. Find the row first,
   # then operate on its real `existing.conversation`.
   def mark_existing_reaction_as_removed(sender:)
-    target_external_id = unwrap_ephemeral_message(@raw_message[:message]).dig(:reactionMessage, :key, :id)
+    target_external_id = unwrap_message_content(@raw_message[:message]).dig(:reactionMessage, :key, :id)
     return if target_external_id.blank?
 
     existing = find_existing_reaction(sender, target_external_id)
@@ -117,7 +153,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
 
   def build_message_content_attributes
     type = message_type
-    msg = unwrap_ephemeral_message(@raw_message[:message])
+    msg = unwrap_message_content(@raw_message[:message])
     content_attributes = { external_created_at: baileys_extract_message_timestamp(@raw_message[:messageTimestamp]) }
     content_attributes[:external_sender_name] = 'WhatsApp' unless incoming?
 
@@ -153,7 +189,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
 
   def attach_media_to_message
     attachment_file = download_attachment_file
-    msg = unwrap_ephemeral_message(@raw_message[:message])
+    msg = unwrap_message_content(@raw_message[:message])
 
     attachment = @message.attachments.build(
       account_id: @message.account_id,
@@ -174,7 +210,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
   end
 
   def build_attachment_filename
-    msg = unwrap_ephemeral_message(@raw_message[:message])
+    msg = unwrap_message_content(@raw_message[:message])
     filename = msg.dig(:documentMessage, :fileName) ||
                msg.dig(:documentWithCaptionMessage, :message, :documentMessage, :fileName) ||
                rich_media_header&.dig(:node, :fileName)
@@ -187,7 +223,7 @@ module Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler # rubocop:dis
   # Location carries no downloadable bytes; persist coordinates as a native
   # location attachment so the dashboard renders it in the map bubble.
   def attach_location_to_message
-    loc = unwrap_ephemeral_message(@raw_message[:message])
+    loc = unwrap_message_content(@raw_message[:message])
     loc = loc[:locationMessage] || loc[:liveLocationMessage]
     return if loc.blank?
 

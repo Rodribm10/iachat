@@ -7,6 +7,7 @@
 #  custom_attributes     :jsonb
 #  domain                :string(100)
 #  feature_flags         :bigint           default(0), not null
+#  feature_flags_ext_1   :bigint           default(0), not null
 #  internal_attributes   :jsonb            not null
 #  limits                :jsonb
 #  locale                :integer          default("en")
@@ -23,7 +24,7 @@
 #
 
 class Account < ApplicationRecord
-  # used for single column multi flags
+  # used for multi-flag bitset columns
   include FlagShihTzu
   include Reportable
   include Featurable
@@ -36,6 +37,9 @@ class Account < ApplicationRecord
     flag_query_mode: :bit_operator,
     check_for_column: false
   }.freeze
+  SUSPENSION_CATEGORIES = %w[spam non_payment other].freeze
+
+  attr_accessor :suspension_category, :suspension_reason
 
   validates :name, presence: true
   # `domain` is the inbound email domain used to construct reply addresses
@@ -67,6 +71,8 @@ class Account < ApplicationRecord
     super(ActiveModel::Type::Boolean.new.cast(value))
   end
 
+  store_accessor :settings, :captain_auto_resolve_mode, :captain_false_promise_harness_enabled
+  include AccountAgentRestrictions
   include AccountCaptainAutoResolve
 
   has_many :account_users, dependent: :destroy_async
@@ -157,6 +163,10 @@ class Account < ApplicationRecord
     }
   end
 
+  def suspension_history
+    internal_attributes['suspensions'] || []
+  end
+
   def inbound_email_domain
     domain.presence || GlobalConfig.get('MAILER_INBOUND_EMAIL_DOMAIN')['MAILER_INBOUND_EMAIL_DOMAIN'] || ENV.fetch('MAILER_INBOUND_EMAIL_DOMAIN',
                                                                                                                    false)
@@ -171,6 +181,10 @@ class Account < ApplicationRecord
       agents: ChatwootApp.max_limit.to_i,
       inboxes: ChatwootApp.max_limit.to_i
     }
+  end
+
+  def api_and_webhooks_enabled?
+    true
   end
 
   def locale_english_name
@@ -224,10 +238,6 @@ class Account < ApplicationRecord
     return if reporting_timezone.blank? || ActiveSupport::TimeZone[reporting_timezone].present?
 
     errors.add(:reporting_timezone, I18n.t('errors.account.reporting_timezone.invalid'))
-  end
-
-  def enforce_agent_assignee_tabs_constraint
-    self.hide_agent_all_tab = true if hide_agent_unassigned_tab
   end
 
   def validate_support_email_format

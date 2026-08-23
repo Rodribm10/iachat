@@ -219,6 +219,7 @@ const renderInstruction = instruction => () =>
 
       <TextArea
         v-model="state.description"
+        :max-length="500"
         :label="
           t('CAPTAIN.ASSISTANTS.SCENARIOS.ADD.NEW.FORM.DESCRIPTION.LABEL')
         "

@@ -398,6 +398,174 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
     end
   end
 
+  describe 'album and wrapped media handling' do
+    let(:phone) { '5511912345678' }
+    let(:lid) { '12345678' }
+
+    context 'when receiving an album marker message' do
+      it 'ignores the marker and creates no message' do
+        raw_message = {
+          key: { id: 'msg_album_marker', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            albumMessage: { expectedImageCount: 2, expectedVideoCount: 0 }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.not_to change(Message, :count)
+      end
+    end
+
+    context 'when receiving an album child image message' do
+      it 'unwraps the wrapper and processes the message with media' do
+        raw_message = {
+          key: { id: 'msg_album_child_1', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            associatedChildMessage: {
+              message: {
+                imageMessage: {
+                  caption: 'Album photo',
+                  mimetype: 'image/jpeg',
+                  url: 'https://example.com/img.jpg'
+                }
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        stub_request(:get, whatsapp_channel.media_url('msg_album_child_1'))
+          .to_return(status: 200, body: 'fake image data')
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.content).to eq('Album photo')
+        expect(message.is_unsupported).to be_falsey
+        expect(message.attachments.count).to eq(1)
+        expect(message.attachments.first.file_type).to eq('image')
+      end
+    end
+
+    context 'when receiving an album child nested inside an ephemeral message' do
+      it 'unwraps the nested wrappers and processes the message with media' do
+        raw_message = {
+          key: { id: 'msg_nested_wrappers_1', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2
+            },
+            ephemeralMessage: {
+              message: {
+                associatedChildMessage: {
+                  message: {
+                    imageMessage: {
+                      caption: 'Nested album photo',
+                      mimetype: 'image/jpeg',
+                      url: 'https://example.com/nested.jpg'
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        stub_request(:get, whatsapp_channel.media_url('msg_nested_wrappers_1'))
+          .to_return(status: 200, body: 'fake image data')
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.content).to eq('Nested album photo')
+        expect(message.is_unsupported).to be_falsey
+        expect(message.attachments.count).to eq(1)
+        expect(message.attachments.first.file_type).to eq('image')
+      end
+    end
+
+    context 'when receiving a lottie sticker message' do
+      it 'unwraps the wrapper and processes the sticker with media' do
+        raw_message = {
+          key: { id: 'msg_lottie_1', remoteJid: "#{phone}@s.whatsapp.net", remoteJidAlt: "#{lid}@lid", fromMe: false,
+                 addressingMode: 'pn' },
+          pushName: 'Gabriel',
+          messageTimestamp: timestamp,
+          message: {
+            messageContextInfo: {
+              deviceListMetadata: {},
+              deviceListMetadataVersion: 2,
+              messageSecret: 'secret'
+            },
+            lottieStickerMessage: {
+              message: {
+                stickerMessage: {
+                  mimetype: 'application/was',
+                  url: 'https://example.com/sticker.was',
+                  isLottie: true
+                }
+              }
+            }
+          }
+        }
+        params = {
+          webhookVerifyToken: webhook_verify_token,
+          event: 'messages.upsert',
+          data: { type: 'notify', messages: [raw_message] }
+        }
+
+        stub_request(:get, whatsapp_channel.media_url('msg_lottie_1'))
+          .to_return(status: 200, body: 'fake sticker data')
+
+        expect do
+          Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: params).perform
+        end.to change(inbox.messages, :count).by(1)
+
+        message = inbox.messages.last
+        expect(message.is_unsupported).to be_falsey
+        expect(message.attachments.count).to eq(1)
+        expect(message.attachments.first.file_type).to eq('image')
+      end
+    end
+  end
+
   describe 'filename extraction' do
     let(:phone) { '5511912345678' }
 
@@ -739,6 +907,91 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
     end
   end
 
+  describe 'echo of a message sent by Chatwoot' do
+    let(:phone) { '5511912345678' }
+    let(:lid) { '12345678' }
+    let(:contact) { create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid") }
+    let(:contact_inbox) { create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid) }
+    let(:conversation) { create(:conversation, inbox: inbox, contact: contact, contact_inbox: contact_inbox) }
+
+    def echo_params(id)
+      raw_message = {
+        key: { id: id, remoteJid: "#{lid}@lid", remoteJidAlt: "#{phone}@s.whatsapp.net", fromMe: true, addressingMode: 'lid' },
+        messageTimestamp: timestamp,
+        message: { conversation: '*John* olá' }
+      }
+      { webhookVerifyToken: webhook_verify_token, event: 'messages.upsert', data: { type: 'append', messages: [raw_message] } }
+    end
+
+    # The send response never arrived, so `source_id` is still blank and only the id reserved before
+    # the request identifies the message. Without that match the echo would land as a second message
+    # attributed to WhatsApp instead of the agent.
+    it 'confirms the reserved message instead of creating a duplicate' do
+      sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
+                              content: '**John** olá', source_id: nil,
+                              content_attributes: { pending_source_id: 'RESERVED_1' })
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('RESERVED_1')).perform
+      end.not_to change(Message, :count)
+
+      expect(sent.reload.source_id).to eq('RESERVED_1')
+    end
+
+    # A delayed echo must not reopen the thread it belongs to, nor open a new one to hold a message
+    # that is already stored.
+    it 'confirms a reserved message whose conversation was resolved meanwhile' do
+      sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
+                              content: '**John** olá', source_id: nil,
+                              content_attributes: { pending_source_id: 'RESERVED_3' })
+      conversation.update!(status: :resolved)
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('RESERVED_3')).perform
+      end.to not_change(Message, :count).and not_change(Conversation, :count)
+
+      expect(sent.reload.source_id).to eq('RESERVED_3')
+      expect(conversation.reload.status).to eq('resolved')
+    end
+
+    # Deleting a message whose send is still in flight leaves nobody holding its provider id, so the
+    # echo is the only chance to learn it — and to revoke the message on the contact's phone.
+    it 'revokes on the channel when the confirmed message was deleted meanwhile' do
+      sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
+                              content: 'Mensagem apagada', source_id: nil,
+                              content_attributes: { pending_source_id: 'RESERVED_4', deleted: true })
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('RESERVED_4')).perform
+      end.to have_enqueued_job(Messages::DeleteOnChannelJob).with(sent.id)
+
+      expect(sent.reload.source_id).to eq('RESERVED_4')
+    end
+
+    it 'keeps the source_id already confirmed by the send response' do
+      sent = create(:message, inbox: inbox, conversation: conversation, message_type: :outgoing,
+                              content: '**John** olá', source_id: 'RESERVED_2',
+                              content_attributes: { pending_source_id: 'RESERVED_2' })
+
+      Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('RESERVED_2')).perform
+
+      expect(sent.reload.source_id).to eq('RESERVED_2')
+    end
+
+    it 'still stores a message actually sent from the phone' do
+      conversation
+
+      expect do
+        Whatsapp::IncomingMessageBaileysService.new(inbox: inbox, params: echo_params('PHONE_MSG_1')).perform
+      end.to change(Message, :count).by(1)
+
+      message = Message.find_by(source_id: 'PHONE_MSG_1')
+      expect(message).to be_outgoing
+      expect(message.sender).to be_nil
+      expect(message.content_attributes['external_sender_name']).to eq('WhatsApp')
+    end
+  end
+
   describe 'membership request stub handling' do
     let(:group_jid) { '123456789123456789@g.us' }
     let(:requester_lid) { '12345678' }
@@ -1051,7 +1304,7 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
       it 'anchors the reply to the quoted message' do
         contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid")
         contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid)
-        conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+        conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox, contact: contact)
         original = create(:message, inbox: inbox, conversation: conversation, source_id: 'QUOTED_RICH_1')
 
         params = rich_params(
@@ -1201,7 +1454,7 @@ describe Whatsapp::BaileysHandlers::MessagesUpsert do
     it 'anchors the reply when the location quotes another message' do
       contact = create(:contact, account: inbox.account, phone_number: "+#{phone}", identifier: "#{lid}@lid")
       contact_inbox = create(:contact_inbox, inbox: inbox, contact: contact, source_id: lid)
-      conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox)
+      conversation = create(:conversation, inbox: inbox, contact_inbox: contact_inbox, contact: contact)
       original = create(:message, inbox: inbox, conversation: conversation, source_id: 'QUOTED_LOC_1')
 
       params = loc_params(

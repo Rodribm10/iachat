@@ -203,7 +203,6 @@ export default {
         instagramInbox
       );
     },
-
     replyWindowBannerMessage() {
       if (this.isAWhatsAppChannel) {
         return this.$t('CONVERSATION.TWILIO_WHATSAPP_CAN_REPLY');

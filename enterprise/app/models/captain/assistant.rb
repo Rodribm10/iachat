@@ -5,7 +5,7 @@
 #  id                         :bigint           not null, primary key
 #  api_key                    :text
 #  config                     :jsonb            not null
-#  description                :string
+#  description                :text
 #  engine                     :string           default("captain_interno"), not null
 #  guardrails                 :jsonb
 #  handoff_webhook_config     :jsonb
@@ -37,6 +37,8 @@
 #  fk_rails_...  (captain_unit_id => captain_units.id) ON DELETE => nullify
 #
 class Captain::Assistant < ApplicationRecord
+  DESCRIPTION_LENGTH_LIMIT = 500
+
   include Avatarable
   include Concerns::CaptainToolsHelpers
 
@@ -46,6 +48,7 @@ class Captain::Assistant < ApplicationRecord
   belongs_to :captain_unit, class_name: 'Captain::Unit', optional: true
   has_many :documents, class_name: 'Captain::Document', dependent: :destroy_async
   has_many :responses, class_name: 'Captain::AssistantResponse', dependent: :destroy_async
+  has_many :faq_suggestions, class_name: 'Captain::FaqSuggestion', dependent: :destroy_async
   has_many :captain_inboxes,
            class_name: 'CaptainInbox',
            foreign_key: :captain_assistant_id,
@@ -55,13 +58,14 @@ class Captain::Assistant < ApplicationRecord
   has_many :messages, as: :sender, dependent: :nullify
   has_many :copilot_threads, dependent: :destroy_async
   has_many :scenarios, class_name: 'Captain::Scenario', dependent: :destroy_async
+  has_many :agent_sessions, class_name: 'Captain::AgentSession', dependent: :destroy_async
 
   store_accessor :config, :temperature, :feature_faq, :feature_memory, :feature_contact_attributes, :product_name
 
   ENGINES = %w[captain_interno hermes].freeze
 
   validates :name, presence: true
-  validates :description, presence: true
+  validates :description, presence: true, length: { maximum: DESCRIPTION_LENGTH_LIMIT }
   validates :account_id, presence: true
   validates :engine, inclusion: { in: ENGINES }
   validates :hermes_profile_name, presence: true, if: :hermes?

@@ -147,6 +147,67 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(Rails.logger).to have_received(:error).with('error message').twice
       end
     end
+
+    context 'with a confirmed reconnect loop (quarantine strikes at the reset threshold)' do
+      before do
+        whatsapp_channel.update_provider_connection!(
+          connection: 'reconnecting',
+          quarantine: { strikes: 3, until: '2026-07-31T12:00:00.000Z' }
+        )
+      end
+
+      it 'discards the stored session before requesting the new connection, so a QR is offered' do
+        delete_stub = stub_request(:delete, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+                      .to_return(status: 200)
+        post_stub = stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+                    .to_return(status: 200)
+
+        expect(service.setup_channel_provider).to be(true)
+
+        expect(delete_stub).to have_been_requested
+        expect(post_stub).to have_been_requested
+      end
+    end
+
+    context 'with quarantine strikes below the reset threshold' do
+      before do
+        whatsapp_channel.update_provider_connection!(
+          connection: 'reconnecting',
+          quarantine: { strikes: 2, until: '2026-07-31T12:00:00.000Z' }
+        )
+      end
+
+      it 'does not discard the stored session' do
+        post_stub = stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+                    .to_return(status: 200)
+
+        expect(service.setup_channel_provider).to be(true)
+
+        expect(post_stub).to have_been_requested
+        expect(a_request(:delete, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"))
+          .not_to have_been_made
+      end
+    end
+
+    context 'when the channel is open despite stale quarantine data' do
+      before do
+        whatsapp_channel.update_provider_connection!(
+          connection: 'open',
+          quarantine: { strikes: 5, until: '2026-07-31T12:00:00.000Z' }
+        )
+      end
+
+      it 'never discards the stored session of an open channel' do
+        post_stub = stub_request(:post, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}")
+                    .to_return(status: 200)
+
+        expect(service.setup_channel_provider).to be(true)
+
+        expect(post_stub).to have_been_requested
+        expect(a_request(:delete, "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}"))
+          .not_to have_been_made
+      end
+    end
   end
 
   describe '#import_session' do
@@ -674,6 +735,57 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         result = service.send_message(group_jid, message)
 
         expect(result).to eq('msg_123')
+      end
+    end
+
+    context 'when reserving the WhatsApp message id' do
+      let(:unsent_message) { create(:message, inbox: whatsapp_channel.inbox, content: 'Hello') }
+
+      it 'sends under a reserved id and persists it before the request' do
+        stub_request(:post, request_path)
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: result_body.to_json)
+
+        service.send_message(test_send_phone_number, unsent_message)
+
+        reserved = unsent_message.reload.pending_source_id
+        expect(reserved).to match(/\A3EB0[0-9A-F]{18}\z/)
+        expect(WebMock).to(have_requested(:post, request_path).with { |req| JSON.parse(req.body)['messageId'] == reserved })
+        # Stored so the echo handler's lookup can read it back out of the JSON column.
+        expect(Message.where("(content_attributes#>>'{}')::jsonb->>'pending_source_id' = ?", reserved)).to exist
+      end
+
+      # A send can sit behind the channel lock for minutes; the row may have been re-reserved (or
+      # cleared and re-reserved by a reaction toggle) since it was loaded.
+      it 'reads the reservation under the lock instead of the copy loaded before waiting' do
+        Message.find(unsent_message.id).update!(content_attributes: { pending_source_id: 'RESERVED_ELSEWHERE' })
+        stub_request(:post, request_path)
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: result_body.to_json)
+
+        service.send_message(test_send_phone_number, unsent_message)
+
+        expect(WebMock).to(have_requested(:post, request_path).with { |req| JSON.parse(req.body)['messageId'] == 'RESERVED_ELSEWHERE' })
+      end
+
+      # The reservation is bookkeeping for a send that has not happened yet: it must not look like a
+      # message update to integrations, nor invalidate the idempotency key a retry has to reuse.
+      it 'does not touch updated_at when reserving' do
+        stub_request(:post, request_path)
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: result_body.to_json)
+
+        expect { service.send_message(test_send_phone_number, unsent_message) }
+          .not_to(change { unsent_message.reload.updated_at })
+      end
+
+      it 'reuses the reserved id when the same message is sent again' do
+        stub_request(:post, request_path)
+          .to_return(status: 200, headers: { 'Content-Type' => 'application/json' }, body: result_body.to_json)
+
+        service.send_message(test_send_phone_number, unsent_message)
+        reserved = unsent_message.reload.pending_source_id
+        service.send_message(test_send_phone_number, unsent_message)
+
+        expect(unsent_message.reload.pending_source_id).to eq(reserved)
+        expect(WebMock).to(have_requested(:post, request_path).with { |req| JSON.parse(req.body)['messageId'] == reserved }.twice)
       end
     end
 
@@ -1961,7 +2073,13 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     }
   end
 
+  # The service reserves the WhatsApp message id before posting, so reserve it here too or the
+  # expected body would carry a different `messageId`. The reload matters: the reservation runs
+  # under a row lock, which re-reads the row, so the service builds the idempotency key from the
+  # database `updated_at` (microseconds) rather than the in-memory one written by `update!`.
   def send_message_body(hash, msg = message)
-    hash.merge(chatwootMessageId: "#{msg.id}:#{msg.updated_at.to_f}").to_json
+    msg.update_under_lock!(pending_source_id: 'reserved_msg_id') if msg.pending_source_id.blank?
+    msg.reload
+    hash.merge(chatwootMessageId: "#{msg.id}:#{msg.updated_at.to_f}", messageId: msg.pending_source_id).to_json
   end
 end
