@@ -1,5 +1,6 @@
 import advancedFilters from './advancedFilters.json';
 import aggressiveBanner from './aggressiveBanner.json';
+import groups from './groups.json';
 import agentBots from './agentBots.json';
 import agentMgmt from './agentMgmt.json';
 import attributesMgmt from './attributesMgmt.json';
@@ -10,9 +11,11 @@ import campaign from './campaign.json';
 import cannedMgmt from './cannedMgmt.json';
 import captain from './captain.json';
 import chatlist from './chatlist.json';
+import companies from './companies.json';
 import components from './components.json';
 import contact from './contact.json';
 import contactFilters from './contactFilters.json';
+import contentTemplates from './contentTemplates.json';
 import conversation from './conversation.json';
 import csatMgmt from './csatMgmt.json';
 import customRole from './customRole.json';
@@ -26,9 +29,11 @@ import inboxMgmt from './inboxMgmt.json';
 import integrationApps from './integrationApps.json';
 import integrations from './integrations.json';
 import jasmine from './jasmine.json';
+import kanban from './kanban.json';
 import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
 import macros from './macros.json';
+import mfa from './mfa.json';
 import report from './report.json';
 import resetPassword from './resetPassword.json';
 import search from './search.json';
@@ -36,12 +41,16 @@ import setNewPassword from './setNewPassword.json';
 import settings from './settings.json';
 import signup from './signup.json';
 import sla from './sla.json';
+import snooze from './snooze.json';
 import teamsSettings from './teamsSettings.json';
+import webhooks from './webhooks.json';
 import whatsappTemplates from './whatsappTemplates.json';
+import yearInReview from './yearInReview.json';
 
 export default {
   ...advancedFilters,
   ...aggressiveBanner,
+  ...groups,
   ...agentBots,
   ...agentMgmt,
   ...attributesMgmt,
@@ -52,9 +61,11 @@ export default {
   ...cannedMgmt,
   ...captain,
   ...chatlist,
+  ...companies,
   ...components,
   ...contact,
   ...contactFilters,
+  ...contentTemplates,
   ...conversation,
   ...csatMgmt,
   ...customRole,
@@ -68,9 +79,11 @@ export default {
   ...integrationApps,
   ...integrations,
   ...jasmine,
+  ...kanban,
   ...labelsMgmt,
   ...login,
   ...macros,
+  ...mfa,
   ...report,
   ...resetPassword,
   ...search,
@@ -78,6 +91,9 @@ export default {
   ...settings,
   ...signup,
   ...sla,
+  ...snooze,
   ...teamsSettings,
+  ...webhooks,
   ...whatsappTemplates,
+  ...yearInReview,
 };

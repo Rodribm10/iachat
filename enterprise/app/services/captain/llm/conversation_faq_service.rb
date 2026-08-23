@@ -1,5 +1,6 @@
 class Captain::Llm::ConversationFaqService < Llm::BaseAiService
   include Integrations::LlmInstrumentation
+
   DISTANCE_THRESHOLD = 0.3
   MAX_JUDGE_NEIGHBOURS = 5
 
@@ -197,7 +198,7 @@ class Captain::Llm::ConversationFaqService < Llm::BaseAiService
   def parse_response(response)
     return [] if response.nil?
 
-    JSON.parse(response.strip).fetch('faqs', [])
+    JSON.parse(sanitize_json_response(response)).fetch('faqs', [])
   rescue JSON::ParserError => e
     Rails.logger.error "Error in parsing GPT processed response: #{e.message}"
     []

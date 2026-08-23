@@ -73,11 +73,13 @@ class Inbox < ApplicationRecord
   has_many :contacts, through: :contact_inboxes
 
   has_many :inbox_members, dependent: :destroy_async
+  has_many :inbox_signatures, dependent: :destroy_async
   has_many :members, through: :inbox_members, source: :user
   has_many :conversations, dependent: :destroy_async
   has_many :messages, dependent: :destroy_async
   has_many :scheduled_messages, dependent: :destroy_async
   has_many :reporting_events, dependent: :nullify
+  has_many :recurring_scheduled_messages, dependent: :destroy_async
 
   has_one :inbox_assignment_policy, dependent: :destroy
   has_one :assignment_policy, through: :inbox_assignment_policy

@@ -30,7 +30,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       it 'schedules captain response job for incoming messages on pending conversations' do
         expect(Captain::Hermes::OutgoingJob).to receive(:perform_later)
 
-        create(:message, conversation: conversation, message_type: :incoming)
+        create(:message, conversation: conversation, message_type: :incoming, account: account)
       end
     end
 
@@ -49,7 +49,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       it 'schedules captain response job outside business hours (Captain always responds when configured)' do
         expect(Captain::Hermes::OutgoingJob).to receive(:perform_later)
 
-        create(:message, conversation: conversation, message_type: :incoming)
+        create(:message, conversation: conversation, message_type: :incoming, account: account)
       end
 
       it 'performs captain handoff when quota is exceeded (OOO template will kick in after handoff)' do
@@ -58,7 +58,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
           custom_attributes: account.custom_attributes.merge('captain_responses_usage' => 100)
         )
 
-        create(:message, conversation: conversation, message_type: :incoming)
+        create(:message, conversation: conversation, message_type: :incoming, account: account)
 
         expect(conversation.reload.status).to eq('open')
       end
@@ -68,7 +68,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
         allow(MessageTemplates::Template::OutOfOffice).to receive(:new).and_return(out_of_office_service)
         allow(out_of_office_service).to receive(:perform).and_return(true)
 
-        create(:message, conversation: conversation, message_type: :incoming)
+        create(:message, conversation: conversation, message_type: :incoming, account: account)
 
         expect(MessageTemplates::Template::OutOfOffice).not_to have_received(:new)
       end
@@ -82,7 +82,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       it 'schedules captain response job regardless of time' do
         expect(Captain::Hermes::OutgoingJob).to receive(:perform_later)
 
-        create(:message, conversation: conversation, message_type: :incoming)
+        create(:message, conversation: conversation, message_type: :incoming, account: account)
       end
     end
 
@@ -101,7 +101,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       end
 
       it 'performs handoff within business hours when quota exceeded' do
-        create(:message, conversation: conversation, message_type: :incoming)
+        create(:message, conversation: conversation, message_type: :incoming, account: account)
 
         expect(conversation.reload.status).to eq('open')
       end
@@ -135,7 +135,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
     it 'does not schedule captain response job' do
       expect(Captain::Hermes::OutgoingJob).not_to receive(:perform_later)
 
-      create(:message, conversation: conversation, message_type: :incoming)
+      create(:message, conversation: conversation, message_type: :incoming, account: account)
     end
   end
 
@@ -147,7 +147,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
     it 'does not schedule captain response job' do
       expect(Captain::Hermes::OutgoingJob).not_to receive(:perform_later)
 
-      create(:message, conversation: conversation, message_type: :incoming)
+      create(:message, conversation: conversation, message_type: :incoming, account: account)
     end
   end
 
@@ -155,7 +155,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
     it 'does not schedule captain response job' do
       expect(Captain::Hermes::OutgoingJob).not_to receive(:perform_later)
 
-      create(:message, conversation: conversation, message_type: :outgoing)
+      create(:message, conversation: conversation, message_type: :outgoing, account: account)
     end
   end
 
@@ -169,7 +169,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
         inbox.update!(greeting_enabled: true, greeting_message: 'Hello! How can we help you?', enable_email_collect: false)
 
         expect do
-          create(:message, conversation: conversation, message_type: :incoming)
+          create(:message, conversation: conversation, message_type: :incoming, account: account)
         end.not_to(change { conversation.reload.messages.template.count })
       end
 
@@ -185,7 +185,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
         )
 
         expect do
-          create(:message, conversation: conversation, message_type: :incoming)
+          create(:message, conversation: conversation, message_type: :incoming, account: account)
         end.not_to(change { conversation.reload.messages.template.count })
       end
     end
@@ -199,7 +199,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
         inbox.update!(greeting_enabled: true, greeting_message: 'Hello! How can we help you?', enable_email_collect: false)
 
         expect do
-          create(:message, conversation: conversation, message_type: :incoming)
+          create(:message, conversation: conversation, message_type: :incoming, account: account)
         end.to change { conversation.reload.messages.template.count }.by(1)
 
         greeting_message = conversation.reload.messages.template.last
@@ -218,7 +218,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
         )
 
         expect do
-          create(:message, conversation: conversation, message_type: :incoming)
+          create(:message, conversation: conversation, message_type: :incoming, account: account)
         end.to change { conversation.reload.messages.template.count }.by(1)
 
         out_of_office_message = conversation.reload.messages.template.last
@@ -236,7 +236,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       inbox.update!(greeting_enabled: true, greeting_message: 'Hello! How can we help you?', enable_email_collect: false)
 
       expect do
-        create(:message, conversation: conversation, message_type: :incoming)
+        create(:message, conversation: conversation, message_type: :incoming, account: account)
       end.to change { conversation.reload.messages.template.count }.by(1)
 
       greeting_message = conversation.reload.messages.template.last
@@ -255,7 +255,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       )
 
       expect do
-        create(:message, conversation: conversation, message_type: :incoming)
+        create(:message, conversation: conversation, message_type: :incoming, account: account)
       end.to change { conversation.reload.messages.template.count }.by(1)
 
       out_of_office_message = conversation.reload.messages.template.last
@@ -270,7 +270,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
     it 'schedules captain response job for incoming messages on pending campaign conversations' do
       expect(Captain::Hermes::OutgoingJob).to receive(:perform_later)
 
-      create(:message, conversation: campaign_conversation, message_type: :incoming)
+      create(:message, conversation: campaign_conversation, message_type: :incoming, account: account)
     end
 
     it 'does not send greeting template on campaign conversations' do
@@ -280,7 +280,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       allow(MessageTemplates::Template::Greeting).to receive(:new).and_return(greeting_service)
       allow(greeting_service).to receive(:perform).and_return(true)
 
-      create(:message, conversation: campaign_conversation, message_type: :incoming)
+      create(:message, conversation: campaign_conversation, message_type: :incoming, account: account)
 
       expect(MessageTemplates::Template::Greeting).not_to have_received(:new)
     end
@@ -296,7 +296,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       allow(MessageTemplates::Template::OutOfOffice).to receive(:new).and_return(out_of_office_service)
       allow(out_of_office_service).to receive(:perform).and_return(true)
 
-      create(:message, conversation: campaign_conversation, message_type: :incoming)
+      create(:message, conversation: campaign_conversation, message_type: :incoming, account: account)
 
       expect(MessageTemplates::Template::OutOfOffice).not_to have_received(:new)
     end
@@ -309,7 +309,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       allow(MessageTemplates::Template::EmailCollect).to receive(:new).and_return(email_collect_service)
       allow(email_collect_service).to receive(:perform).and_return(true)
 
-      create(:message, conversation: campaign_conversation, message_type: :incoming)
+      create(:message, conversation: campaign_conversation, message_type: :incoming, account: account)
 
       expect(MessageTemplates::Template::EmailCollect).not_to have_received(:new)
     end
@@ -329,7 +329,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
       )
 
       expect do
-        create(:message, conversation: campaign_conversation, message_type: :incoming)
+        create(:message, conversation: campaign_conversation, message_type: :incoming, account: account)
       end.not_to(change { campaign_conversation.messages.template.count })
     end
   end
@@ -357,7 +357,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
 
       it 'sends out of office message after handoff due to quota exceeded' do
         expect do
-          create(:message, conversation: conversation, message_type: :incoming)
+          create(:message, conversation: conversation, message_type: :incoming, account: account)
         end.to change { conversation.messages.template.count }.by(1)
 
         expect(conversation.reload.status).to eq('open')
@@ -381,7 +381,7 @@ RSpec.describe MessageTemplates::HookExecutionService do
 
       it 'does not send out of office message after handoff' do
         expect do
-          create(:message, conversation: conversation, message_type: :incoming)
+          create(:message, conversation: conversation, message_type: :incoming, account: account)
         end.not_to(change { conversation.messages.template.count })
 
         expect(conversation.reload.status).to eq('open')

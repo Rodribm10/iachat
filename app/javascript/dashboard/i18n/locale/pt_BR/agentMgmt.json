@@ -9,6 +9,7 @@
       "ADMINISTRATOR": "Administrador",
       "AGENT": "Agente"
     },
+    "COUNT": "{n} agente | {n} agentes",
     "LIST": {
       "404": "Não existem agentes associados a esta conta",
       "TITLE": "Gerenciar agentes de seu time",
@@ -103,6 +104,8 @@
         "NONE_WARNING": "Nenhuma caixa selecionada — este agente não verá o alerta agressivo."
       }
     },
+    "SEARCH_PLACEHOLDER": "Pesquisar agentes...",
+    "NO_RESULTS": "Nenhum agente encontrado correspondente à sua busca",
     "SEARCH": {
       "NO_RESULTS": "Nenhum resultado encontrado."
     },

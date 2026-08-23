@@ -3,6 +3,21 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
+- **Setup**: `bundle install && pnpm install`
+- **Run Dev**: `pnpm dev` or `overmind start -f ./Procfile.dev`
+- **Seed Local Test Data**: `bundle exec rails db:seed` (quickly populates minimal data for standard feature verification)
+- **Seed Search Test Data**: `bundle exec rails search:setup_test_data` (bulk fixture generation for search/performance/manual load scenarios)
+- **Seed Account Sample Data (richer test data)**: `Seeders::AccountSeeder` is available as an internal utility and is exposed through Super Admin `Accounts#seed`, but can be used directly in dev workflows too:
+  - UI path: Super Admin → Accounts → Seed (enqueues `Internal::SeedAccountJob`).
+  - CLI path: `bundle exec rails runner "Internal::SeedAccountJob.perform_now(Account.find(<id>))"` (or call `Seeders::AccountSeeder.new(account: Account.find(<id>)).perform!` directly).
+- **Lint JS/Vue**: `pnpm eslint` / `pnpm eslint:fix`
+- **Lint Ruby**: `bundle exec rubocop -a`
+- **Test JS**: `pnpm test` or `pnpm test:watch`
+- **Test Ruby**: `bundle exec rspec spec/path/to/file_spec.rb`
+- **Single Test**: `bundle exec rspec spec/path/to/file_spec.rb:LINE_NUMBER`
+- **Run Project**: `overmind start -f Procfile.dev`
+- **Ruby Version**: Manage Ruby via `rvm`
+- Always prefer `bundle exec` for Ruby CLI tasks (rspec, rake, rubocop, etc.)
 
 **Chatwoot** customizado para **fazer.ai** — plataforma de atendimento ao cliente multi-canal com IA (Captain). Multi-tenant SaaS para hotelaria, com integração de PIX/Inter, reservas e WhatsApp.
 
@@ -50,6 +65,16 @@ bundle exec rubocop -a   # auto-fix Ruby
 ```
 
 ### Database
+## PR Description Format
+
+- Start with a short, user-facing paragraph describing the product change.
+- Add a `Closes` section with relevant issue links (GitHub, Linear, etc.).
+- For feature PRs, add `How to test` from a product/UX standpoint.
+- For bugfix PRs, use `How to reproduce` when helpful.
+- Optionally add a `What changed` section for implementation highlights.
+- Do not add a `How this was tested` section listing specs/commands.
+
+## Project-Specific
 
 ```bash
 bin/rails db:migrate

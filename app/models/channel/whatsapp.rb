@@ -1,3 +1,4 @@
+# rubocop:disable Layout/LineLength
 # == Schema Information
 #
 # Table name: channel_whatsapp
@@ -28,6 +29,7 @@
 #  index_channel_whatsapp_on_phone_number      (phone_number) UNIQUE
 #  index_channel_whatsapp_provider_connection  (provider_connection) WHERE ((provider)::text = ANY ((ARRAY['baileys'::character varying, 'zapi'::character varying])::text[])) USING gin
 #
+# rubocop:enable Layout/LineLength
 
 class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLength
   include Channelable
@@ -189,6 +191,63 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     return unless provider_service.respond_to?(:on_whatsapp)
 
     provider_service.on_whatsapp(phone_number)
+  end
+
+  def delete_message(message, conversation:)
+    return unless provider_service.respond_to?(:delete_message)
+
+    recipient_id = if provider == 'zapi'
+                     conversation.contact.phone_number.presence || conversation.contact.identifier
+                   else
+                     conversation.contact.identifier || conversation.contact.phone_number
+                   end
+    return if recipient_id.blank?
+
+    provider_service.delete_message(recipient_id, message)
+  end
+
+  def edit_message(message, new_content, conversation:)
+    return unless provider_service.respond_to?(:edit_message)
+
+    recipient_id = conversation.contact.identifier || conversation.contact.phone_number
+    provider_service.edit_message(recipient_id, message, new_content)
+  end
+
+  def sync_group(conversation, soft: false)
+    return unless provider_service.respond_to?(:sync_group)
+
+    provider_service.sync_group(conversation, soft: soft)
+  end
+
+  def allow_group_creation?
+    provider_service.respond_to?(:allow_group_creation?) && provider_service.allow_group_creation?
+  end
+
+  delegate :setup_channel_provider, to: :provider_service
+  delegate :send_message, to: :provider_service
+  delegate :send_template, to: :provider_service
+  delegate :sync_templates, to: :provider_service
+  delegate :media_url, to: :provider_service
+  delegate :api_headers, to: :provider_service
+  delegate :create_group, to: :provider_service
+  delegate :update_group_subject, to: :provider_service
+  delegate :update_group_description, to: :provider_service
+  delegate :update_group_picture, to: :provider_service
+  delegate :update_group_participants, to: :provider_service
+  delegate :group_invite_code, to: :provider_service
+  delegate :revoke_group_invite, to: :provider_service
+  delegate :group_join_requests, to: :provider_service
+  delegate :handle_group_join_requests, to: :provider_service
+  delegate :group_leave, to: :provider_service
+  delegate :group_setting_update, to: :provider_service
+  delegate :group_join_approval_mode, to: :provider_service
+  delegate :group_member_add_mode, to: :provider_service
+
+  def setup_webhooks
+    perform_webhook_setup
+  rescue StandardError => e
+    Rails.logger.error "[WHATSAPP] Webhook setup failed: #{e.message}"
+    prompt_reauthorization!
   end
 
   private

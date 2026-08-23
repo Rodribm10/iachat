@@ -4,38 +4,40 @@
 #
 # Table name: contacts
 #
-#  id                           :integer          not null, primary key
-#  additional_attributes        :jsonb
-#  blocked                      :boolean          default(FALSE), not null
-#  contact_type                 :integer          default("visitor")
-#  country_code                 :string           default("")
-#  custom_attributes            :jsonb
+#  id                    :integer          not null, primary key
+#  account_id            :integer          not null
+#  additional_attributes :jsonb
+#  blocked               :boolean          default(FALSE), not null
+#  company_id            :bigint
+#  contact_type          :integer          default("visitor")
+#  country_code          :string           default("")
+#  created_at            :datetime         not null
+#  custom_attributes     :jsonb
 #  days_since_last_interaction  :integer
-#  email                        :string
+#  email                 :string
 #  first_interaction_at         :datetime
-#  identifier                   :string
+#  group_type            :integer          default("individual"), not null
+#  identifier            :string
 #  interactions_count           :integer          default(0), not null
 #  is_recurring                 :boolean          default(FALSE), not null
-#  last_activity_at             :datetime
+#  last_activity_at      :datetime
 #  last_interaction_at          :datetime
-#  last_name                    :string           default("")
-#  location                     :string           default("")
-#  middle_name                  :string           default("")
-#  name                         :string           default("")
+#  last_name             :string           default("")
+#  location              :string           default("")
+#  middle_name           :string           default("")
+#  name                  :string           default("")
 #  one_shot_consultations_count :integer          default(0), not null
-#  phone_number                 :string
+#  phone_number          :string
 #  pix_generated_count          :integer          default(0), not null
 #  reservations_paid_count      :integer          default(0), not null
-#  created_at                   :datetime         not null
-#  updated_at                   :datetime         not null
-#  account_id                   :integer          not null
-#  company_id                   :bigint
+#  updated_at            :datetime         not null
 #
 # Indexes
 #
 #  idx_contacts_account_recurring_last                   (account_id,is_recurring,last_interaction_at)
 #  index_contacts_on_account_id                          (account_id)
 #  index_contacts_on_account_id_and_contact_type         (account_id,contact_type)
+#  index_contacts_on_account_id_and_group_type           (account_id,group_type)
 #  index_contacts_on_account_id_and_last_activity_at     (account_id,last_activity_at DESC NULLS LAST)
 #  index_contacts_on_blocked                             (blocked)
 #  index_contacts_on_company_id                          (company_id)
@@ -53,7 +55,7 @@
 
 # rubocop:enable Layout/LineLength
 
-class Contact < ApplicationRecord
+class Contact < ApplicationRecord # rubocop:disable Metrics/ClassLength
   include Avatarable
   include AvailabilityStatusable
   include Labelable
@@ -74,6 +76,10 @@ class Contact < ApplicationRecord
   has_many :inboxes, through: :contact_inboxes
   has_many :messages, as: :sender, dependent: :destroy_async
   has_many :notes, dependent: :destroy_async
+  has_many :group_memberships, class_name: 'GroupMember', foreign_key: :group_contact_id, dependent: :destroy,
+                               inverse_of: :group_contact
+  has_many :group_member_contacts, through: :group_memberships, source: :contact
+  has_many :group_participations, class_name: 'GroupMember', dependent: :destroy, inverse_of: :contact
   before_validation :prepare_contact_attributes
   after_create_commit :dispatch_create_event, :ip_lookup
   after_update_commit :dispatch_update_event
@@ -81,6 +87,7 @@ class Contact < ApplicationRecord
   before_save :sync_contact_attributes
 
   enum contact_type: { visitor: 0, lead: 1, customer: 2 }
+  enum group_type: { individual: 0, group: 1 }, _prefix: true
 
   scope :order_on_last_activity_at, lambda { |direction|
     order(
@@ -159,11 +166,16 @@ class Contact < ApplicationRecord
     contact_inboxes.find_by!(inbox_id: inbox_id).source_id
   end
 
+  def group_channel
+    contact_inboxes.first&.inbox&.channel
+  end
+
   def push_event_data
     {
       additional_attributes: additional_attributes,
       custom_attributes: custom_attributes,
       email: email,
+      group_type: group_type,
       id: id,
       identifier: identifier,
       name: name,

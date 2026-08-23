@@ -9,6 +9,7 @@
       "ADMINISTRATOR": "Administrator",
       "AGENT": "Agent"
     },
+    "COUNT": "{n} agent | {n} agents",
     "LIST": {
       "404": "There are no agents associated to this account",
       "TITLE": "Manage agents in your team",
@@ -103,6 +104,8 @@
         "NONE_WARNING": "No inbox selected — this agent will not see the aggressive alert."
       }
     },
+    "SEARCH_PLACEHOLDER": "Search agents...",
+    "NO_RESULTS": "No agents found matching your search",
     "SEARCH": {
       "NO_RESULTS": "No results found."
     },
