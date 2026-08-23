@@ -7,6 +7,12 @@ class Gowa::Client # rubocop:disable Metrics/ClassLength
   class AuthenticationError < Error; end
   class ConnectionError < Error; end
 
+  DEFAULT_READ_TIMEOUT = 30
+  # O GOWA só responde o POST de mídia depois de subir o arquivo pro WhatsApp.
+  # Com 30s, uma arte de 2 MB estourava Net::ReadTimeout: a mensagem ficava
+  # pendurada no Chatwoot e a foto nunca chegava no celular do cliente.
+  MEDIA_READ_TIMEOUT = 120
+
   def initialize(base_url, username, password)
     @base_url = normalize_url(base_url)
     @username = username
@@ -134,7 +140,7 @@ class Gowa::Client # rubocop:disable Metrics/ClassLength
     request_object['Content-Type'] = "multipart/form-data; boundary=#{boundary}"
     request_object.body = multipart_body(payload, boundary)
 
-    parse_response(perform_http_request(request_object, uri))
+    parse_response(perform_http_request(request_object, uri, read_timeout: MEDIA_READ_TIMEOUT))
   end
 
   def request_object_for(method, uri)
@@ -169,11 +175,11 @@ class Gowa::Client # rubocop:disable Metrics/ClassLength
     "#{parts.join("\r\n")}\r\n--#{boundary}--\r\n"
   end
 
-  def perform_http_request(request_object, uri)
+  def perform_http_request(request_object, uri, read_timeout: DEFAULT_READ_TIMEOUT)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme == 'https'
     http.open_timeout = 10
-    http.read_timeout = 30
+    http.read_timeout = read_timeout
     http.request(request_object)
   rescue SocketError, Errno::ECONNREFUSED, Errno::ECONNRESET, Net::OpenTimeout, Net::ReadTimeout, OpenSSL::SSL::SSLError => e
     raise ConnectionError, "Não foi possível conectar ao GOWA: #{e.message}"
