@@ -105,6 +105,8 @@ Metrics/ModuleLength:
     - lib/seeders/message_seeder.rb
     - spec/support/slack_stubs.rb
     - app/models/concerns/landing_host_ai_syncable.rb
+    # Roteamento pro Hermes + fallbacks do fork somados ao que veio do upstream
+    - enterprise/app/services/enterprise/message_templates/hook_execution_service.rb
 
 Rails/HelperInstanceVariable:
   Exclude:

@@ -1,7 +1,7 @@
 module Enterprise::MessageTemplates::HookExecutionService
   def trigger_templates
     super
-    return unless captain_conversation_message?
+    return unless should_process_captain_response?
 
     # Eligibility is demand-level: every inbound customer message in a
     # Captain-connected inbox counts, including conversations a human grabbed
@@ -9,10 +9,9 @@ module Enterprise::MessageTemplates::HookExecutionService
     # otherwise the coverage denominator only ever contains conversations
     # Captain was already about to answer.
     track_captain_eligibility
-    return unless conversation.pending?
     return perform_handoff unless inbox.captain_active?
 
-    Captain::Conversation::ResponseSchedulerService.new(message: message).perform
+    schedule_captain_response
   end
 
   def should_send_greeting?
@@ -34,6 +33,15 @@ module Enterprise::MessageTemplates::HookExecutionService
   end
 
   private
+
+  # Metrica de cobertura que veio do upstream: toda mensagem de cliente numa
+  # inbox com Captain conta como demanda, mesmo que um humano assuma antes.
+  def track_captain_eligibility
+    Captain::ConversationOutcomeTracker.new(
+      conversation: conversation,
+      assistant: inbox.captain_assistant
+    ).record_eligibility(at: message.created_at)
+  end
 
   # O motor interno do Captain saiu em 22/08/2026 — o Hermes é o único caminho
   # de resposta. Se um assistant não estiver configurado pra Hermes, a conversa
