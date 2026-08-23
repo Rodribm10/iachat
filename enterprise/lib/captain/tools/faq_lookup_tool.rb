@@ -2,13 +2,16 @@ class Captain::Tools::FaqLookupTool < Captain::Tools::BasePublicTool
   description 'Search FAQ responses using semantic similarity to find relevant answers'
   param :query, type: 'string', desc: 'The question or topic to search for in the FAQ database'
 
-  def perform(_tool_context, query:)
+  def perform(tool_context, query:)
     Rails.logger.info "[Captain][FaqLookupTool] Starting search with query: '#{query}'"
     log_tool_usage('searching', { query: query })
 
     # Vector search on live knowledge: approved + trial (quarantine) responses
     responses = @assistant.responses.retrievable.search(query).to_a
     Rails.logger.info "[Captain][FaqLookupTool] Query returned #{responses.size} results."
+    # Registro das fontes usadas (veio do upstream): alimenta a citacao e o
+    # painel de origem da resposta.
+    record_retrieved_sources(tool_context, responses)
 
     if responses.empty?
       Rails.logger.info "[Captain][FaqLookupTool] No results found for: #{query}"

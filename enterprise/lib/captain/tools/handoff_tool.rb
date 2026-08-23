@@ -41,20 +41,20 @@ class Captain::Tools::HandoffTool < Captain::Tools::BasePublicTool
 
   private
 
-  def trigger_handoff(tool_context, conversation, reason)
-    # post the reason as a private note
-    note = conversation.messages.create!(
-      message_type: :outgoing,
-      private: true,
-      sender: @assistant,
-      account: conversation.account,
-      inbox: conversation.inbox,
-      content: reason,
-      content_attributes: {
-        external_source: 'captain_handoff_tool',
-        triage_reason: 'sem_resposta_segura'
-      }
-    )
+  def trigger_handoff(tool_context, conversation, reason, reason_category)
+    return trigger_legacy_handoff(tool_context, conversation, reason, reason_category) unless captain_v2_enabled?
+
+    note = nil
+    handoff_result = conversation.with_lock do
+      next :changed unless conversation.pending?
+      next :stale if newer_customer_message_arrived?(tool_context.state)
+
+      note = create_handoff_note(conversation, reason)
+      conversation.bot_handoff!(dispatch_event: false)
+      :completed
+    end
+
+    return handoff_result unless handoff_result == :completed
 
     # Session capture attributes the run to this note so agents can inspect the
     # generation path on the handoff reason instead of the canned follow-up message.
@@ -72,11 +72,21 @@ class Captain::Tools::HandoffTool < Captain::Tools::BasePublicTool
     :completed
   end
 
-  def trigger_legacy_handoff(tool_context, conversation, reason, reason_category)
-    note = conversation.messages.create!(
+  # A nota carrega o triage_reason do fork: e por ele que o relatorio de triagem
+  # sabe por que a conversa saiu da IA.
+  def create_handoff_note(conversation, reason)
+    conversation.messages.create!(
       message_type: :outgoing, private: true, sender: @assistant,
-      account: conversation.account, inbox: conversation.inbox, content: reason
+      account: conversation.account, inbox: conversation.inbox, content: reason,
+      content_attributes: {
+        external_source: 'captain_handoff_tool',
+        triage_reason: 'sem_resposta_segura'
+      }
     )
+  end
+
+  def trigger_legacy_handoff(tool_context, conversation, reason, reason_category)
+    note = create_handoff_note(conversation, reason)
     record_handoff_note(tool_context, note) if reason.present?
     conversation.bot_handoff!
     emit_tool_handoff_event(conversation, reason_category)
