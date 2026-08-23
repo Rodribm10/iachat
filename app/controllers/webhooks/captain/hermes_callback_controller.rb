@@ -225,15 +225,11 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     normalized.scan(/[a-z0-9]+/).reject { |w| w.length < 3 }.to_set
   end
 
+  # Rede de segurança do caminho determinístico: quando o assistente escreve a
+  # frase-âncora em vez de chamar a tool `handoff`, o desfecho tem que ser o
+  # mesmo. Por isso os dois caminhos passam pelo mesmo serviço.
   def mark_for_human_triage(conversation, reason: nil)
-    reason_label = "triagem_#{reason}" if reason.present?
-    current = conversation.label_list
-    already_triaged = current.include?('triagem_humana')
-    labels = (current + %w[triagem_humana] + [reason_label]).compact.uniq
-    conversation.update!(status: :open) unless conversation.open?
-    conversation.update_labels(labels)
-    Captain::Hermes::HumanTriageNoteService.new(conversation: conversation, reason: reason).perform unless already_triaged
-    Rails.logger.info("[Hermes::Callback] conv #{conversation.display_id} → triagem_humana (#{reason})")
+    Captain::Hermes::HumanTriageService.perform(conversation: conversation, reason: reason)
   end
 
   def fetch_inbox

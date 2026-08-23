@@ -10,6 +10,7 @@
 class Captain::Mcp::ToolRegistry
   TOOLS = [
     Captain::Mcp::Tools::AddLabelTool,
+    Captain::Mcp::Tools::HandoffTool,
     Captain::Mcp::Tools::FaqLookupTool,
     Captain::Mcp::Tools::GeneratePixTool,
     Captain::Mcp::Tools::UpdateContactTool,
