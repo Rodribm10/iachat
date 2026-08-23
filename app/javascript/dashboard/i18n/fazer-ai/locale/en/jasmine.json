@@ -1,6 +1,10 @@
 {
   "JASMINE": {
-    "CONFIG": {},
+    "CONFIG": {
+      "TYPING_DELAY_LABEL": "Buffer / typing delay (seconds)",
+      "TYPING_DELAY_PLACEHOLDER": "e.g. 5",
+      "TYPING_DELAY_HELP": "How long the AI waits for more messages (buffer) before simulating typing and replying. Zero replies immediately."
+    },
     "WUZAPI": {
       "STATUS": "Status: {status}",
       "ACCOUNT_ERROR": "Error: Account ID not loaded. Please refresh the page.",

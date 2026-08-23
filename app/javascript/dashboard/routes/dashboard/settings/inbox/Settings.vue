@@ -1145,6 +1145,34 @@ export default {
             </SettingsFieldSection>
 
             <SettingsFieldSection
+              :label="$t('CAPTAIN_SETTINGS.UNITS.INBOX.CONNECT_UNIT_LABEL')"
+              :help-text="$t('CAPTAIN_SETTINGS.UNITS.INBOX.CONNECT_UNIT_HELP')"
+            >
+              <SelectInput
+                v-model="captainUnitId"
+                :options="
+                  captainUnitOptions.map(o => ({
+                    value: o.id,
+                    label: o.label,
+                  }))
+                "
+              />
+            </SettingsFieldSection>
+
+            <SettingsFieldSection
+              :label="$t('JASMINE.CONFIG.TYPING_DELAY_LABEL')"
+              :help-text="$t('JASMINE.CONFIG.TYPING_DELAY_HELP')"
+            >
+              <input
+                v-model.number="typingDelay"
+                type="number"
+                min="0"
+                max="60"
+                :placeholder="$t('JASMINE.CONFIG.TYPING_DELAY_PLACEHOLDER')"
+              />
+            </SettingsFieldSection>
+
+            <SettingsFieldSection
               v-if="canLocktoSingleConversation"
               :label="
                 $t('INBOX_MGMT.SETTINGS_POPUP.LOCK_TO_SINGLE_CONVERSATION')
