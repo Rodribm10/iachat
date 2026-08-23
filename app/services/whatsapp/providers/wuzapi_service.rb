@@ -23,7 +23,7 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
   def send_attachment_message(user_token, phone_number, message, content_with_signature = nil)
     attachment = message.attachments.first
     mime_type = attachment.file.content_type
-    caption = content_with_signature || message.content
+    caption = content_with_signature || normalize_whatsapp_markdown(message.content)
 
     return send_image_attachment(user_token, phone_number, attachment, mime_type, caption) if mime_type.start_with?('image/')
     return send_audio_attachment(user_token, phone_number, attachment) if wuzapi_audio_attachment?(attachment, mime_type)
@@ -249,7 +249,7 @@ class Whatsapp::Providers::WuzapiService < Whatsapp::Providers::BaseService
   end
 
   def build_content_with_signature(message)
-    content = message.content
+    content = normalize_whatsapp_markdown(message.content)
     return content unless message.inbox.message_signature_enabled?
 
     name = sender_name_for(message)

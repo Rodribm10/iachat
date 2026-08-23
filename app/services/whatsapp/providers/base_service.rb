@@ -154,6 +154,16 @@ class Whatsapp::Providers::BaseService
     create_payload('list', message.outgoing_content, JSON.generate(json_hash))
   end
 
+  # WhatsApp usa asterisco SIMPLES para negrito. O editor rich text do dashboard
+  # (assinatura do agente, respostas prontas) grava markdown padrao `**negrito**`,
+  # que chega literal no celular do cliente e parece defeito. Mesma normalizacao
+  # que o caminho do Hermes ja faz em Webhooks::Captain::HermesCallbackController.
+  def normalize_whatsapp_markdown(content)
+    return content if content.blank?
+
+    content.gsub(/\*\*([^*\n]+?)\*\*/, '*\1*')
+  end
+
   def attachment_to_base64(attachment)
     buffer = +''
     attachment.file.blob.open do |file|

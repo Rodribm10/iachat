@@ -5,11 +5,11 @@ class Whatsapp::Providers::GowaService < Whatsapp::Providers::BaseService
                    device_id,
                    phone_number,
                    message.attachments.first,
-                   caption: message.content,
+                   caption: normalize_whatsapp_markdown(message.content),
                    reply_message_id: reply_message_id(message)
                  )
                else
-                 client.send_text(device_id, phone_number, message.content, reply_message_id: reply_message_id(message))
+                 client.send_text(device_id, phone_number, normalize_whatsapp_markdown(message.content), reply_message_id: reply_message_id(message))
                end
 
     message_id = response.dig('results', 'id') || response.dig('results', 'message_id')

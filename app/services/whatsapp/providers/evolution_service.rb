@@ -31,7 +31,7 @@ class Whatsapp::Providers::EvolutionService < Whatsapp::Providers::BaseService
                    params['quoted'] = { key: { id: reply_id } }
                  end
 
-                 client.send_text(instance_name, normalized_phone, message.content, **params)
+                 client.send_text(instance_name, normalized_phone, normalize_whatsapp_markdown(message.content), **params)
                end
 
     extract_message_id(response)
@@ -43,12 +43,12 @@ class Whatsapp::Providers::EvolutionService < Whatsapp::Providers::BaseService
     # Verifica o env se estamos servindo de S3 ou local
     # Dependendo da lib Evolution, ele aceita URL ou Base64. Vamos usar Base64 para ser seguro pareado c/ local ou nuvem.
     begin
-      base64_data = Base64.strict_encode64(attachment.file.download)
+      base64_data = attachment_to_base64(attachment)
       mime_type = attachment.file.content_type
       data_uri = "data:#{mime_type};base64,#{base64_data}"
 
       if mime_type.start_with?('image/')
-        client.send_image(instance_name, phone_number, data_uri, message.content)
+        client.send_image(instance_name, phone_number, data_uri, normalize_whatsapp_markdown(message.content))
       else
         client.send_file(instance_name, phone_number, data_uri, attachment.file.filename.to_s)
       end
