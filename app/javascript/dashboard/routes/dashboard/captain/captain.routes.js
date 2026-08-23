@@ -33,6 +33,12 @@ const knowledgeBaseMeta = {
   permissions: ['administrator', 'agent', PORTAL_PERMISSIONS],
 };
 
+const metaCustomTools = {
+  permissions: ['administrator', 'agent'],
+  featureFlag: FEATURE_FLAGS.CAPTAIN_CUSTOM_TOOLS,
+  installationTypes: [INSTALLATION_TYPES.CLOUD, INSTALLATION_TYPES.ENTERPRISE],
+};
+
 const metaV2 = {
   permissions: ['administrator', 'agent'],
   featureFlag: FEATURE_FLAGS.CAPTAIN_V2,
@@ -56,7 +62,7 @@ const assistantRoutes = [
     path: frontendURL('accounts/:accountId/captain/:assistantId/tools'),
     component: CustomToolsIndex,
     name: 'captain_tools_index',
-    meta: metaV2,
+    meta: metaCustomTools,
   },
   {
     path: frontendURL('accounts/:accountId/captain/:assistantId/scenarios'),

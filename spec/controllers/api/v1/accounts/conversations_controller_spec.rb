@@ -35,6 +35,23 @@ RSpec.describe 'Conversations API', type: :request do
         expect(body[:data][:payload].first[:messages].first[:id]).to eq(message.id)
       end
 
+      # Regression: when the latest message is a private note, the seed is the
+      # cursor for setActiveChat → fetchPreviousMessages(before: id). Filtering
+      # private notes here would leave the trailing note out of the store on
+      # cold open, so the bubble wouldn't render until a non-private message
+      # arrived after it.
+      it 'seeds the latest message even when it is a private note' do
+        create(:message, conversation: conversation, account: account)
+        private_note = create(:message, conversation: conversation, account: account, private: true)
+
+        get "/api/v1/accounts/#{account.id}/conversations",
+            headers: agent.create_new_auth_token,
+            as: :json
+
+        body = JSON.parse(response.body, symbolize_names: true)
+        expect(body[:data][:payload].first[:messages].first[:id]).to eq(private_note.id)
+      end
+
       it 'returns conversations with empty messages array for conversations with out messages' do
         get "/api/v1/accounts/#{account.id}/conversations",
             headers: agent.create_new_auth_token,
@@ -727,6 +744,23 @@ RSpec.describe 'Conversations API', type: :request do
 
         expect(response).to have_http_status(:success)
         expect(conversation.reload.assignee_last_seen_at).not_to be_nil
+      end
+
+      it 'marks unread notifications as read when updating last seen' do
+        allow(Rails.configuration.dispatcher).to receive(:dispatch)
+        notification = create(:notification, account: account, user: agent, primary_actor: conversation, read_at: nil)
+
+        post "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/update_last_seen",
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(notification.reload.read_at).to be_present
+        expect(Rails.configuration.dispatcher).to have_received(:dispatch).with(
+          'notification.updated',
+          kind_of(Time),
+          hash_including(notification: have_attributes(id: notification.id))
+        )
       end
 
       it 'throttles updates within an hour when there are no unread messages' do

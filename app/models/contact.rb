@@ -4,33 +4,33 @@
 #
 # Table name: contacts
 #
-#  id                    :integer          not null, primary key
-#  account_id            :integer          not null
-#  additional_attributes :jsonb
-#  blocked               :boolean          default(FALSE), not null
-#  company_id            :bigint
-#  contact_type          :integer          default("visitor")
-#  country_code          :string           default("")
-#  created_at            :datetime         not null
-#  custom_attributes     :jsonb
+#  id                           :integer          not null, primary key
+#  additional_attributes        :jsonb
+#  blocked                      :boolean          default(FALSE), not null
+#  contact_type                 :integer          default("visitor")
+#  country_code                 :string           default("")
+#  custom_attributes            :jsonb
 #  days_since_last_interaction  :integer
-#  email                 :string
+#  email                        :string
 #  first_interaction_at         :datetime
-#  group_type            :integer          default("individual"), not null
-#  identifier            :string
+#  group_type                   :integer          default("individual"), not null
+#  identifier                   :string
 #  interactions_count           :integer          default(0), not null
 #  is_recurring                 :boolean          default(FALSE), not null
-#  last_activity_at      :datetime
+#  last_activity_at             :datetime
 #  last_interaction_at          :datetime
-#  last_name             :string           default("")
-#  location              :string           default("")
-#  middle_name           :string           default("")
-#  name                  :string           default("")
+#  last_name                    :string           default("")
+#  location                     :string           default("")
+#  middle_name                  :string           default("")
+#  name                         :string           default("")
 #  one_shot_consultations_count :integer          default(0), not null
-#  phone_number          :string
+#  phone_number                 :string
 #  pix_generated_count          :integer          default(0), not null
 #  reservations_paid_count      :integer          default(0), not null
-#  updated_at            :datetime         not null
+#  created_at                   :datetime         not null
+#  updated_at                   :datetime         not null
+#  account_id                   :integer          not null
+#  company_id                   :bigint
 #
 # Indexes
 #

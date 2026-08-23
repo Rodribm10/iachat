@@ -434,7 +434,7 @@ RSpec.describe Conversation do
 
     context 'when contact is missing' do
       before do
-        conversation.update_columns(contact_id: nil, contact_inbox_id: nil) # rubocop:disable Rails/SkipsModelValidations
+        allow(conversation).to receive(:contact).and_return(nil)
       end
 
       it 'does not change conversation status' do
@@ -478,7 +478,7 @@ RSpec.describe Conversation do
       let(:conversation) { create(:conversation) }
 
       before do
-        conversation.update_columns(contact_id: nil, contact_inbox_id: nil) # rubocop:disable Rails/SkipsModelValidations
+        allow(conversation).to receive(:contact).and_return(nil)
       end
 
       it 'does not change conversation status' do
@@ -507,7 +507,7 @@ RSpec.describe Conversation do
 
     context 'when contact is missing' do
       before do
-        conversation.update_columns(contact_id: nil, contact_inbox_id: nil) # rubocop:disable Rails/SkipsModelValidations
+        allow(conversation).to receive(:contact).and_return(nil)
       end
 
       it 'returns false' do
@@ -613,6 +613,7 @@ RSpec.describe Conversation do
         },
         id: conversation.display_id,
         messages: [],
+        last_non_activity_message: nil,
         labels: [],
         last_activity_at: conversation.last_activity_at.to_i,
         inbox_id: conversation.inbox_id,

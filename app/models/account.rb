@@ -30,50 +30,7 @@ class Account < ApplicationRecord
   include CacheKeys
   include CaptainFeaturable
   include AccountEmailRateLimitable
-
-  SETTINGS_PARAMS_SCHEMA = {
-    'type': 'object',
-    'properties':
-      {
-        'auto_resolve_after': { 'type': %w[integer null], 'minimum': 10, 'maximum': 1_439_856 },
-        'auto_resolve_message': { 'type': %w[string null] },
-        'auto_resolve_ignore_waiting': { 'type': %w[boolean null] },
-        'audio_transcriptions': { 'type': %w[boolean null] },
-        'auto_resolve_label': { 'type': %w[string null] },
-        'keep_pending_on_bot_failure': { 'type': %w[boolean null] },
-        'captain_auto_resolve_mode': { 'type': %w[string null], 'enum': ['evaluated', 'legacy', 'disabled', nil] },
-        'conversation_required_attributes': {
-          'type': %w[array null],
-          'items': { 'type': 'string' }
-        },
-        'captain_models': {
-          'type': %w[object null],
-          'properties': {
-            'editor': { 'type': %w[string null] },
-            'assistant': { 'type': %w[string null] },
-            'copilot': { 'type': %w[string null] },
-            'label_suggestion': { 'type': %w[string null] },
-            'audio_transcription': { 'type': %w[string null] },
-            'help_center_search': { 'type': %w[string null] }
-          },
-          'additionalProperties': false
-        },
-        'captain_features': {
-          'type': %w[object null],
-          'properties': {
-            'editor': { 'type': %w[boolean null] },
-            'assistant': { 'type': %w[boolean null] },
-            'copilot': { 'type': %w[boolean null] },
-            'label_suggestion': { 'type': %w[boolean null] },
-            'audio_transcription': { 'type': %w[boolean null] },
-            'help_center_search': { 'type': %w[boolean null] }
-          },
-          'additionalProperties': false
-        }
-      },
-    'required': [],
-    'additionalProperties': true
-  }.to_json.freeze
+  include AccountSettingsSchema
 
   DEFAULT_QUERY_SETTING = {
     flag_query_mode: :bit_operator,
@@ -86,6 +43,7 @@ class Account < ApplicationRecord
                  schema: SETTINGS_PARAMS_SCHEMA,
                  attribute_resolver: ->(record) { record.settings }
   validate :validate_reporting_timezone
+  validate :validate_support_email_format, if: :will_save_change_to_support_email?
 
   store_accessor :settings, :auto_resolve_after, :auto_resolve_message, :auto_resolve_ignore_waiting
 
@@ -95,6 +53,17 @@ class Account < ApplicationRecord
   store_accessor :settings, :keep_pending_on_bot_failure
   store_accessor :settings, :aggressive_alert_enabled
   store_accessor :settings, :captain_auto_resolve_mode
+  store_accessor :settings, :hide_agent_unassigned_tab, :hide_agent_all_tab
+  before_validation :enforce_agent_assignee_tabs_constraint
+
+  def hide_agent_unassigned_tab=(value)
+    super(ActiveModel::Type::Boolean.new.cast(value))
+  end
+
+  def hide_agent_all_tab=(value)
+    super(ActiveModel::Type::Boolean.new.cast(value))
+  end
+
   include AccountCaptainAutoResolve
 
   has_many :account_users, dependent: :destroy_async
@@ -124,6 +93,8 @@ class Account < ApplicationRecord
   has_many :tiktok_channels, dependent: :destroy_async, class_name: '::Channel::Tiktok'
   has_many :hooks, dependent: :destroy_async, class_name: 'Integrations::Hook'
   has_many :inboxes, dependent: :destroy_async
+  has_many :internal_chat_categories, class_name: 'InternalChat::Category', dependent: :destroy_async
+  has_many :internal_chat_channels, class_name: 'InternalChat::Channel', dependent: :destroy_async
   has_many :labels, dependent: :destroy_async
   has_many :line_channels, dependent: :destroy_async, class_name: '::Channel::Line'
   has_many :mentions, dependent: :destroy_async
@@ -154,6 +125,7 @@ class Account < ApplicationRecord
 
   before_validation :validate_limit_keys
   after_create_commit :notify_creation
+  after_create_commit :setup_internal_chat
   after_destroy :remove_account_sequences
 
   def agents
@@ -211,6 +183,10 @@ class Account < ApplicationRecord
     Rails.configuration.dispatcher.dispatch(ACCOUNT_CREATED, Time.zone.now, account: self)
   end
 
+  def setup_internal_chat
+    InternalChat::DefaultChannelSetupService.new(account: self).perform
+  end
+
   trigger.after(:insert).for_each(:row) do
     "execute format('create sequence IF NOT EXISTS conv_dpid_seq_%s', NEW.id);"
   end
@@ -227,6 +203,20 @@ class Account < ApplicationRecord
     return if reporting_timezone.blank? || ActiveSupport::TimeZone[reporting_timezone].present?
 
     errors.add(:reporting_timezone, I18n.t('errors.account.reporting_timezone.invalid'))
+  end
+
+  def enforce_agent_assignee_tabs_constraint
+    self.hide_agent_all_tab = true if hide_agent_unassigned_tab
+  end
+
+  def validate_support_email_format
+    value = attributes['support_email']
+    return if value.blank?
+
+    parsed = Mail::Address.new(value).address
+    errors.add(:support_email, I18n.t('errors.account.support_email.invalid')) if parsed.blank?
+  rescue Mail::Field::ParseError, Mail::Field::IncompleteParseError
+    errors.add(:support_email, I18n.t('errors.account.support_email.invalid'))
   end
 
   def remove_account_sequences

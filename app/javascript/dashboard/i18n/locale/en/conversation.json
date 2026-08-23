@@ -46,6 +46,7 @@
     "ANNOUNCEMENT_MODE_BANNER": "Only administrators are allowed to send messages in this group",
     "GROUP_LEFT_BANNER": "You are no longer part of this group and cannot send messages in it",
     "GROUPS_DISABLED_BANNER": "Group messages are disabled. Enable full group support (free) to view and send messages.",
+    "GROUPS_DISABLED_BANNER_NON_ADMIN": "Group messages are disabled. Contact your administrator to enable full group support.",
     "GROUPS_DISABLED_CTA": "Learn how to enable (free)",
     "OLD_INSTAGRAM_INBOX_REPLY_BANNER": "This Instagram account was migrated to the new Instagram channel inbox. All new messages will show up there. You won’t be able to send messages from this conversation anymore.",
     "REPLYING_TO": "You are replying to:",
@@ -312,6 +313,23 @@
     "SIDEBAR": {
       "CONTACT": "Contact",
       "COPILOT": "Copilot"
+    },
+    "REACTIONS": {
+      "ADD_REACTION": "Add reaction",
+      "MORE_EMOJIS": "More emojis",
+      "FAILED": "Couldn't update reaction. Try again.",
+      "YOU": "You",
+      "CLICK_TO_REMOVE": "Click to remove",
+      "QUICK": {
+        "THUMBS_UP": "Thumbs up",
+        "HEART": "Heart",
+        "JOY": "Joy",
+        "SURPRISED": "Surprised",
+        "SAD": "Sad",
+        "PRAY": "Pray",
+        "FIRE": "Fire",
+        "PARTY": "Party"
+      }
     },
     "VOICE_WIDGET": {
       "INCOMING_CALL": "Incoming call",
@@ -639,6 +657,11 @@
     "ONE": "{user} is typing",
     "TWO": "{user} and {secondUser} are typing",
     "MULTIPLE": "{user} and {count} others are typing"
+  },
+  "RECORDING": {
+    "ONE": "{user} is recording audio",
+    "TWO": "{user} and {secondUser} are recording audio",
+    "MULTIPLE": "{user} and {count} others are recording audio"
   },
   "COPILOT": {
     "TRY_THESE_PROMPTS": "Try these prompts"

@@ -29,6 +29,7 @@ import inboxMgmt from './inboxMgmt.json';
 import integrationApps from './integrationApps.json';
 import integrations from './integrations.json';
 import jasmine from './jasmine.json';
+import internalChat from './internalChat.json';
 import kanban from './kanban.json';
 import labelsMgmt from './labelsMgmt.json';
 import login from './login.json';
@@ -79,6 +80,7 @@ export default {
   ...integrationApps,
   ...integrations,
   ...jasmine,
+  ...internalChat,
   ...kanban,
   ...labelsMgmt,
   ...login,

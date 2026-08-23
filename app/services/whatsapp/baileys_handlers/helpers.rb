@@ -15,7 +15,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     !@raw_message[:key][:fromMe]
   end
 
-  def jid_type # rubocop:disable Metrics/CyclomaticComplexity
+  def jid_type
     jid = @raw_message[:key][:remoteJid]
     server = jid.split('@').last
 
@@ -39,7 +39,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     end
   end
 
-  def message_type # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity,Metrics/MethodLength,Metrics/AbcSize
+  def message_type # rubocop:disable Metrics/MethodLength,Metrics/AbcSize
     msg = unwrap_ephemeral_message(@raw_message[:message])
     if msg.key?(:conversation) || msg.dig(:extendedTextMessage, :text).present?
       'text'
@@ -69,7 +69,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     end
   end
 
-  def message_content # rubocop:disable Metrics/CyclomaticComplexity,Metrics/PerceivedComplexity,Metrics/MethodLength
+  def message_content # rubocop:disable Metrics/MethodLength
     msg = unwrap_ephemeral_message(@raw_message[:message])
     case message_type
     when 'text'
@@ -98,7 +98,7 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     end
   end
 
-  def reply_to_message_id # rubocop:disable Metrics/CyclomaticComplexity
+  def reply_to_message_id
     msg = unwrap_ephemeral_message(@raw_message[:message])
     message_key = case message_type
                   when 'text' then :extendedTextMessage
@@ -172,17 +172,11 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
   end
 
   def ignore_message?
-    message_type.in?(%w[protocol context edited]) ||
-      (message_type == 'reaction' && message_content.blank?)
+    message_type.in?(%w[protocol context edited])
   end
 
-  def fetch_profile_picture_url(phone_number)
-    jid = "#{phone_number}@s.whatsapp.net"
-    response = inbox.channel.provider_service.get_profile_pic(jid)
-    response&.dig('data', 'profilePictureUrl')
-  rescue StandardError => e
-    Rails.logger.error "Failed to fetch profile picture for #{phone_number}: #{e.message}"
-    nil
+  def reaction_removal?
+    message_type == 'reaction' && message_content.blank?
   end
 
   def try_update_contact_avatar(contact = nil)
@@ -191,8 +185,9 @@ module Whatsapp::BaileysHandlers::Helpers # rubocop:disable Metrics/ModuleLength
     return if target_contact.avatar.attached?
 
     phone = contact ? target_contact.phone_number&.delete('+') : extract_from_jid(type: 'pn')
-    profile_pic_url = fetch_profile_picture_url(phone) if phone
-    ::Avatar::AvatarFromUrlJob.perform_later(target_contact, profile_pic_url) if profile_pic_url
+    return if phone.blank?
+
+    Channels::Whatsapp::BaileysUpdateContactAvatarJob.perform_later(target_contact, inbox, phone)
   end
 
   def message_under_process?

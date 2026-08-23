@@ -1,22 +1,45 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n, I18nT } from 'vue-i18n';
 import Twilio from './Twilio.vue';
 import ThreeSixtyDialogWhatsapp from './360DialogWhatsapp.vue';
 import CloudWhatsapp from './CloudWhatsapp.vue';
 import WhatsappEmbeddedSignup from './WhatsappEmbeddedSignup.vue';
+import ChannelSelector from 'dashboard/components/ChannelSelector.vue';
+import BaileysWhatsapp from './BaileysWhatsapp.vue';
+import ZapiWhatsapp from './ZapiWhatsapp.vue';
 import Wuzapi from './Wuzapi.vue';
 import Gowa from './Gowa.vue';
 import EvolutionGo from './EvolutionGo.vue';
-import ZapiWhatsapp from './ZapiWhatsapp.vue';
-import BaileysWhatsapp from './BaileysWhatsapp.vue';
-import ChannelSelector from 'dashboard/components/ChannelSelector.vue';
-import PromoBanner from 'dashboard/components-next/banner/PromoBanner.vue';
+
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'create',
+    validator: value => ['create', 'convert'].includes(value),
+  },
+  inbox: {
+    type: Object,
+    default: null,
+  },
+});
+
+const isConvertMode = computed(() => props.mode === 'convert');
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useI18n();
+
+// Latched by the child once it triggers the post-success router.replace.
+// Suppresses rendering during the navigation tail so the parent doesn't
+// briefly re-render against the new route's query params (which would clear
+// `route.query.provider` and flash the provider picker between the success
+// toast and the unmount).
+const isLeaving = ref(false);
+const handleEmbeddedSignupLeaving = () => {
+  isLeaving.value = true;
+};
 
 const PROVIDER_TYPES = {
   WHATSAPP: 'whatsapp',
@@ -32,20 +55,35 @@ const PROVIDER_TYPES = {
   EVOLUTION: 'evolution',
 };
 
-const hasWhatsappAppId = computed(() => {
+const hasEmbeddedSignupConfig = computed(() => {
+  const { whatsappAppId, whatsappConfigurationId } =
+    window.chatwootConfig ?? {};
   return (
-    window.chatwootConfig?.whatsappAppId &&
-    window.chatwootConfig.whatsappAppId !== 'none'
+    whatsappAppId &&
+    whatsappAppId !== 'none' &&
+    whatsappConfigurationId &&
+    whatsappConfigurationId !== 'none'
   );
 });
 
 const selectedProvider = computed(() => route.query.provider);
 
-const showProviderSelection = computed(() => !selectedProvider.value);
+const INBOX_PROVIDER_TO_KEY = {
+  whatsapp_cloud: PROVIDER_TYPES.WHATSAPP,
+  default: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
+  baileys: PROVIDER_TYPES.BAILEYS,
+  zapi: PROVIDER_TYPES.ZAPI,
+  wuzapi: PROVIDER_TYPES.WUZAPI,
+  gowa: PROVIDER_TYPES.GOWA,
+  evolution: PROVIDER_TYPES.EVOLUTION,
+};
 
-const showConfiguration = computed(() => Boolean(selectedProvider.value));
+const currentProviderKey = computed(() => {
+  if (!props.inbox?.provider) return null;
+  return INBOX_PROVIDER_TO_KEY[props.inbox.provider] || null;
+});
 
-const availableProviders = computed(() => [
+const PROVIDER_CATALOG = computed(() => [
   {
     key: PROVIDER_TYPES.WHATSAPP,
     title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.WHATSAPP_CLOUD'),
@@ -88,7 +126,69 @@ const availableProviders = computed(() => [
     description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.EVOLUTION_DESC'),
     icon: 'i-woot-whatsapp',
   },
+  {
+    key: PROVIDER_TYPES.THREE_SIXTY_DIALOG,
+    title: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG'),
+    description: t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.360_DIALOG_DESC'),
+    icon: 'i-woot-whatsapp',
+  },
 ]);
+
+// Keys shown in the picker. 360Dialog is intentionally hidden in create mode
+// (URL-reachable only) but offered in convert mode where it is a valid target.
+const CREATE_PICKER_KEYS = [
+  PROVIDER_TYPES.WHATSAPP,
+  PROVIDER_TYPES.TWILIO,
+  PROVIDER_TYPES.BAILEYS,
+  PROVIDER_TYPES.ZAPI,
+  PROVIDER_TYPES.WUZAPI,
+  PROVIDER_TYPES.GOWA,
+  PROVIDER_TYPES.EVOLUTION,
+];
+const CONVERT_PICKER_KEYS = [
+  PROVIDER_TYPES.WHATSAPP,
+  PROVIDER_TYPES.BAILEYS,
+  PROVIDER_TYPES.ZAPI,
+  PROVIDER_TYPES.THREE_SIXTY_DIALOG,
+];
+
+const availableProviders = computed(() => {
+  const allowed = isConvertMode.value
+    ? CONVERT_PICKER_KEYS
+    : CREATE_PICKER_KEYS;
+  return PROVIDER_CATALOG.value
+    .filter(p => allowed.includes(p.key))
+    .filter(p => !isConvertMode.value || p.key !== currentProviderKey.value);
+});
+
+const currentProviderLabel = computed(() => {
+  if (!isConvertMode.value || !currentProviderKey.value) return '';
+  return (
+    PROVIDER_CATALOG.value.find(({ key }) => key === currentProviderKey.value)
+      ?.title || ''
+  );
+});
+
+const isValidSelectedProvider = computed(() => {
+  if (!selectedProvider.value) return false;
+  // In create mode, allow the embedded-signup manual fallback link and the
+  // legacy-URL path to 360Dialog even though neither is in the picker.
+  if (!isConvertMode.value) {
+    if (selectedProvider.value === PROVIDER_TYPES.WHATSAPP_MANUAL) return true;
+    if (selectedProvider.value === PROVIDER_TYPES.THREE_SIXTY_DIALOG)
+      return true;
+  }
+  return availableProviders.value.some(
+    ({ key }) => key === selectedProvider.value
+  );
+});
+
+const showProviderSelection = computed(
+  () => !isLeaving.value && !isValidSelectedProvider.value
+);
+const showConfiguration = computed(
+  () => !isLeaving.value && isValidSelectedProvider.value
+);
 
 const selectProvider = providerValue => {
   router.push({
@@ -101,7 +201,7 @@ const selectProvider = providerValue => {
 const shouldShowCloudWhatsapp = provider => {
   return (
     provider === PROVIDER_TYPES.WHATSAPP_MANUAL ||
-    (provider === PROVIDER_TYPES.WHATSAPP && !hasWhatsappAppId.value)
+    (provider === PROVIDER_TYPES.WHATSAPP && !hasEmbeddedSignupConfig.value)
   );
 };
 
@@ -115,14 +215,25 @@ const handleManualLinkClick = () => {
     <div v-if="showProviderSelection">
       <div class="mb-10 text-left">
         <h1 class="mb-2 text-lg font-medium text-n-slate-12">
-          {{ $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.TITLE') }}
+          {{
+            isConvertMode
+              ? $t('INBOX_MGMT.CONVERT.SELECT_PROVIDER_TITLE')
+              : $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.TITLE')
+          }}
         </h1>
         <p class="text-sm leading-relaxed text-n-slate-11">
-          {{ $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.DESCRIPTION') }}
+          {{
+            isConvertMode
+              ? $t('INBOX_MGMT.CONVERT.SELECT_PROVIDER_DESCRIPTION', {
+                  inboxName: inbox?.name,
+                  currentProvider: currentProviderLabel,
+                })
+              : $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.DESCRIPTION')
+          }}
         </p>
       </div>
 
-      <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <div class="flex gap-6 justify-start">
         <ChannelSelector
           v-for="provider in availableProviders"
           :key="provider.key"
@@ -132,29 +243,6 @@ const handleManualLinkClick = () => {
           @click="selectProvider(provider.key)"
         />
       </div>
-
-      <div class="mt-6 relative overflow-visible">
-        <img
-          src="~dashboard/assets/images/curved-arrow.svg"
-          alt=""
-          class="absolute -top-12 right-64 w-20 h-20 pointer-events-none z-10 scale-y-[-1] -rotate-45"
-        />
-        <PromoBanner
-          :title="
-            $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.ZAPI_PROMO.TITLE')
-          "
-          :description="
-            $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.ZAPI_PROMO.DESCRIPTION')
-          "
-          variant="success"
-          logo-src="/assets/images/dashboard/channels/z-api/z-api-dark-green.png"
-          logo-alt="Z-API"
-          :cta-text="
-            $t('INBOX_MGMT.ADD.WHATSAPP.SELECT_PROVIDER.ZAPI_PROMO.CTA')
-          "
-          @cta-click="selectProvider(PROVIDER_TYPES.ZAPI)"
-        />
-      </div>
     </div>
 
     <div v-else-if="showConfiguration">
@@ -162,10 +250,15 @@ const handleManualLinkClick = () => {
         <!-- Show embedded signup if app ID is configured -->
         <div
           v-if="
-            hasWhatsappAppId && selectedProvider === PROVIDER_TYPES.WHATSAPP
+            hasEmbeddedSignupConfig &&
+            selectedProvider === PROVIDER_TYPES.WHATSAPP
           "
         >
-          <WhatsappEmbeddedSignup />
+          <WhatsappEmbeddedSignup
+            :mode="mode"
+            :inbox="inbox"
+            @leaving="handleEmbeddedSignupLeaving"
+          />
 
           <!-- Manual setup fallback option -->
           <div class="pt-6 mt-6 border-t border-n-weak">
@@ -192,17 +285,11 @@ const handleManualLinkClick = () => {
         </div>
 
         <!-- Show manual setup -->
-        <CloudWhatsapp v-else-if="shouldShowCloudWhatsapp(selectedProvider)" />
-
-        <Wuzapi v-else-if="selectedProvider === PROVIDER_TYPES.WUZAPI" />
-        <Gowa v-else-if="selectedProvider === PROVIDER_TYPES.GOWA" />
-        <EvolutionGo
-          v-else-if="selectedProvider === PROVIDER_TYPES.EVOLUTION"
+        <CloudWhatsapp
+          v-else-if="shouldShowCloudWhatsapp(selectedProvider)"
+          :mode="mode"
+          :inbox="inbox"
         />
-        <BaileysWhatsapp
-          v-else-if="selectedProvider === PROVIDER_TYPES.BAILEYS"
-        />
-        <ZapiWhatsapp v-else-if="selectedProvider === PROVIDER_TYPES.ZAPI" />
 
         <!-- Other providers -->
         <Twilio
@@ -211,8 +298,24 @@ const handleManualLinkClick = () => {
         />
         <ThreeSixtyDialogWhatsapp
           v-else-if="selectedProvider === PROVIDER_TYPES.THREE_SIXTY_DIALOG"
+          :mode="mode"
+          :inbox="inbox"
         />
-        <CloudWhatsapp v-else />
+        <BaileysWhatsapp
+          v-else-if="selectedProvider === PROVIDER_TYPES.BAILEYS"
+          :mode="mode"
+          :inbox="inbox"
+        />
+        <ZapiWhatsapp
+          v-else-if="selectedProvider === PROVIDER_TYPES.ZAPI"
+          :mode="mode"
+          :inbox="inbox"
+        />
+        <Wuzapi v-else-if="selectedProvider === PROVIDER_TYPES.WUZAPI" />
+        <Gowa v-else-if="selectedProvider === PROVIDER_TYPES.GOWA" />
+        <EvolutionGo
+          v-else-if="selectedProvider === PROVIDER_TYPES.EVOLUTION"
+        />
       </div>
     </div>
   </div>

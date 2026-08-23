@@ -8,6 +8,7 @@ import {
   computed,
   watch,
   onMounted,
+  onBeforeUnmount,
   defineEmits,
 } from 'vue';
 import { useStore } from 'vuex';
@@ -47,6 +48,7 @@ import { useConversationRequiredAttributes } from 'dashboard/composables/useConv
 
 import { emitter } from 'shared/helpers/mitt';
 
+import ConversationAPI from 'dashboard/api/inbox/conversation';
 import wootConstants from 'dashboard/constants/globals';
 import advancedFilterOptions from './widgets/conversation/advancedFilterItems';
 import filterQueryGenerator from '../helper/filterQueryGenerator.js';
@@ -56,10 +58,12 @@ import { generateValuesForEditCustomViews } from 'dashboard/helper/customViewsHe
 import { conversationListPageURL } from '../helper/URLHelper';
 import {
   isOnMentionsView,
+  isOnParticipatingView,
   isOnUnattendedView,
 } from '../store/modules/conversations/helpers/actionHelpers';
 import {
   getUserPermissions,
+  getUserRole,
   filterItemsByPermission,
 } from 'dashboard/helper/permissionsHelper.js';
 import { matchesFilters } from '../store/modules/conversations/helpers/filterHelpers';
@@ -114,6 +118,7 @@ const chatLists = useMapGetter('getFilteredConversations');
 const mineChatsList = useMapGetter('getMineChats');
 const allChatList = useMapGetter('getAllStatusChats');
 const unAssignedChatsList = useMapGetter('getUnAssignedChats');
+const participatingChatsList = useMapGetter('getParticipatingChats');
 const chatListLoading = useMapGetter('getChatListLoadingStatus');
 const activeInbox = useMapGetter('getSelectedInbox');
 const conversationStats = useMapGetter('conversationStats/getStats');
@@ -125,6 +130,7 @@ const inboxesList = useMapGetter('inboxes/getInboxes');
 const campaigns = useMapGetter('campaigns/getAllCampaigns');
 const labels = useMapGetter('labels/getLabels');
 const currentAccountId = useMapGetter('getCurrentAccountId');
+const getAccount = useMapGetter('accounts/getAccount');
 // We can't useFunctionGetter here since it needs to be called on setup?
 const getTeamFn = useMapGetter('teams/getTeam');
 const getConversationById = useMapGetter('getConversationById');
@@ -176,6 +182,19 @@ const activeFolderName = computed(() => {
   return activeFolder.value?.name;
 });
 
+const activeFolderVisibility = computed(() => {
+  return activeFolder.value?.visibility ?? 'personal';
+});
+
+const currentRole = useMapGetter('getCurrentRole');
+const canManageActiveFolder = computed(() => {
+  if (!activeFolder.value) return true;
+  if (activeFolder.value.visibility === 'global') {
+    return currentRole.value === 'administrator';
+  }
+  return true;
+});
+
 const hasActiveFolders = computed(() => {
   return Boolean(activeFolder.value && props.foldersId !== 0);
 });
@@ -193,9 +212,29 @@ const userPermissions = computed(() => {
   return getUserPermissions(currentUser.value, currentAccountId.value);
 });
 
+const assigneeTabPermissions = computed(() => {
+  if (getUserRole(currentUser.value, currentAccountId.value) !== 'agent') {
+    return ASSIGNEE_TYPE_TAB_PERMISSIONS;
+  }
+
+  const accountSettings =
+    getAccount.value(currentAccountId.value)?.settings || {};
+  const hideUnassigned = Boolean(accountSettings.hide_agent_unassigned_tab);
+  const hideAll = hideUnassigned || Boolean(accountSettings.hide_agent_all_tab);
+
+  if (!hideUnassigned && !hideAll) return ASSIGNEE_TYPE_TAB_PERMISSIONS;
+
+  const { unassigned, all, ...rest } = ASSIGNEE_TYPE_TAB_PERMISSIONS;
+  return {
+    ...rest,
+    ...(hideUnassigned ? {} : { unassigned }),
+    ...(hideAll ? {} : { all }),
+  };
+});
+
 const assigneeTabItems = computed(() => {
   return filterItemsByPermission(
-    ASSIGNEE_TYPE_TAB_PERMISSIONS,
+    assigneeTabPermissions.value,
     userPermissions.value,
     item => item.permissions
   ).map(({ key, count: countKey }) => ({
@@ -238,10 +277,10 @@ const conversationCustomAttributes = useFunctionGetter(
 );
 
 const activeAssigneeTabCount = computed(() => {
-  const count = assigneeTabItems.value.find(
-    item => item.key === activeAssigneeTab.value
-  ).count;
-  return count;
+  return (
+    assigneeTabItems.value.find(item => item.key === activeAssigneeTab.value)
+      ?.count ?? 0
+  );
 });
 
 const conversationListPagination = computed(() => {
@@ -298,13 +337,15 @@ const pageTitle = computed(() => {
   if (props.label) {
     return `#${props.label}`;
   }
-  if (props.conversationType === 'mention') {
+  if (props.conversationType === wootConstants.CONVERSATION_TYPE.MENTION) {
     return t('CHAT_LIST.MENTION_HEADING');
   }
-  if (props.conversationType === 'participating') {
+  if (
+    props.conversationType === wootConstants.CONVERSATION_TYPE.PARTICIPATING
+  ) {
     return t('CONVERSATION_PARTICIPANTS.SIDEBAR_MENU_TITLE');
   }
-  if (props.conversationType === 'unattended') {
+  if (props.conversationType === wootConstants.CONVERSATION_TYPE.UNATTENDED) {
     return t('CHAT_LIST.UNATTENDED_HEADING');
   }
   if (hasActiveFolders.value) {
@@ -313,12 +354,30 @@ const pageTitle = computed(() => {
   return t('CHAT_LIST.TAB_HEADING');
 });
 
+function filterByAssigneeTab(conversations) {
+  if (activeAssigneeTab.value === wootConstants.ASSIGNEE_TYPE.ME) {
+    return conversations.filter(
+      c => c.meta?.assignee?.id === currentUser.value?.id
+    );
+  }
+  if (activeAssigneeTab.value === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
+    return conversations.filter(c => !c.meta?.assignee);
+  }
+  return [...conversations];
+}
+
 const conversationList = computed(() => {
   let localConversationList = [];
 
   if (!hasAppliedFiltersOrActiveFolders.value) {
     const filters = conversationFilters.value;
-    if (activeAssigneeTab.value === 'me') {
+    if (
+      props.conversationType === wootConstants.CONVERSATION_TYPE.PARTICIPATING
+    ) {
+      localConversationList = filterByAssigneeTab(
+        participatingChatsList.value(filters)
+      );
+    } else if (activeAssigneeTab.value === 'me') {
       localConversationList = [...mineChatsList.value(filters)];
     } else if (activeAssigneeTab.value === 'unassigned') {
       localConversationList = [...unAssignedChatsList.value(filters)];
@@ -415,15 +474,23 @@ function closeAdvanceFiltersModal() {
   appliedFilter.value = [];
 }
 
-function onUpdateSavedFilter(payload, folderName) {
+async function onUpdateSavedFilter(payload, folderName, folderVisibility) {
   const transformedPayload = useSnakeCase(payload);
   const payloadData = {
     ...unref(activeFolder),
     name: unref(folderName),
+    visibility:
+      folderVisibility ?? unref(activeFolder)?.visibility ?? 'personal',
     query: filterQueryGenerator(transformedPayload),
   };
-  store.dispatch('customViews/update', payloadData);
-  closeAdvanceFiltersModal();
+  try {
+    await store.dispatch('customViews/update', payloadData);
+    closeAdvanceFiltersModal();
+  } catch (error) {
+    useAlert(
+      error?.message ?? t('FILTER.CUSTOM_VIEWS.EDIT.API_FOLDERS.ERROR_MESSAGE')
+    );
+  }
 }
 
 function onClickOpenAddFoldersModal() {
@@ -646,9 +713,11 @@ function redirectToConversationList() {
 
   let conversationType = '';
   if (isOnMentionsView({ route: { name } })) {
-    conversationType = 'mention';
+    conversationType = wootConstants.CONVERSATION_TYPE.MENTION;
+  } else if (isOnParticipatingView({ route: { name } })) {
+    conversationType = wootConstants.CONVERSATION_TYPE.PARTICIPATING;
   } else if (isOnUnattendedView({ route: { name } })) {
-    conversationType = 'unattended';
+    conversationType = wootConstants.CONVERSATION_TYPE.UNATTENDED;
   }
   router.push(
     conversationListPageURL({
@@ -804,6 +873,17 @@ useEmitter('fetch_conversation_stats', () => {
   store.dispatch('conversationStats/get', conversationFilters.value);
 });
 
+let lastSubscribedIds = '';
+const subscribePresenceForTopChats = () => {
+  const ids = conversationList.value.slice(0, 10).map(c => c.id);
+  const key = ids.join(',');
+  if (!ids.length || key === lastSubscribedIds) return;
+  lastSubscribedIds = key;
+  ConversationAPI.presenceSubscribeBulk(ids).catch(() => {});
+};
+
+let presenceInterval = null;
+
 onMounted(() => {
   store.dispatch('setChatListFilters', conversationFilters.value);
   setFiltersFromUISettings();
@@ -814,6 +894,19 @@ onMounted(() => {
   if (hasActiveFolders.value) {
     store.dispatch('campaigns/get');
   }
+  presenceInterval = setInterval(subscribePresenceForTopChats, 60000);
+});
+
+watch(conversationList, subscribePresenceForTopChats);
+
+watch(assigneeTabItems, items => {
+  if (!items.some(item => item.key === activeAssigneeTab.value)) {
+    updateAssigneeTab(wootConstants.ASSIGNEE_TYPE.ME);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (presenceInterval) clearInterval(presenceInterval);
 });
 
 const deleteConversationDialogRef = ref(null);
@@ -896,6 +989,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       :page-title="pageTitle"
       :has-applied-filters="hasAppliedFilters"
       :has-active-folders="hasActiveFolders"
+      :can-manage-active-folder="canManageActiveFolder"
       :active-status="activeStatus"
       :is-on-expanded-layout="isOnExpandedLayout"
       :conversation-stats="conversationStats"
@@ -1013,6 +1107,7 @@ watch(conversationFilters, (newVal, oldVal) => {
       <ConversationFilter
         v-model="appliedFilter"
         :folder-name="activeFolderName"
+        :folder-visibility="activeFolderVisibility"
         :is-folder-view="hasActiveFolders"
         @apply-filter="onApplyFilter"
         @update-folder="onUpdateSavedFilter"

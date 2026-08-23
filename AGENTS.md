@@ -244,3 +244,43 @@ Interprete os atalhos abaixo carregando o arquivo correspondente em `.aios-core/
 - `@squad-creator`, `/squad-creator`, `/squad-creator.md` -> `.aios-core/development/agents/squad-creator.md`
 - `@aios-master`, `/aios-master`, `/aios-master.md` -> `.aios-core/development/agents/aios-master.md`
 <!-- AIOS-MANAGED-END: shortcuts -->
+
+
+---
+
+# Regras herdadas do upstream (fazer-ai)
+
+Trazidas no sync 4.13. Valem para este fork tambem.
+
+## Diretrizes gerais
+
+- MVP focus: Least code change, happy-path only
+- No unnecessary defensive programming
+- Ship the happy path first: limit guards/fallbacks to what production has proven necessary, then iterate
+- Prefer minimal, readable code over elaborate abstractions; clarity beats cleverness
+- Break down complex tasks into small, testable units
+- New features must include specs covering the main flows (happy path + critical edge cases). Bugfixes should add a regression spec when the fix is non-trivial.
+- Remove dead/unreachable/unused code
+- Prefer `with_modified_env` (from spec helpers) over stubbing `ENV` directly in specs
+- Specs em ambientes paralelos: compare `error.class.name` em vez de igualdade de constante de classe
+
+## Traducoes e frontend
+
+- Atualize `en.yml`/`en.json` e `pt_BR.yml`/`pt_BR.json`; outros idiomas ficam com a comunidade
+- Backend i18n -> `.yml`; frontend i18n -> `.json`
+- Use `components-next/` para bolhas de mensagem (o resto esta sendo depreciado)
+- Para strings que hoje contem "Chatwoot" mas deveriam se adaptar a instalacoes com marca propria, use `replaceInstallationName` de `shared/composables/useBranding` na camada de UI
+
+## Toggles por conta: NAO estenda `config/features.yml`
+
+- `Account#feature_flags` e um `bigint` do FlagShihTzu — cada entrada do YAML vira o bit da posicao `index` (0-based). Bigint com sinal so guarda os bits 0..63; a 65a entrada estoura a coluna e quebra em silencio as features de bit alto.
+- Para NOVOS toggles por conta, use a coluna jsonb `settings`:
+  1. `store_accessor :settings, :seu_toggle` em `app/models/account.rb`, com writer que faz cast (`super(ActiveModel::Type::Boolean.new.cast(value))`)
+  2. adicione a chave em `SETTINGS_PARAMS_SCHEMA` (`app/models/concerns/account_settings_schema.rb`)
+  3. registre como `Field::Boolean` em `app/dashboards/account_dashboard.rb`
+  4. o frontend le de `account.settings.seu_toggle`
+
+## Release notes
+
+- Todo release cortado deste repo leva os blocos bilingues `user-notes` (pt-BR + en) no corpo, escritos para usuario final nao-tecnico.
+- Antes de `gh release create`/`gh release edit`, invoque a skill `release-notes` em `.claude/skills/release-notes/SKILL.md`.

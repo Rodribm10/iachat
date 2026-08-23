@@ -220,9 +220,8 @@ export const actions = {
       sendAnalyticsEvent(channel.type);
       return response.data;
     } catch (error) {
-      const errorMessage = error?.response?.data?.message;
       commit(types.default.SET_INBOXES_UI_FLAG, { isCreating: false });
-      throw new Error(errorMessage);
+      return throwErrorMessage(error);
     }
   },
   createWebsiteChannel: async ({ commit }, params) => {
@@ -277,6 +276,19 @@ export const actions = {
       throw error;
     }
   },
+  convertWhatsAppEmbeddedSignup: async ({ commit, dispatch }, params) => {
+    commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: true });
+    try {
+      const response =
+        await WhatsappChannel.postEmbeddedSignupAuthorization(params);
+      await dispatch('get');
+      commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
+      return response.data;
+    } catch (error) {
+      commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
+      throw error;
+    }
+  },
   ...channelActions,
   // TODO: Extract other create channel methods to separate files to reduce file size
   // - createChannel
@@ -295,6 +307,24 @@ export const actions = {
     } catch (error) {
       commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
       throwErrorMessage(error);
+    }
+  },
+  convertProvider: async (
+    { commit },
+    { inboxId, provider, providerConfig }
+  ) => {
+    commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: true });
+    try {
+      const response = await InboxesAPI.convertProvider(inboxId, {
+        provider,
+        providerConfig,
+      });
+      commit(types.default.EDIT_INBOXES, response.data);
+      commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
+      return response.data;
+    } catch (error) {
+      commit(types.default.SET_INBOXES_UI_FLAG, { isUpdating: false });
+      return throwErrorMessage(error);
     }
   },
   updateInboxIMAP: async ({ commit }, { id, ...inboxParams }) => {
@@ -366,6 +396,16 @@ export const actions = {
       template
     );
     return response.data;
+  },
+  resetSecret: async ({ commit }, inboxId) => {
+    try {
+      const response = await InboxesAPI.resetSecret(inboxId);
+      commit(types.default.EDIT_INBOXES, response.data);
+      return response.data;
+    } catch (error) {
+      throwErrorMessage(error);
+      return null;
+    }
   },
   linkCSATTemplate: async (_, { inboxId, template }) => {
     const response = await InboxesAPI.linkCSATTemplate(inboxId, template);

@@ -34,6 +34,7 @@ import SenderNameExamplePreview from './components/SenderNameExamplePreview.vue'
 import LockToSingleConversationPreview from './components/LockToSingleConversationPreview.vue';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import SpinnerLoader from 'dashboard/components-next/spinner/Spinner.vue';
+import ConvertInboxModal from 'dashboard/components/widgets/modal/ConvertInboxModal.vue';
 import { INBOX_TYPES } from 'dashboard/helper/inbox';
 import { getInboxIconByType } from 'dashboard/helper/inbox';
 import { LOCAL_STORAGE_KEYS } from 'dashboard/constants/localStorage';
@@ -43,6 +44,8 @@ import LandingHostsConfig from './settingsPage/LandingHostsConfig.vue';
 import ColorPicker from 'dashboard/components-next/colorpicker/ColorPicker.vue';
 import SelectInput from 'dashboard/components-next/select/Select.vue';
 import Widget from 'dashboard/modules/widget-preview/components/Widget.vue';
+import AccessToken from 'dashboard/routes/dashboard/settings/profile/AccessToken.vue';
+import { copyTextToClipboard } from 'shared/helpers/clipboard';
 
 export default {
   components: {
@@ -64,6 +67,7 @@ export default {
     GoogleReauthorize,
     NextButton,
     SpinnerLoader,
+    ConvertInboxModal,
     InstagramReauthorize,
     TiktokReauthorize,
     WhatsappReauthorize,
@@ -79,6 +83,7 @@ export default {
     InboxAutoResolve,
     LandingHostsConfig,
     Widget,
+    AccessToken,
   },
   mixins: [inboxMixin],
   setup() {
@@ -122,6 +127,7 @@ export default {
       widgetBubblePosition: 'right',
       widgetBubbleType: 'standard',
       widgetBubbleLauncherTitle: '',
+      showConvertGate: false,
     };
   },
   computed: {
@@ -163,6 +169,14 @@ export default {
         return this.$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.TWILIO');
       }
       return '';
+    },
+    isConvertibleWhatsAppChannel() {
+      return (
+        this.isAWhatsAppCloudChannel ||
+        this.isAWhatsAppBaileysChannel ||
+        this.isAWhatsAppZapiChannel ||
+        this.is360DialogWhatsAppChannel
+      );
     },
     tabs() {
       let visibleToAllChannelTabs = [
@@ -404,6 +418,33 @@ export default {
     this.fetchSharedData();
   },
   methods: {
+    async copyWebhookSecret(value) {
+      await copyTextToClipboard(value);
+      useAlert(
+        this.$t(
+          'INBOX_MGMT.ADD.WEBSITE_CHANNEL.CHANNEL_WEBHOOK_SECRET.COPY_SUCCESS'
+        )
+      );
+    },
+    async resetWebhookSecret() {
+      const response = await this.$store.dispatch(
+        'inboxes/resetSecret',
+        this.inbox.id
+      );
+      if (response) {
+        useAlert(
+          this.$t(
+            'INBOX_MGMT.ADD.WEBSITE_CHANNEL.CHANNEL_WEBHOOK_SECRET.RESET_SUCCESS'
+          )
+        );
+      } else {
+        useAlert(
+          this.$t(
+            'INBOX_MGMT.ADD.WEBSITE_CHANNEL.CHANNEL_WEBHOOK_SECRET.RESET_ERROR'
+          )
+        );
+      }
+    },
     fetchSharedData() {
       this.$store.dispatch('agents/get');
       this.$store.dispatch('teams/get');
@@ -667,6 +708,22 @@ export default {
     toggleLockToSingleConversation(value) {
       this.locktoSingleConversation = value;
     },
+    openConvertGate() {
+      this.showConvertGate = true;
+    },
+    closeConvertGate() {
+      this.showConvertGate = false;
+    },
+    goToConvert() {
+      this.showConvertGate = false;
+      this.$router.push({
+        name: 'settings_inbox_convert',
+        params: {
+          accountId: this.$route.params.accountId,
+          inboxId: this.inbox.id,
+        },
+      });
+    },
   },
   validations: {
     webhookUrl: {
@@ -821,6 +878,21 @@ export default {
             </SettingsFieldSection>
 
             <SettingsFieldSection
+              v-if="isAPIInbox && inbox.secret"
+              :label="
+                $t(
+                  'INBOX_MGMT.ADD.WEBSITE_CHANNEL.CHANNEL_WEBHOOK_SECRET.LABEL'
+                )
+              "
+            >
+              <AccessToken
+                :value="inbox.secret"
+                @on-copy="copyWebhookSecret"
+                @on-reset="resetWebhookSecret"
+              />
+            </SettingsFieldSection>
+
+            <SettingsFieldSection
               v-if="isAWebWidgetInbox"
               :label="$t('INBOX_MGMT.ADD.WEBSITE_CHANNEL.CHANNEL_DOMAIN.LABEL')"
             >
@@ -839,12 +911,21 @@ export default {
               v-if="isAWhatsAppChannel"
               :label="$t('INBOX_MGMT.ADD.WHATSAPP.PROVIDERS.LABEL')"
             >
-              <input
-                v-model="whatsAppAPIProviderName"
-                type="text"
-                disabled
-                class="!mb-0"
-              />
+              <div class="flex items-center gap-2 w-full">
+                <input
+                  :value="whatsAppAPIProviderName"
+                  type="text"
+                  disabled
+                  class="!mb-0 flex-1"
+                />
+                <NextButton
+                  v-if="isConvertibleWhatsAppChannel"
+                  slate
+                  sm
+                  :label="$t('INBOX_MGMT.CONVERT.BUTTON')"
+                  @click="openConvertGate"
+                />
+              </div>
             </SettingsFieldSection>
 
             <SettingsFieldSection
@@ -1300,5 +1381,13 @@ export default {
         <LandingHostsConfig :inbox="inbox" />
       </div>
     </section>
+    <ConvertInboxModal
+      v-if="showConvertGate"
+      v-model:show="showConvertGate"
+      :inbox-name="inbox.name"
+      :current-provider="whatsAppAPIProviderName"
+      @on-confirm="goToConvert"
+      @on-close="closeConvertGate"
+    />
   </div>
 </template>

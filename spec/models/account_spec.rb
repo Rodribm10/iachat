@@ -244,6 +244,50 @@ RSpec.describe Account do
       end
     end
 
+    context 'when toggling agent assignee tab visibility' do
+      it 'casts truthy form input to boolean true' do
+        account.hide_agent_unassigned_tab = '1'
+        account.hide_agent_all_tab = 'true'
+
+        expect(account.hide_agent_unassigned_tab).to be true
+        expect(account.hide_agent_all_tab).to be true
+        expect(account.settings['hide_agent_unassigned_tab']).to be true
+        expect(account.settings['hide_agent_all_tab']).to be true
+      end
+
+      it 'casts falsy form input to boolean false' do
+        account.hide_agent_unassigned_tab = '0'
+        account.hide_agent_all_tab = 'false'
+
+        expect(account.hide_agent_unassigned_tab).to be false
+        expect(account.hide_agent_all_tab).to be false
+      end
+
+      it 'persists across save with the schema validator passing' do
+        account.update!(hide_agent_unassigned_tab: '0', hide_agent_all_tab: '1')
+        reloaded = described_class.find(account.id)
+
+        expect(reloaded.hide_agent_unassigned_tab).to be false
+        expect(reloaded.hide_agent_all_tab).to be true
+      end
+
+      it 'rejects non-boolean values via the JSON schema validator' do
+        account.settings = { hide_agent_unassigned_tab: 'maybe' }
+        expect(account).to be_invalid
+        expect(account.errors.messages).to have_key(:hide_agent_unassigned_tab)
+      end
+
+      it 'forces hide_agent_all_tab to true when hide_agent_unassigned_tab is enabled' do
+        account.update!(hide_agent_unassigned_tab: true, hide_agent_all_tab: false)
+        expect(account.reload.hide_agent_all_tab).to be true
+      end
+
+      it 'leaves hide_agent_all_tab untouched when hide_agent_unassigned_tab is false' do
+        account.update!(hide_agent_unassigned_tab: false, hide_agent_all_tab: false)
+        expect(account.reload.hide_agent_all_tab).to be false
+      end
+    end
+
     context 'when using with_auto_resolve scope' do
       it 'finds accounts with auto_resolve_after set' do
         account.update!(auto_resolve_after: 40 * 24 * 60)
@@ -253,6 +297,29 @@ RSpec.describe Account do
       it 'does not find accounts without auto_resolve_after' do
         account.update!(auto_resolve_after: nil)
         expect(described_class.with_auto_resolve.pluck(:id)).not_to include(account.id)
+      end
+    end
+
+    context 'when support_email is set' do
+      it 'allows a plain email address' do
+        account.support_email = 'support@example.com'
+        expect(account).to be_valid
+      end
+
+      it 'allows display-name format' do
+        account.support_email = 'Support Team <support@example.com>'
+        expect(account).to be_valid
+      end
+
+      it 'allows blank values' do
+        account.support_email = ''
+        expect(account).to be_valid
+      end
+
+      it 'rejects malformed strings with no email part' do
+        account.support_email = 'Smith Smith'
+        expect(account).not_to be_valid
+        expect(account.errors[:support_email]).to include(I18n.t('errors.account.support_email.invalid'))
       end
     end
 

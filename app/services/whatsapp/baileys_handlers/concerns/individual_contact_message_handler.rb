@@ -1,6 +1,7 @@
 module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
   extend ActiveSupport::Concern
   include Whatsapp::BaileysHandlers::Concerns::MessageCreationHandler
+  include Events::Types
 
   private
 
@@ -28,11 +29,29 @@ module Whatsapp::BaileysHandlers::Concerns::IndividualContactMessageHandler
         return
       end
 
+      # Reaction removals don't produce a new Message row; handle them before
+      # set_conversation so a blank webhook can't open/create a stray thread.
+      next mark_existing_reaction_as_removed(sender: @contact) if reaction_removal?
+
       set_conversation
       handle_create_message
+      dispatch_incoming_typing_off
     end
   ensure
     clear_message_source_id_from_redis if @lock_acquired
+  end
+
+  def dispatch_incoming_typing_off
+    return unless incoming?
+    return unless @conversation && @contact
+
+    Rails.configuration.dispatcher.dispatch(
+      CONVERSATION_TYPING_OFF,
+      Time.zone.now,
+      conversation: @conversation,
+      user: @contact,
+      is_private: false
+    )
   end
 
   def set_contact

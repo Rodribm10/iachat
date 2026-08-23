@@ -65,6 +65,8 @@ import captainReservations from './captain/reservations';
 import captainUnits from './modules/captainUnits';
 import captainGalleryItems from './modules/captainGalleryItems';
 import captainReports from './modules/captainReports';
+import internalChat from './modules/internalChat';
+import internalChatTypingStatus from './modules/internalChat/typingStatus';
 
 const plugins = [];
 
@@ -135,6 +137,8 @@ export default createStore({
     captainUnits,
     captainGalleryItems,
     captainReports,
+    internalChat,
+    internalChatTypingStatus,
   },
   plugins,
 });

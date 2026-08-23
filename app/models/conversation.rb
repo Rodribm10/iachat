@@ -2,38 +2,37 @@
 #
 # Table name: conversations
 #
-#  id                     :integer          not null, primary key
-#  account_id             :integer          not null
+#  id                         :integer          not null, primary key
 #  active_scenario_expires_at :datetime
 #  active_scenario_key        :string
 #  active_scenario_state      :jsonb            not null
-#  additional_attributes  :jsonb
-#  agent_last_seen_at     :datetime
-#  assignee_agent_bot_id  :bigint
-#  assignee_id            :integer
-#  assignee_last_seen_at  :datetime
-#  cached_label_list      :text
-#  campaign_id            :bigint
-#  contact_id             :bigint
-#  contact_inbox_id       :bigint
-#  contact_last_seen_at   :datetime
-#  created_at             :datetime         not null
-#  custom_attributes      :jsonb
-#  display_id             :integer          not null
-#  first_reply_created_at :datetime
-#  group_type             :integer          default("individual"), not null
-#  identifier             :string
-#  inbox_id               :integer          not null
-#  kanban_task_id         :bigint
-#  last_activity_at       :datetime         not null
-#  priority               :integer
-#  sla_policy_id          :bigint
-#  snoozed_until          :datetime
-#  status                 :integer          default("open"), not null
-#  team_id                :bigint
-#  updated_at             :datetime         not null
-#  uuid                   :uuid             not null
-#  waiting_since          :datetime
+#  additional_attributes      :jsonb
+#  agent_last_seen_at         :datetime
+#  assignee_last_seen_at      :datetime
+#  cached_label_list          :text
+#  contact_last_seen_at       :datetime
+#  custom_attributes          :jsonb
+#  first_reply_created_at     :datetime
+#  group_type                 :integer          default("individual"), not null
+#  identifier                 :string
+#  last_activity_at           :datetime         not null
+#  priority                   :integer
+#  snoozed_until              :datetime
+#  status                     :integer          default("open"), not null
+#  uuid                       :uuid             not null
+#  waiting_since              :datetime
+#  created_at                 :datetime         not null
+#  updated_at                 :datetime         not null
+#  account_id                 :integer          not null
+#  assignee_agent_bot_id      :bigint
+#  assignee_id                :integer
+#  campaign_id                :bigint
+#  contact_id                 :bigint           not null
+#  contact_inbox_id           :bigint
+#  display_id                 :integer          not null
+#  inbox_id                   :integer          not null
+#  sla_policy_id              :bigint
+#  team_id                    :bigint
 #
 # Indexes
 #
@@ -51,17 +50,12 @@
 #  index_conversations_on_identifier_and_account_id   (identifier,account_id)
 #  index_conversations_on_inbox_id                    (inbox_id)
 #  index_conversations_on_inbox_id_and_group_type     (inbox_id,group_type)
-#  index_conversations_on_kanban_task_id              (kanban_task_id)
 #  index_conversations_on_priority                    (priority)
 #  index_conversations_on_status_and_account_id       (status,account_id)
 #  index_conversations_on_status_and_priority         (status,priority)
 #  index_conversations_on_team_id                     (team_id)
 #  index_conversations_on_uuid                        (uuid) UNIQUE
 #  index_conversations_on_waiting_since               (waiting_since)
-#
-# Foreign Keys
-#
-#  fk_rails_...  (kanban_task_id => kanban_tasks.id)
 #
 
 class Conversation < ApplicationRecord
@@ -228,8 +222,8 @@ class Conversation < ApplicationRecord
     "#{ENV.fetch('FRONTEND_URL', nil)}/survey/responses/#{uuid}"
   end
 
-  def dispatch_conversation_updated_event(previous_changes = nil)
-    dispatcher_dispatch(CONVERSATION_UPDATED, previous_changes)
+  def dispatch_conversation_updated_event(previous_changes = nil, broadcast_metadata: nil)
+    dispatcher_dispatch(CONVERSATION_UPDATED, previous_changes, broadcast_metadata: broadcast_metadata)
   end
 
   private
@@ -325,10 +319,11 @@ class Conversation < ApplicationRecord
     end
   end
 
-  def dispatcher_dispatch(event_name, changed_attributes = nil)
-    Rails.configuration.dispatcher.dispatch(event_name, Time.zone.now, conversation: self, notifiable_assignee_change: notifiable_assignee_change?,
-                                                                       changed_attributes: changed_attributes,
-                                                                       performed_by: Current.executed_by)
+  def dispatcher_dispatch(event_name, changed_attributes = nil, broadcast_metadata: nil)
+    payload = { conversation: self, notifiable_assignee_change: notifiable_assignee_change?,
+                changed_attributes: changed_attributes, performed_by: Current.executed_by }
+    payload[:broadcast_metadata] = broadcast_metadata unless broadcast_metadata.nil?
+    Rails.configuration.dispatcher.dispatch(event_name, Time.zone.now, **payload)
   end
 
   def conversation_status_changed_to_open?

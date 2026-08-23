@@ -4,14 +4,14 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   class MessageContentTypeNotSupported < StandardError; end
   class ProviderUnavailableError < StandardError; end
   class GroupParticipantNotAllowedError < StandardError; end
+  class MessageAlreadyProcessingError < StandardError; end
 
   DEFAULT_CLIENT_NAME = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_CLIENT_NAME', nil)
   DEFAULT_URL = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_URL', nil)
   DEFAULT_API_KEY = ENV.fetch('BAILEYS_PROVIDER_DEFAULT_API_KEY', nil)
-  GROUPS_ENABLED = ENV.fetch('BAILEYS_WHATSAPP_GROUPS_ENABLED', 'false') == 'true'
 
   def self.groups_enabled?
-    GROUPS_ENABLED
+    ENV.fetch('BAILEYS_WHATSAPP_GROUPS_ENABLED', 'false') == 'true'
   end
 
   def self.status
@@ -47,7 +47,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
         webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
         # TODO: Remove on Baileys v2, default will be false
         includeMedia: false,
-        groupsEnabled: GROUPS_ENABLED
+        groupsEnabled: self.class.groups_enabled?
       }.compact.to_json
     )
 
@@ -56,14 +56,22 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     true
   end
 
+  # Best-effort disconnect: we tell the Baileys API to drop the session and
+  # move on regardless of the response. A stale or already-cleared session
+  # (404), a Baileys API hiccup (5xx), or even a network error should not
+  # block a provider conversion or channel teardown — the only point of
+  # calling this is to avoid leaving a dangling session, not to gate the
+  # caller's flow on that cleanup succeeding.
   def disconnect_channel_provider
     response = HTTParty.delete(
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}",
-      headers: api_headers
+      headers: api_headers,
+      timeout: 10
     )
-
-    raise ProviderUnavailableError unless process_response(response)
-
+    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider non-success status=#{response.code}") unless response.success?
+    true
+  rescue StandardError => e
+    Rails.logger.warn("[WHATSAPP][BAILEYS] disconnect_channel_provider failed (ignored): #{e.message}")
     true
   end
 
@@ -263,7 +271,7 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     persist_group_settings(group_contact, metadata)
     persist_invite_code(group_contact) unless soft
     persist_pending_join_requests(group_contact, inbox) unless soft
-    try_update_group_avatar(group_contact) unless soft
+    Channels::Whatsapp::BaileysUpdateGroupAvatarJob.perform_later(group_contact) unless soft
 
     participant_contacts = build_participant_contacts(metadata[:participants], inbox, skip_avatars: soft)
     sync_group_members(group_contact, participant_contacts)
@@ -309,6 +317,19 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     raise ProviderUnavailableError unless process_response(response)
 
     true
+  end
+
+  def presence_subscribe(jids)
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/presence-subscribe",
+      headers: api_headers,
+      body: { jids: Array(jids) }.to_json,
+      timeout: 10
+    )
+
+    raise ProviderUnavailableError unless process_response(response)
+
+    response.parsed_response&.dig('data')
   end
 
   def update_presence(status)
@@ -391,7 +412,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       "#{provider_url}/connections/#{whatsapp_channel.phone_number}/profile-picture-url",
       headers: api_headers,
       query: { jid: jid },
-      format: :json
+      format: :json,
+      timeout: 10
     )
 
     return nil unless process_response(response)
@@ -425,7 +447,9 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
     raise ProviderUnavailableError unless process_response(response)
 
-    response.parsed_response&.dig('data')&.first || { 'jid' => remote_jid, 'exists' => false }
+    result = response.parsed_response
+    result = result.is_a?(Array) ? result : result&.dig('data')
+    result&.first || { 'jid' => remote_jid, 'exists' => false }
   end
 
   def delete_message(recipient_id, message)
@@ -566,10 +590,18 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
       headers: api_headers,
       body: {
         jid: remote_jid,
-        messageContent: @message_content
-      }.to_json
+        messageContent: @message_content,
+        # baileys-api uses this as an idempotency key. Reactions UPDATE a single
+        # Message row in place across toggle/replace/remove cycles, so reusing
+        # only `id` would make every follow-up send hit the cached response and
+        # never reach WhatsApp. Suffixing with updated_at gives each send a fresh
+        # key while still letting Sidekiq retries of the same attempt dedupe.
+        chatwootMessageId: "#{@message.id}:#{@message.updated_at.to_f}"
+      }.to_json,
+      timeout: 120
     )
 
+    raise MessageAlreadyProcessingError if response.code == 409
     raise ProviderUnavailableError unless process_response(response)
 
     update_external_created_at(response)
@@ -815,6 +847,8 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
 
       define_method(method_name) do |*args, **kwargs, &block|
         original_method.bind_call(self, *args, **kwargs, &block)
+      rescue MessageAlreadyProcessingError
+        raise
       rescue StandardError => e
         handle_channel_error
         raise e
@@ -838,9 +872,9 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
   end
 
   with_error_handling :setup_channel_provider,
-                      :disconnect_channel_provider,
                       :send_message,
                       :toggle_typing_status,
+                      :presence_subscribe,
                       :update_presence,
                       :read_messages,
                       :unread_message,

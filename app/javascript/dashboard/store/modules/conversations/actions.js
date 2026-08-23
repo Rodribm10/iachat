@@ -6,6 +6,7 @@ import { createPendingMessage } from 'dashboard/helper/commons';
 import {
   buildConversationList,
   isOnMentionsView,
+  isOnParticipatingView,
   isOnUnattendedView,
   isOnFoldersView,
 } from './helpers/actionHelpers';
@@ -204,6 +205,7 @@ const actions = {
         // Ignore error
       }
     }
+    ConversationApi.presenceSubscribe(data.id)?.catch(() => {});
   },
 
   assignAgent: async ({ dispatch }, { conversationId, agentId }) => {
@@ -348,6 +350,18 @@ const actions = {
     }
   },
 
+  toggleMessageReaction: function toggleMessageReaction(
+    _context,
+    { conversationId, messageId, emoji, echoId }
+  ) {
+    // The optimistic Message is dispatched to the store by the caller.
+    // Backend echoes back the same echo_id via ActionCable MESSAGE_CREATED, and
+    // findPendingMessageIndex in the ADD_MESSAGE mutation swaps the fake for
+    // the real one. Returning the promise lets callers reconcile if the cable
+    // echo is delayed/missing.
+    return MessageApi.toggleReaction(conversationId, messageId, emoji, echoId);
+  },
+
   editMessage: async function editMessage(
     { commit },
     { conversationId, messageId, content }
@@ -388,6 +402,7 @@ const actions = {
       !hasAppliedFilters &&
       !isOnFoldersView(rootState) &&
       !isOnMentionsView(rootState) &&
+      !isOnParticipatingView(rootState) &&
       !isOnUnattendedView(rootState) &&
       isMatchingInboxFilter
     ) {
@@ -412,6 +427,7 @@ const actions = {
     const {
       meta: { sender },
     } = conversation;
+
     commit(types.UPDATE_CONVERSATION, conversation);
 
     dispatch('conversationLabels/setConversationLabel', {
