@@ -26,6 +26,7 @@
         "PREVIEW": {
           "TITLE": "Signature Preview",
           "NOTE": "This is how your signature will appear in messages",
+          "AUTO_NOTE": "You have not written a signature yet, so your messages are signed automatically with your name. To stop signing, turn it off with the signature button in the reply box.",
           "EMPTY": "Enter a signature above to see the preview",
           "SAMPLE_MESSAGE": "Hello! Thank you for contacting us. How can I help you today?"
         }

@@ -37,8 +37,12 @@ const { t } = useI18n();
 const { formatMessage } = useMessageFormatter();
 
 const inboxes = useMapGetter('inboxes/getInboxes');
-const { fetchInboxSignatures, getInboxSignature, hasInboxSignature } =
-  useInboxSignatures();
+const {
+  fetchInboxSignatures,
+  getInboxSignature,
+  hasInboxSignature,
+  autoSignature,
+} = useInboxSignatures();
 
 const selectedInboxId = ref(INBOX_OPTION_DEFAULT);
 const selectedInbox = ref(null);
@@ -115,13 +119,24 @@ const sampleMessage = computed(
     `<p>${t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.PREVIEW.SAMPLE_MESSAGE')}</p>`
 );
 
+// Campo vazio nao significa "sem assinatura": nesse caso vale a automatica
+// (nome de exibicao, ou o primeiro nome). A previa precisa mostrar o que o
+// cliente vai receber de verdade, senao a tela mente para quem esta olhando.
+const effectiveSignature = computed(
+  () => signature.value || autoSignature.value
+);
+
+const isUsingAutoSignature = computed(
+  () => !signature.value && !!autoSignature.value
+);
+
 const formattedSignature = computed(() => {
-  if (!signature.value) return '';
-  return formatMessage(signature.value, false, false);
+  if (!effectiveSignature.value) return '';
+  return formatMessage(effectiveSignature.value, false, false);
 });
 
 const messagePreview = computed(() => {
-  if (!signature.value) return sampleMessage.value;
+  if (!effectiveSignature.value) return sampleMessage.value;
 
   const separator =
     signatureSeparator.value === 'blank' ? '<p></p>' : '<p>--</p>';
@@ -345,7 +360,13 @@ const resetToDefault = () => {
         </div>
       </div>
       <p class="text-xs text-n-slate-11 m-0">
-        {{ $t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.PREVIEW.NOTE') }}
+        {{
+          isUsingAutoSignature
+            ? $t(
+                'PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.PREVIEW.AUTO_NOTE'
+              )
+            : $t('PROFILE_SETTINGS.FORM.MESSAGE_SIGNATURE_SECTION.PREVIEW.NOTE')
+        }}
       </p>
     </div>
     <div class="flex items-center gap-3">

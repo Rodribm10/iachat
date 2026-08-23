@@ -26,6 +26,7 @@
         "PREVIEW": {
           "TITLE": "Vista previa de la firma",
           "NOTE": "Así se verá su firma en los mensajes",
+          "AUTO_NOTE": "Aún no ha escrito una firma, así que sus mensajes se firman automáticamente con su nombre. Para no firmar, desactívelo con el botón de firma en la caja de respuesta.",
           "EMPTY": "Escriba una firma arriba para ver la vista previa",
           "SAMPLE_MESSAGE": "¡Hola! Gracias por contactarnos. ¿En qué puedo ayudarle hoy?"
         }

@@ -12,15 +12,23 @@ vi.mock('dashboard/api/inboxSignatures', () => ({
   default: mockInboxSignaturesAPI,
 }));
 
+const DEFAULT_USER = {
+  message_signature: '<p>Global Signature</p>',
+  ui_settings: {
+    signature_position: 'bottom',
+    signature_separator: '--',
+  },
+};
+
+// Mutavel para os testes da assinatura automatica, que precisam de um usuario
+// sem assinatura escrita. Restaurado no beforeEach.
+const mockUser = vi.hoisted(() => ({ current: null }));
+
 vi.mock('dashboard/composables/store', () => ({
   useStoreGetters: () => ({
     getCurrentUser: {
-      value: {
-        message_signature: '<p>Global Signature</p>',
-        ui_settings: {
-          signature_position: 'bottom',
-          signature_separator: '--',
-        },
+      get value() {
+        return mockUser.current;
       },
     },
     getCurrentAccountId: {
@@ -32,6 +40,7 @@ vi.mock('dashboard/composables/store', () => ({
 describe('useInboxSignatures', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUser.current = { ...DEFAULT_USER };
     const { _resetForTesting } = useInboxSignatures();
     _resetForTesting();
   });
@@ -193,6 +202,50 @@ describe('useInboxSignatures', () => {
 
       expect(hasInboxSignature(1)).toBe(false);
       // Falls back to global
+      expect(getSignatureForInbox(1)).toBe('<p>Global Signature</p>');
+    });
+  });
+
+  describe('autoSignature', () => {
+    it('prefers the display name', () => {
+      mockUser.current = {
+        display_name: 'Duda',
+        name: 'Maria Eduarda Souza',
+      };
+      const { autoSignature } = useInboxSignatures();
+      expect(autoSignature.value).toBe('**Duda**');
+    });
+
+    it('falls back to the first name when there is no display name', () => {
+      mockUser.current = { name: 'Rodrigo Borba Machado' };
+      const { autoSignature } = useInboxSignatures();
+      expect(autoSignature.value).toBe('**Rodrigo**');
+    });
+
+    it('ignores a display name that is only whitespace', () => {
+      mockUser.current = { display_name: '   ', name: 'Rodrigo Borba' };
+      const { autoSignature } = useInboxSignatures();
+      expect(autoSignature.value).toBe('**Rodrigo**');
+    });
+
+    it('is empty when the agent has no name at all', () => {
+      mockUser.current = {};
+      const { autoSignature } = useInboxSignatures();
+      expect(autoSignature.value).toBe('');
+    });
+
+    it('signs with the automatic name when nothing was written', () => {
+      mockUser.current = { name: 'Rodrigo Borba Machado' };
+      const { getSignatureForInbox } = useInboxSignatures();
+      expect(getSignatureForInbox(1)).toBe('**Rodrigo**');
+    });
+
+    it('never overrides a signature the agent wrote', () => {
+      mockUser.current = {
+        name: 'Rodrigo Borba Machado',
+        message_signature: '<p>Global Signature</p>',
+      };
+      const { getSignatureForInbox } = useInboxSignatures();
       expect(getSignatureForInbox(1)).toBe('<p>Global Signature</p>');
     });
   });

@@ -26,6 +26,7 @@
         "PREVIEW": {
           "TITLE": "Pré-visualização da Assinatura",
           "NOTE": "Esta é a aparência da sua assinatura nas mensagens",
+          "AUTO_NOTE": "Você ainda não escreveu uma assinatura, então suas mensagens são assinadas automaticamente com o seu nome. Para não assinar, desligue no botão de assinatura da caixa de resposta.",
           "EMPTY": "Digite uma assinatura acima para ver a pré-visualização",
           "SAMPLE_MESSAGE": "Olá! Obrigado por entrar em contato. Como posso ajudá-lo hoje?"
         }

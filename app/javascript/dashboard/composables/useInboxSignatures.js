@@ -19,6 +19,27 @@ export function useInboxSignatures() {
     () => currentUser.value?.message_signature || ''
   );
 
+  /**
+   * Assinatura automatica de quem esta falando, usada quando a pessoa nunca
+   * escreveu uma. Ordem de prioridade: nome de exibicao; na falta dele, o
+   * primeiro nome do nome completo — "Rodrigo Borba Machado" assina "Rodrigo",
+   * nao o nome inteiro.
+   *
+   * Vai em negrito markdown; os providers de WhatsApp convertem `**x**` para o
+   * asterisco simples que o app usa (Whatsapp::Providers::BaseService).
+   *
+   * Quem nao quiser assinar desliga no botao da caixa de resposta — o padrao e
+   * assinar, porque uma mensagem sem nome deixa o cliente sem saber com quem
+   * esta falando.
+   */
+  const autoSignature = computed(() => {
+    const user = currentUser.value || {};
+    const displayName = (user.display_name || '').trim();
+    const firstName = (user.name || '').trim().split(/\s+/)[0] || '';
+    const name = displayName || firstName;
+    return name ? `**${name}**` : '';
+  });
+
   const fetchInboxSignatures = async ({ force = false } = {}) => {
     if (isFetching.value) return;
     if (hasFetched.value && !force) return;
@@ -56,11 +77,16 @@ export function useInboxSignatures() {
   };
 
   /**
-   * Returns the inbox-specific signature if it exists, otherwise the global signature.
+   * Returns the inbox-specific signature if it exists, otherwise the global
+   * signature, otherwise the automatic one derived from the agent's name.
    */
   const getSignatureForInbox = inboxId => {
     const inboxSig = inboxSignatures.value[inboxId];
-    return inboxSig?.message_signature || globalSignature.value;
+    return (
+      inboxSig?.message_signature ||
+      globalSignature.value ||
+      autoSignature.value
+    );
   };
 
   /**
@@ -103,6 +129,7 @@ export function useInboxSignatures() {
     fetchInboxSignatures,
     upsertInboxSignature,
     deleteInboxSignature,
+    autoSignature,
     getSignatureForInbox,
     getSignatureSettingsForInbox,
     getInboxSignature,
