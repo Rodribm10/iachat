@@ -709,6 +709,9 @@
     "RESOLUTION_COUNT": "Contagem de Resolução",
     "CONVERSATIONS": "Nº de Conversas"
   },
+  "SINAL_REPORTS": {
+    "OPEN_IN_SINAL": "Abrir no Sinal ↗"
+  },
   "DIRECTORY_DASHBOARD": {
     "HEADER": "Painel Diretoria",
     "BANNER": {
