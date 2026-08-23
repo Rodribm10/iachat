@@ -34,6 +34,30 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
   end
 
   describe 'POST /webhooks/captain/hermes_callback' do
+    # Regressao (conv 17 da academia, 23/08/2026): o agente respondeu o que sabia
+    # e fechou com a ancora numa linha final. Ancorado em \A isso nao casava — o
+    # cliente lia "vou verificar", a conversa seguia em pending e ninguem assumia.
+    it 'marca triagem humana quando a ancora vem no fim da mensagem, depois da resposta' do
+      resposta = "No plano anual da para trancar, e o contrato e estendido pelo mesmo periodo.\n\n" \
+                 "Por motivo de saude, precisa apresentar atestado.\n\n" \
+                 '⏳ Um momento — vou verificar.'
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: resposta }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).to include('triagem_humana')
+      expect(conversation.reload).to be_open
+    end
+
+    it 'nao confunde a ancora citada no meio de uma frase com um pedido de transferencia' do
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'Se eu disser um momento e sumir, me cobra o retorno.' }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).not_to include('triagem_humana')
+    end
+
     it 'marca triagem humana com nota interna de motivo real quando Hermes pede verificacao humana' do
       post '/webhooks/captain/hermes_callback',
            params: { inbox_id: inbox.id, content: 'um momento - vou verificar ....' }

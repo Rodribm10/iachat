@@ -21,10 +21,17 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   # (quando o agente não sabe responder e quer escalar pra humano). NÃO
   # bloqueamos — entregamos pro cliente e marcamos triagem_humana pra
   # próximas msgs não dispararem Hermes.
+  #
+  # Ancorado em INÍCIO DE LINHA (^), não em início de mensagem (\A): o prompt
+  # manda mandar só a frase, mas o LLM às vezes responde o que sabe e fecha com
+  # a âncora numa linha final. Com \A isso não casava — o cliente lia "vou
+  # verificar", a conversa continuava em `pending` e nenhum humano era chamado.
+  # Visto na conv 17 da academia em 23/08/2026, e o mesmo padrão vale para os
+  # perfis de hotel, que rodam esta mesma regra.
   HANDOFF_PATTERNS = [
-    /\A\s*[⏳⌛]?\s*um\s+momento.*verificar/i,
-    /\A\s*[⏳⌛]?\s*um\s+instante.*verificar/i,
-    /\A\s*aguarde\s+um\s+instante/i
+    /^\s*[⏳⌛]?\s*um\s+momento\b.*verificar/i,
+    /^\s*[⏳⌛]?\s*um\s+instante\b.*verificar/i,
+    /^\s*aguarde\s+um\s+instante/i
   ].freeze
 
   # Loop detection: 2 sinais combinados.
