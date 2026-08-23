@@ -10,6 +10,10 @@
 class Captain::Hermes::Client
   TIMEOUT_SECONDS = 10
 
+  # Nomes genéricos que o WhatsApp sugere/preenche sozinho ou que o
+  # cliente digita por padrão — nunca são nome de pessoa de verdade.
+  GENERIC_FIRST_NAMES = %w[unknown contato cliente whatsapp usuario].freeze
+
   class DispatchError < StandardError; end
 
   def initialize(inbox)
@@ -79,7 +83,7 @@ class Captain::Hermes::Client
       image_urls: image_urls_for_hermes(message),
       reply_context: reply_context,
       contact_name: contact&.name,
-      contact_first_name: contact&.name.to_s.split.first,
+      contact_first_name: usable_first_name(contact, conversation),
       contact_id: conversation.contact_id,
       contact_cpf_present: cpf_digits.length == 11,
       contact_email_present: contact&.email.to_s.include?('@'),
@@ -116,7 +120,7 @@ class Captain::Hermes::Client
       is_system_event: true,
       event_type: event_type,
       contact_name: contact&.name,
-      contact_first_name: contact&.name.to_s.split.first,
+      contact_first_name: usable_first_name(contact, conversation),
       contact_id: conversation.contact_id,
       contact_cpf_present: cpf_digits.length == 11,
       contact_email_present: contact&.email.to_s.include?('@'),
@@ -136,6 +140,45 @@ class Captain::Hermes::Client
       message_id: 0,
       timestamp: Time.current.to_i
     }
+  end
+
+  # Primeiro nome só é "utilizável" quando parece nome de pessoa de
+  # verdade. Conservador de propósito: na dúvida, devolve o nome — deixar
+  # de chamar alguém pelo nome (falso negativo) é pior que o contrário.
+  # Mas tem caso claramente ruim: contato que salva o WhatsApp com o nome
+  # do próprio estabelecimento (3 contatos assim na inbox 25 faziam a
+  # atendente dizer "Oi, Academia!") ou com emoji/número no lugar do nome
+  # ("😅‼️", "556182098580").
+  def usable_first_name(contact, conversation)
+    full_name = contact&.name.to_s
+    first_name = full_name.split.first.to_s
+    return nil if first_name.blank? || first_name.length < 2
+    return nil if first_name.scan(/\p{L}/).length < 2
+    return nil if first_name.match?(/\d/)
+    return nil if GENERIC_FIRST_NAMES.include?(normalize_for_comparison(first_name))
+    return nil if establishment_name?(full_name, conversation)
+
+    first_name
+  end
+
+  # Rejeita quando o contato salvou o WhatsApp com o nome do próprio
+  # hotel/academia em vez do nome dele. Compara o nome INTEIRO do contato
+  # (não só a primeira palavra) com o nome da inbox e o product_name do
+  # assistente, pra um nome tipo "Maurício Informática" não cair só por
+  # ter uma palavra em comum com o estabelecimento.
+  def establishment_name?(full_name, conversation)
+    normalized_contact = normalize_for_comparison(full_name)
+    return false if normalized_contact.blank?
+
+    assistant = conversation.inbox.captain_assistant
+    [conversation.inbox.name, assistant&.config.to_h['product_name']].any? do |name|
+      normalized = normalize_for_comparison(name)
+      normalized.present? && (normalized == normalized_contact || normalized.start_with?(normalized_contact))
+    end
+  end
+
+  def normalize_for_comparison(text)
+    ActiveSupport::Inflector.transliterate(text.to_s.downcase).scan(/[a-z0-9]+/).join(' ')
   end
 
   # Resolve texto da message pro Hermes consumir. Reusa
