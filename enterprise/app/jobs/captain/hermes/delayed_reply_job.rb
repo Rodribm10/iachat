@@ -23,6 +23,17 @@ class Captain::Hermes::DelayedReplyJob < ApplicationJob
     'max_seconds' => 8.0
   }.freeze
 
+  # Message splitting: o assistente divide a resposta em baloes separados
+  # colocando uma linha contendo apenas ||| entre as partes. Cada balao ganha o
+  # proprio ciclo de typing + delay, entao a cadencia sai natural (balao curto
+  # chega rapido, balao longo demora mais). Sem delimitador, comportamento
+  # identico ao de sempre: uma mensagem so.
+  BUBBLE_DELIMITER = /\n[ \t]*\|\|\|[ \t]*\n/
+  MAX_BUBBLES = 4
+  # Sem delay configurado, um respiro minimo entre baloes: os SendReplyJob sao
+  # assincronos e dois enfileirados no mesmo instante podem chegar fora de ordem.
+  MIN_BUBBLE_GAP = 0.8
+
   def perform(conversation_id, content)
     conversation = Conversation.find_by(id: conversation_id)
     if conversation.blank?
@@ -30,14 +41,17 @@ class Captain::Hermes::DelayedReplyJob < ApplicationJob
       return
     end
 
-    delay = compute_delay(conversation, content)
+    split_bubbles(content).each_with_index do |part, index|
+      delay = compute_delay(conversation, part)
+      delay = MIN_BUBBLE_GAP if delay.zero? && index.positive?
 
-    if delay.positive?
-      send_typing(conversation, 'typing_on')
-      sleep(delay)
+      if delay.positive?
+        send_typing(conversation, 'typing_on')
+        sleep(delay)
+      end
+
+      create_outgoing_message(conversation, part)
     end
-
-    create_outgoing_message(conversation, content)
 
     # NÃO mandamos typing_off explícito — WhatsApp cancela o indicador
     # automaticamente quando a msg chega no celular. Mandar paused agora
@@ -46,6 +60,15 @@ class Captain::Hermes::DelayedReplyJob < ApplicationJob
   end
 
   private
+
+  def split_bubbles(content)
+    parts = content.to_s.split(BUBBLE_DELIMITER).map(&:strip).reject(&:blank?)
+    return [content] if parts.blank?
+
+    return parts if parts.length <= MAX_BUBBLES
+
+    parts.first(MAX_BUBBLES - 1) + [parts[(MAX_BUBBLES - 1)..].join("\n\n")]
+  end
 
   def compute_delay(conversation, content)
     cfg = DEFAULT_CONFIG.merge(conversation.inbox.captain_assistant&.config.to_h.fetch('response_delay', {}))
