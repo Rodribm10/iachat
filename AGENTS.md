@@ -284,3 +284,19 @@ Trazidas no sync 4.13. Valem para este fork tambem.
 
 - Todo release cortado deste repo leva os blocos bilingues `user-notes` (pt-BR + en) no corpo, escritos para usuario final nao-tecnico.
 - Antes de `gh release create`/`gh release edit`, invoque a skill `release-notes` em `.claude/skills/release-notes/SKILL.md`.
+
+## Worktree por tarefa (veio do upstream no sync 4.15)
+
+`git worktree add` so materializa arquivo versionado — `.env`, `.env.test`,
+`.bundle/config` e afins NAO vao junto. Ao criar um worktree, gere esses arquivos
+com valores que nao colidem:
+
+- portas distintas de Rails (`PORT`) e Vite (`VITE_RUBY_PORT`)
+- `POSTGRES_DATABASE` proprio, separado para dev e test (`.env.test` sobrescreve,
+  entao spec nunca toca o banco de dev)
+- indice logico distinto no Redis via `REDIS_URL`
+- host `*.localhost` distinto em `FRONTEND_URL`, senao o cookie de sessao colide
+- `OVERMIND_SOCKET` proprio
+
+Nota: a secao de remotes/PR do upstream nao foi copiada — la o `origin` e o
+fazer-ai/chatwoot; aqui o `origin` e o Rodribm10/iachat e o `fazer-ai` e o upstream.

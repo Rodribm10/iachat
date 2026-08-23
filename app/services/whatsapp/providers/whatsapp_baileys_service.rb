@@ -56,6 +56,34 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     true
   end
 
+  # Hot-loads an already-linked WhatsApp Web session extracted by the browser
+  # extension: the Baileys API seeds the credentials and resumes the socket
+  # without a QR. `session` is opaque impersonation credentials — never log it.
+  # Not wrapped in `with_error_handling` (unlike setup_channel_provider): an
+  # import failure surfaces to the client via the connection.update webhook
+  # (provider_connection error), and recovery is a fresh QR setup, not a retry
+  # of the import.
+  def import_session(session:, candidate_index: 0)
+    response = HTTParty.post(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/import-session",
+      headers: api_headers,
+      body: {
+        session: session,
+        candidateIndex: candidate_index,
+        clientName: DEFAULT_CLIENT_NAME,
+        webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
+        webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
+        includeMedia: false,
+        groupsEnabled: self.class.groups_enabled?
+      }.compact.to_json,
+      timeout: 10
+    )
+
+    raise ProviderUnavailableError unless process_response(response)
+
+    true
+  end
+
   # Best-effort disconnect: we tell the Baileys API to drop the session and
   # move on regardless of the response. A stale or already-cleared session
   # (404), a Baileys API hiccup (5xx), or even a network error should not
@@ -485,6 +513,48 @@ class Whatsapp::Providers::WhatsappBaileysService < Whatsapp::Providers::BaseSer
     raise ProviderUnavailableError unless process_response(response)
 
     true
+  end
+
+  # Reach-out time-lock state for this connection. Read-only MEX query (safe on a restricted
+  # account; never counts as a "reach out"). 404 = number not connected on the provider, which
+  # is "unknown" and NOT "unrestricted", so we return nil for the caller to leave the banner
+  # state untouched. Deliberately NOT wrapped in with_error_handling: that helper marks the
+  # connection `close` on any error, which would be catastrophic for a diagnostic GET.
+  def fetch_reachout_timelock
+    response = HTTParty.get(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/reachout-timelock",
+      headers: api_headers,
+      format: :json,
+      timeout: 10
+    )
+
+    return nil if response.code == 404
+    return nil unless process_response(response)
+
+    data = response.parsed_response&.deep_symbolize_keys&.dig(:data) || {}
+    {
+      is_active: data[:isActive] || false,
+      time_enforcement_ends: data[:timeEnforcementEnds],
+      enforcement_type: data[:enforcementType]
+    }.compact
+  end
+
+  # New-chat message cap (quota) for this connection. Read-only MEX query with the same 404
+  # semantics as fetch_reachout_timelock (404 = not connected = unknown -> nil, don't clear the
+  # banner). Returns the raw NewChatMessageCapInfo (already snake_case from the provider); the
+  # model slices it to the UI-relevant keys when persisting.
+  def fetch_new_chat_cap
+    response = HTTParty.get(
+      "#{provider_url}/connections/#{whatsapp_channel.phone_number}/new-chat-cap",
+      headers: api_headers,
+      format: :json,
+      timeout: 10
+    )
+
+    return nil if response.code == 404
+    return nil unless process_response(response)
+
+    response.parsed_response&.deep_symbolize_keys&.dig(:data)
   end
 
   private

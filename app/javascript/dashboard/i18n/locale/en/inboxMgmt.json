@@ -338,7 +338,11 @@
             "RECONNECTING": "Connecting...",
             "LINK_DEVICE": "Link device",
             "DISCONNECT": "Disconnect",
-            "CONNECTED": "Your device has been connected successfully. You can now start sending and receiving messages."
+            "CONNECTED": "Your device has been connected successfully. You can now start sending and receiving messages.",
+            "IMPORT_SESSION_TITLE": "QR code not working?",
+            "IMPORT_SESSION_SHOW_MORE": "Show more",
+            "IMPORT_SESSION_DESC": "WhatsApp now requires a passkey when linking some accounts, which blocks the QR code. Install the browser extension to import a session you're already logged into on WhatsApp Web.",
+            "IMPORT_SESSION_INSTALL": "Install the extension"
           }
         },
         "SUBMIT_BUTTON": "Create WhatsApp Channel",
@@ -860,6 +864,10 @@
       },
       "CREDENTIALS": {
         "DESCRIPTION": "Voice calling requires Twilio API Key credentials. These are used to generate tokens for agent voice connections."
+      },
+      "INBOUND": {
+        "LABEL": "Allow incoming calls",
+        "DESCRIPTION": "Let customers call this number. When turned off, incoming calls are declined automatically — agents aren't notified and no conversation is created. Agents can still place outgoing calls."
       }
     },
     "WHATSAPP_CALLING": {

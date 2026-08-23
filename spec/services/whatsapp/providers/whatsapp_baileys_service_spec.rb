@@ -149,6 +149,55 @@ describe Whatsapp::Providers::WhatsappBaileysService do
     end
   end
 
+  describe '#import_session' do
+    let(:import_url) do
+      "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/import-session"
+    end
+    let(:session) do
+      {
+        'noiseCandidates' => [{ 'private' => 'np0', 'public' => 'nb0' }],
+        'identityKey' => { 'private' => 'ip', 'public' => 'ib' },
+        'registrationId' => 42,
+        'advSecretKey' => 'adv',
+        'account' => { 'details' => 'd', 'accountSignatureKey' => 'ask', 'accountSignature' => 'as', 'deviceSignature' => 'ds' },
+        'id' => '551101234567:12@s.whatsapp.net'
+      }
+    end
+
+    context 'when response is successful' do
+      it 'posts the session to the import endpoint' do
+        request = stub_request(:post, import_url)
+                  .with(
+                    headers: stub_headers(whatsapp_channel),
+                    body: {
+                      session: session,
+                      candidateIndex: 2,
+                      clientName: 'chatwoot-test',
+                      webhookUrl: whatsapp_channel.inbox.callback_webhook_url,
+                      webhookVerifyToken: whatsapp_channel.provider_config['webhook_verify_token'],
+                      includeMedia: false,
+                      groupsEnabled: described_class.groups_enabled?
+                    }.to_json
+                  )
+                  .to_return(status: 202)
+
+        expect(service.import_session(session: session, candidate_index: 2)).to be(true)
+        expect(request).to have_been_requested
+      end
+    end
+
+    context 'when response is unsuccessful' do
+      it 'raises ProviderUnavailableError' do
+        stub_request(:post, import_url).to_return(status: 409, body: 'conflict')
+        allow(Rails.logger).to receive(:error)
+
+        expect do
+          service.import_session(session: session)
+        end.to(raise_error { |error| expect(error.class.name).to eq(described_class::ProviderUnavailableError.name) })
+      end
+    end
+  end
+
   describe '#disconnect_channel_provider' do
     let(:disconnect_url) { "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}" }
 
@@ -701,6 +750,74 @@ describe Whatsapp::Providers::WhatsappBaileysService do
         expect(service.validate_provider_config?).to be(false)
         expect(Rails.logger).to have_received(:error)
       end
+    end
+  end
+
+  describe '#fetch_reachout_timelock' do
+    let(:url) { "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/reachout-timelock" }
+
+    it 'returns the normalized lock when the account is restricted' do
+      stub_request(:get, url).to_return(
+        status: 200,
+        headers: { 'Content-Type' => 'application/json' },
+        body: { data: { isActive: true, timeEnforcementEnds: '2026-06-19T21:52:39.000Z', enforcementType: 'RESTRICT_ALL_COMPANIONS' } }.to_json
+      )
+
+      expect(service.fetch_reachout_timelock).to eq(
+        is_active: true,
+        time_enforcement_ends: '2026-06-19T21:52:39.000Z',
+        enforcement_type: 'RESTRICT_ALL_COMPANIONS'
+      )
+    end
+
+    it 'returns is_active false when the account is not restricted' do
+      stub_request(:get, url).to_return(
+        status: 200,
+        headers: { 'Content-Type' => 'application/json' },
+        body: { data: { isActive: false, enforcementType: 'DEFAULT' } }.to_json
+      )
+
+      expect(service.fetch_reachout_timelock).to eq(is_active: false, enforcement_type: 'DEFAULT')
+    end
+
+    it 'returns nil on 404 (number not connected, not "unrestricted")' do
+      stub_request(:get, url).to_return(status: 404, body: 'Phone number not connected')
+
+      expect(service.fetch_reachout_timelock).to be_nil
+    end
+
+    it 'returns nil on a server error (read-only, never marks the connection closed)' do
+      stub_request(:get, url).to_return(status: 500, body: 'Internal Server Error')
+      allow(Rails.logger).to receive(:error)
+
+      expect(service.fetch_reachout_timelock).to be_nil
+    end
+  end
+
+  describe '#fetch_new_chat_cap' do
+    let(:url) { "#{whatsapp_channel.provider_config['provider_url']}/connections/#{whatsapp_channel.phone_number}/new-chat-cap" }
+
+    it 'returns the raw cap info on success' do
+      stub_request(:get, url).to_return(
+        status: 200,
+        headers: { 'Content-Type' => 'application/json' },
+        body: { data: { capping_status: 'CAPPED', total_quota: 100, used_quota: 100, ote_status: 'ELIGIBLE' } }.to_json
+      )
+
+      expect(service.fetch_new_chat_cap).to eq(capping_status: 'CAPPED', total_quota: 100, used_quota: 100, ote_status: 'ELIGIBLE')
+    end
+
+    it 'returns nil on 404 (number not connected)' do
+      stub_request(:get, url).to_return(status: 404, body: 'Phone number not connected')
+
+      expect(service.fetch_new_chat_cap).to be_nil
+    end
+
+    it 'returns nil on a server error (read-only, never marks the connection closed)' do
+      stub_request(:get, url).to_return(status: 500, body: 'Internal Server Error')
+      allow(Rails.logger).to receive(:error)
+
+      expect(service.fetch_new_chat_cap).to be_nil
     end
   end
 

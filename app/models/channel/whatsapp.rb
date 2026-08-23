@@ -49,6 +49,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   # evolution e gowa ficam de fora: nenhum dos dois implementa envio de reacao.
   REACTION_SUPPORTED_PROVIDERS = %w[whatsapp_cloud baileys zapi wuzapi].freeze
 
+  # UI-relevant subset of the baileys new-chat message cap payload that we persist in
+  # provider_connection. server_sent_timestamp is intentionally dropped (it changes on every
+  # snapshot, so keeping it would make the 5-min poll re-broadcast every cycle for no reason).
+  NEW_CHAT_CAP_KEYS = %w[capping_status ote_status mv_status total_quota used_quota cycle_start_timestamp cycle_end_timestamp].freeze
+
   encrypts :wuzapi_user_token, :wuzapi_admin_token, :evolution_api_token, :gowa_username, :gowa_password
 
   before_validation :ensure_webhook_verify_token
@@ -86,6 +91,11 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
       account.feature_enabled?('channel_voice')
   end
 
+  # Mutes only the incoming side of calling; default on, so only an explicit false disables inbound.
+  def inbound_calls_enabled?
+    provider_config['inbound_calls_enabled'] != false
+  end
+
   # Whether this inbox can do WhatsApp calling at all. Meta's Calling API is
   # reachable by any whatsapp_cloud inbox, so 360dialog inboxes can't be toggled
   # on even though calling_enabled would persist.
@@ -116,8 +126,10 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     provider == 'baileys' && ENV.fetch('BAILEYS_PROVIDER_USE_INTERNAL_HOST_URL', false)
   end
 
-  # Enables voice: turns calling on at Meta (idempotent), subscribes the `calls`
-  # webhook field, and sets calling_enabled. Raises on Meta failure.
+  # Enables voice: turns calling on at Meta (idempotent), then re-registers webhooks
+  # with the in-memory calling_enabled flag so the `calls` field is subscribed. The
+  # flag is persisted only after registration succeeds, so a webhook failure can't
+  # leave the inbox reporting voice_enabled? while the WABA isn't subscribed to calls.
   # Saved with validate: false to skip validate_provider_config's remote credential
   # re-check, which could spuriously fail and desync the flag from Meta.
   def enable_voice_calling!
@@ -125,21 +137,21 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     raise 'WhatsApp calling requires the channel_voice feature' unless account.feature_enabled?('channel_voice')
 
     provider_service.update_calling_status('ENABLED')
-    webhook_setup_service.register_callback
     self.provider_config = provider_config.merge('calling_enabled' => true)
+    webhook_setup_service.register_callback
     save!(validate: false)
   end
 
-  # Disables voice: unsets calling_enabled (gates the call subsystem) and drops
-  # `calls` from the webhook subscription (best-effort, so a Meta outage can't
-  # trap admins). Leaves Meta's WABA calling.status untouched.
+  # Disables voice: unsets calling_enabled (gates the call subsystem) and re-registers
+  # webhooks, which drops `calls` from the subscription (best-effort, so a Meta outage
+  # can't trap admins). Leaves Meta's WABA calling.status untouched.
   def disable_voice_calling!
     raise 'WhatsApp calling requires a whatsapp_cloud inbox' unless voice_calling_supported?
 
     self.provider_config = provider_config.merge('calling_enabled' => false)
     save!(validate: false)
     begin
-      webhook_setup_service.register_callback(subscribed_fields: %w[messages smb_message_echoes])
+      webhook_setup_service.register_callback
     rescue StandardError => e
       Rails.logger.warn "[WHATSAPP CALL] disable webhook re-subscribe failed: #{e.message}"
     end
@@ -168,8 +180,35 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
     broadcast_provider_connection_updated
   end
 
+  # Proactive (REST poll) / push update of just the reach-out lock. Unlike the connection.update
+  # path this carries no lease epoch, so it merges into the existing provider_connection without
+  # touching connection/epoch/qr/error and reuses update_provider_connection!'s no-op guard and
+  # broadcast. The with_lock reloads under SELECT FOR UPDATE so a concurrent connection.update
+  # can't be lost by merging onto a stale snapshot. Callers pass nil (404/fetch error) to skip.
+  def update_reachout_time_lock!(reachout_time_lock)
+    return if reachout_time_lock.nil?
+
+    with_lock do
+      update_provider_connection!(provider_connection.merge('reachout_time_lock' => reachout_time_lock.deep_stringify_keys))
+    end
+  end
+
+  # Same contract as update_reachout_time_lock! for the new-chat message cap (quota). We persist
+  # only the UI-relevant keys (dropping the volatile server_sent_timestamp) so the poll doesn't
+  # re-broadcast every cycle when nothing meaningful changed.
+  def update_new_chat_cap!(new_chat_cap)
+    return if new_chat_cap.nil?
+
+    normalized = new_chat_cap.to_h.deep_stringify_keys.slice(*NEW_CHAT_CAP_KEYS)
+    with_lock do
+      update_provider_connection!(provider_connection.merge('new_chat_cap' => normalized))
+    end
+  end
+
   def provider_connection_data
     data = { connection: provider_connection['connection'] }
+    data[:reachout_time_lock] = provider_connection['reachout_time_lock'] if provider_connection['reachout_time_lock'].present?
+    data[:new_chat_cap] = provider_connection['new_chat_cap'] if provider_connection['new_chat_cap'].present?
     if Current.account_user&.administrator?
       data[:qr_data_url] = provider_connection['qr_data_url']
       data[:error] = provider_connection['error']
@@ -362,6 +401,7 @@ class Channel::Whatsapp < ApplicationRecord # rubocop:disable Metrics/ClassLengt
   end
 
   delegate :setup_channel_provider, to: :provider_service
+  delegate :import_session, to: :provider_service
   delegate :presence_subscribe, to: :provider_service
   delegate :send_message, to: :provider_service
   delegate :send_reaction_message, to: :provider_service

@@ -57,6 +57,7 @@ Rails.application.routes.draw do
             resource :contact_merge, only: [:create]
           end
           resource :bulk_actions, only: [:create]
+          resources :redirect_tokens, only: [:create]
           resource :onboarding, only: [:update] do
             get :help_center_generation
           end
@@ -367,6 +368,7 @@ Rails.application.routes.draw do
             post :set_agent_bot, on: :member
             resources :landing_hosts, only: [:index, :create, :update, :destroy]
             post :setup_channel_provider, on: :member
+            post :import_whatsapp_session, on: :member
             post :disconnect_channel_provider, on: :member
             post :convert_provider, on: :member
             delete :avatar, on: :member
@@ -381,6 +383,7 @@ Rails.application.routes.draw do
               end
               post :enable_whatsapp_calling, on: :member
               post :disable_whatsapp_calling, on: :member
+              post :set_inbound_calls, on: :member
             end
 
             resource :csat_template, only: [:show, :create], controller: 'inbox_csat_templates' do
@@ -566,6 +569,7 @@ Rails.application.routes.draw do
             post :backup_codes
           end
           resources :inbox_signatures, only: %i[index show update destroy], param: :inbox_id
+          resources :sessions, only: [:index, :destroy]
         end
       end
 
@@ -574,6 +578,7 @@ Rails.application.routes.draw do
       namespace :widget do
         resource :direct_uploads, only: [:create]
         resource :config, only: [:create]
+        resource :redirect_token, only: [:create]
         resources :campaigns, only: [:index]
         resources :events, only: [:create]
         resources :messages, only: [:index, :create, :update]
