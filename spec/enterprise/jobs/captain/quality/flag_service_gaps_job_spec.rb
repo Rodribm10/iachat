@@ -6,10 +6,15 @@ RSpec.describe Captain::Quality::FlagServiceGapsJob, type: :job do
     create(:channel_whatsapp, account: account, phone_number: '+5561999990000', sync_templates: false, validate_provider_config: false)
   end
   let(:inbox) { Inbox.find_by!(channel: whatsapp_channel) }
-  let(:assistant) { Captain::Assistant.create!(account: account, name: 'Bot', description: 'assistente de teste', engine: 'captain_interno') }
 
+  # Propositalmente SEM CaptainInbox: o escopo do job é por
+  # Captain::Assistant.account_id (ver comentário em relevant_account_ids
+  # no job), não pela ligação inbox->assistant — que na prática tem conta
+  # real (conta 2 do Chatwoot em produção) rodando só no fallback legado
+  # ENV CAPTAIN_HERMES_INBOX_IDS, sem nenhum CaptainInbox. Manter o setup
+  # do spec sem CaptainInbox cobre exatamente esse caso.
   before do
-    CaptainInbox.create!(captain_assistant: assistant, inbox: inbox)
+    Captain::Assistant.create!(account: account, name: 'Bot', description: 'assistente de teste', engine: 'captain_interno')
   end
 
   # Status é setado via update_column (não no create!) porque

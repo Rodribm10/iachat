@@ -51,8 +51,8 @@ class Captain::Quality::FlagServiceGapsJob < ApplicationJob
   def perform
     @stats = Hash.new(0)
 
-    inbox_ids_by_account.each do |account_id, inbox_ids|
-      process_account(account_id, inbox_ids)
+    relevant_account_ids.each do |account_id|
+      process_account(account_id)
     end
 
     log_summary
@@ -62,28 +62,33 @@ class Captain::Quality::FlagServiceGapsJob < ApplicationJob
 
   private
 
-  # Só contas com pelo menos uma inbox conectada a um Captain::Assistant
-  # (captain_interno ou hermes) — evita varredura global em conta sem
-  # atendimento automatizado (trial parado, conta de teste etc).
-  def inbox_ids_by_account
-    CaptainInbox.joins(:inbox)
-                .pluck(:inbox_id, 'inboxes.account_id')
-                .group_by(&:last)
-                .transform_values { |rows| rows.map(&:first) }
+  # Só contas com pelo menos um Captain::Assistant (captain_interno ou
+  # hermes) — evita varredura global em conta sem atendimento automatizado
+  # (trial parado, conta de teste etc). Mesmo critério de escopo do
+  # Captain::Retention::ChurnOutreachSchedulerJob.
+  #
+  # Propositalmente NÃO filtra por CaptainInbox aqui: a ligação
+  # inbox->assistant tem um fallback legado via ENV CAPTAIN_HERMES_INBOX_IDS
+  # (ver Captain::Hermes.enabled_for?) pra inbox que ainda não foi
+  # re-apontada no painel — confirmado em produção (inbox 1). Exigir
+  # CaptainInbox deixaria de fora justamente a conta que motivou este job
+  # (conta 2, inbox só com Captain::Assistant no nível da conta).
+  def relevant_account_ids
+    Captain::Assistant.distinct.pluck(:account_id)
   end
 
-  def process_account(account_id, inbox_ids)
-    whatsapp_phones = whatsapp_phone_by_inbox(inbox_ids)
+  def process_account(account_id)
+    whatsapp_phones = whatsapp_phone_by_account(account_id)
 
-    conversations_scope(account_id, inbox_ids).find_each do |conversation|
+    conversations_scope(account_id).find_each do |conversation|
       next if self_conversation?(conversation, whatsapp_phones)
 
       sync_labels!(conversation)
     end
   end
 
-  def conversations_scope(account_id, inbox_ids)
-    Conversation.where(account_id: account_id, inbox_id: inbox_ids, status: OPEN_STATUSES)
+  def conversations_scope(account_id)
+    Conversation.where(account_id: account_id, status: OPEN_STATUSES)
                 .where('last_activity_at >= ?', ACTIVITY_LOOKBACK.ago)
                 .includes(:contact)
   end
@@ -106,9 +111,9 @@ class Captain::Quality::FlagServiceGapsJob < ApplicationJob
     value.to_s.gsub(/\D/, '')
   end
 
-  def whatsapp_phone_by_inbox(inbox_ids)
+  def whatsapp_phone_by_account(account_id)
     Channel::Whatsapp.joins(:inbox)
-                     .where(inboxes: { id: inbox_ids })
+                     .where(inboxes: { account_id: account_id })
                      .pluck('inboxes.id', 'channel_whatsapp.phone_number')
                      .to_h
   end
