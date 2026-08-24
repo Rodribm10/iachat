@@ -12,6 +12,7 @@ import HardCard from './HardCard.vue';
 import WordCloud from './WordCloud.vue';
 import AreaCompareChart from './AreaCompareChart.vue';
 import ServiceModeCard from './ServiceModeCard.vue';
+import SystemAdoptionCard from './SystemAdoptionCard.vue';
 import DonutCard from './DonutCard.vue';
 import MonthlyChart from './MonthlyChart.vue';
 import {
@@ -22,6 +23,7 @@ import {
   monthInputValue,
   monthEndDate,
   computePeriodRange,
+  SYSTEM_ADOPTION_COLORS,
 } from './helpers';
 
 const router = useRouter();
@@ -170,6 +172,39 @@ const serviceModeSlices = computed(() => [
     color: '#FBBF24',
   },
 ]);
+
+const systemAdoptionSplit = computed(() => [
+  {
+    name: t('SINAL_REPORTS.SYSTEM_ADOPTION.PANEL'),
+    value: visual.value?.system_adoption?.panel ?? 0,
+    color: SYSTEM_ADOPTION_COLORS.panel,
+  },
+  {
+    name: t('SINAL_REPORTS.SYSTEM_ADOPTION.WHATSAPP_DIRECT'),
+    value: visual.value?.system_adoption?.whatsapp_direct ?? 0,
+    color: SYSTEM_ADOPTION_COLORS.whatsappDirect,
+  },
+]);
+
+const systemAdoptionHourTypes = computed(() => [
+  {
+    key: 'panel',
+    label: t('SINAL_REPORTS.SYSTEM_ADOPTION.PANEL'),
+    color: SYSTEM_ADOPTION_COLORS.panel,
+  },
+  {
+    key: 'whatsapp_direct',
+    label: t('SINAL_REPORTS.SYSTEM_ADOPTION.WHATSAPP_DIRECT'),
+    color: SYSTEM_ADOPTION_COLORS.whatsappDirect,
+  },
+]);
+
+const systemAdoptionHourBuckets = computed(() =>
+  (visual.value?.system_adoption?.hours ?? []).map(bucket => ({
+    label: `${bucket.hour}h`,
+    values: { panel: bucket.panel, whatsapp_direct: bucket.whatsapp_direct },
+  }))
+);
 
 const participantSlices = computed(() => [
   {
@@ -431,6 +466,15 @@ const goToAiReports = () => {
           </DonutCard>
         </div>
       </section>
+
+      <!-- Adoção do sistema: painel x WhatsApp direto -->
+      <SystemAdoptionCard
+        :split-items="systemAdoptionSplit"
+        :agents="visual?.system_adoption?.agents ?? []"
+        :whatsapp-direct-count="visual?.system_adoption?.whatsapp_direct ?? 0"
+        :hour-buckets="systemAdoptionHourBuckets"
+        :hour-types="systemAdoptionHourTypes"
+      />
 
       <!-- Visão mensal -->
       <section

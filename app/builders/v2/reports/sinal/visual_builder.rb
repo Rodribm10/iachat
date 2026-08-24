@@ -1,6 +1,7 @@
 # "Panorama visual" da Overview (portado da branch codex/sinal-relatorios-visuais
 # do Sinal): modelo de atendimento (só IA / misto / só humano), participantes,
-# janelas de horário, formatos e visão mensal — tudo do banco do Chatwoot.
+# janelas de horário, formatos, adoção do sistema (painel x WhatsApp direto)
+# e visão mensal — tudo do banco do Chatwoot.
 class V2::Reports::Sinal::VisualBuilder < V2::Reports::Sinal::BaseBuilder
   MONTHS_WINDOW = 6
 
@@ -14,6 +15,7 @@ class V2::Reports::Sinal::VisualBuilder < V2::Reports::Sinal::BaseBuilder
       inbound_windows: inbound_windows,
       formats: formats,
       service_modes: service_modes,
+      system_adoption: system_adoption,
       months: months
     }
   end
@@ -36,9 +38,12 @@ class V2::Reports::Sinal::VisualBuilder < V2::Reports::Sinal::BaseBuilder
                                            .distinct.pluck(:conversation_id).to_set
   end
 
+  # "Humano" é a união de quem respondeu pelo painel (sender_type = User) com
+  # quem respondeu direto no WhatsApp: resposta direta é sempre humana, então
+  # entra na mesma fatia — ver whatsapp_direct_messages para o critério.
   def human_conversation_ids
-    @human_conversation_ids ||= range_messages.where(message_type: :outgoing, sender_type: 'User')
-                                              .distinct.pluck(:conversation_id).to_set
+    @human_conversation_ids ||= panel_human_messages.distinct.pluck(:conversation_id).to_set |
+                                whatsapp_direct_messages.distinct.pluck(:conversation_id).to_set
   end
 
   def service_modes
@@ -52,6 +57,58 @@ class V2::Reports::Sinal::VisualBuilder < V2::Reports::Sinal::BaseBuilder
       total: base.size,
       unclassified: (base - ai - human).size
     }
+  end
+
+  # ----- adoção do sistema: quanto do atendimento humano sai do painel -----
+
+  # Resposta pelo painel de verdade: outgoing com sender_type = User.
+  def panel_human_messages
+    @panel_human_messages ||= range_messages.where(message_type: :outgoing, sender_type: 'User')
+  end
+
+  # Outgoing sem sender_type (mensagem sem autor) só conta como resposta
+  # direta no WhatsApp quando tem source_id — é o eco real devolvido pelo
+  # provider (gowa), prova de que a mensagem saiu de fato pelo app do
+  # celular. Sem source_id não dá pra distinguir de lixo sem autor.
+  def whatsapp_direct_messages
+    @whatsapp_direct_messages ||= range_messages.where(message_type: :outgoing, sender_type: nil)
+                                                .where.not(source_id: nil)
+  end
+
+  def system_adoption
+    {
+      panel: panel_human_messages.count,
+      whatsapp_direct: whatsapp_direct_messages.count,
+      agents: agent_ranking,
+      hours: hourly_distribution
+    }
+  end
+
+  # Ranking por atendente de quem responde pelo painel. A resposta direta no
+  # WhatsApp não tem autor no banco — não dá pra atribuir a uma pessoa, então
+  # fica de fora daqui (o total entra separado em system_adoption[:whatsapp_direct],
+  # e o front rotula esse volume como "sem autor identificado").
+  def agent_ranking
+    sent = panel_human_messages.where.not(sender_id: nil).group(:sender_id).count
+    rows = account.users.filter_map do |user|
+      next unless sent.key?(user.id)
+
+      { agent_id: user.id, agent_name: user.name, messages_sent: sent[user.id] }
+    end
+    rows.sort_by { |row| -row[:messages_sent] }
+  end
+
+  # Distribuição por hora do dia (0-23, fuso do timezone_offset) das
+  # respostas humanas, painel x WhatsApp direto — mesmo padrão de conversão
+  # de fuso do inbound_windows.
+  def hourly_distribution
+    panel = hourly_counts(panel_human_messages)
+    whatsapp = hourly_counts(whatsapp_direct_messages)
+    (0..23).map { |hour| { hour: hour, panel: panel[hour] || 0, whatsapp_direct: whatsapp[hour] || 0 } }
+  end
+
+  def hourly_counts(scope)
+    scope.group(Arel.sql("EXTRACT(hour FROM #{local_time_sql})")).count.transform_keys(&:to_i)
   end
 
   # ----- contatos -----
@@ -93,12 +150,17 @@ class V2::Reports::Sinal::VisualBuilder < V2::Reports::Sinal::BaseBuilder
     }
   end
 
+  # Postgres não conhece o fuso do Rails direto — SQL cru com AT TIME ZONE
+  # precisa converter UTC (como created_at é salvo) pro identificador IANA.
+  def local_time_sql
+    "(messages.created_at AT TIME ZONE 'UTC' AT TIME ZONE #{ActiveRecord::Base.connection.quote(timezone_identifier)})"
+  end
+
   def inbound_windows
-    local = "(messages.created_at AT TIME ZONE 'UTC' AT TIME ZONE #{ActiveRecord::Base.connection.quote(timezone_identifier)})"
     bucket = <<~SQL.squish
       CASE
-        WHEN EXTRACT(dow FROM #{local}) IN (0, 6) THEN 'weekend'
-        WHEN EXTRACT(hour FROM #{local}) >= 8 AND EXTRACT(hour FROM #{local}) < 20 THEN 'commercial'
+        WHEN EXTRACT(dow FROM #{local_time_sql}) IN (0, 6) THEN 'weekend'
+        WHEN EXTRACT(hour FROM #{local_time_sql}) >= 8 AND EXTRACT(hour FROM #{local_time_sql}) < 20 THEN 'commercial'
         ELSE 'after_hours'
       END
     SQL

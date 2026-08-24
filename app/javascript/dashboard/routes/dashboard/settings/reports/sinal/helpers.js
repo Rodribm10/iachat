@@ -105,3 +105,12 @@ export const SINAL_PALETTE = [
   '#FBBF24',
   '#4ADE80',
 ];
+
+// Cores fixas do card "Adoção do sistema" — painel reaproveita o amber já
+// usado pra "humano" no resto da página; WhatsApp direto ganha uma cor à
+// parte (fora do sistema, vale atenção). Compartilhadas entre
+// SinalOverview.vue e SystemAdoptionCard.vue pra não divergir.
+export const SYSTEM_ADOPTION_COLORS = {
+  panel: '#FBBF24',
+  whatsappDirect: '#F87171',
+};
