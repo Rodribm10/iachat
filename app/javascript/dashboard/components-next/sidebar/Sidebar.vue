@@ -785,6 +785,21 @@ const menuItems = computed(() => {
           label: t('SIDEBAR.REPORTS_DIRECTORY_DASHBOARD'),
           to: accountScopedRoute('directory_dashboard_reports'),
         },
+        {
+          name: 'Sinal Overview',
+          label: t('SIDEBAR.SINAL_OVERVIEW'),
+          to: accountScopedRoute('sinal_overview_reports'),
+        },
+        {
+          name: 'Sinal Privado',
+          label: t('SIDEBAR.SINAL_PRIVADO'),
+          to: accountScopedRoute('sinal_privado_reports'),
+        },
+        {
+          name: 'Sinal Midia',
+          label: t('SIDEBAR.SINAL_MIDIA'),
+          to: accountScopedRoute('sinal_midia_reports'),
+        },
       ],
     },
     {

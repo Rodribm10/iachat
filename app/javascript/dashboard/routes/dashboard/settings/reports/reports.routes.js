@@ -28,6 +28,7 @@ import BotReports from './BotReports.vue';
 import LiveReports from './LiveReports.vue';
 import SLAReports from './SLAReports.vue';
 import DirectoryDashboard from './DirectoryDashboard.vue';
+import SinalEmbed from './SinalEmbed.vue';
 
 const meta = {
   featureFlag: FEATURE_FLAGS.REPORTS,
@@ -170,6 +171,38 @@ export default {
           component: DirectoryDashboard,
         },
       ],
+    },
+    // As páginas do Sinal ficam fora do ReportsWrapper de propósito: o wrapper
+    // limita a largura (max-w-5xl) e o embed precisa da área inteira.
+    {
+      path: frontendURL('accounts/:accountId/reports/sinal/overview'),
+      name: 'sinal_overview_reports',
+      meta: {
+        ...meta,
+        sinalPath: '/',
+        sinalLabelKey: 'SIDEBAR.SINAL_OVERVIEW',
+      },
+      component: SinalEmbed,
+    },
+    {
+      path: frontendURL('accounts/:accountId/reports/sinal/privado'),
+      name: 'sinal_privado_reports',
+      meta: {
+        ...meta,
+        sinalPath: '/privado',
+        sinalLabelKey: 'SIDEBAR.SINAL_PRIVADO',
+      },
+      component: SinalEmbed,
+    },
+    {
+      path: frontendURL('accounts/:accountId/reports/sinal/midia'),
+      name: 'sinal_midia_reports',
+      meta: {
+        ...meta,
+        sinalPath: '/midia',
+        sinalLabelKey: 'SIDEBAR.SINAL_MIDIA',
+      },
+      component: SinalEmbed,
     },
   ],
 };

@@ -712,6 +712,9 @@
     "RESOLUTION_COUNT": "Resolution Count",
     "CONVERSATIONS": "No. of conversations"
   },
+  "SINAL_REPORTS": {
+    "OPEN_IN_SINAL": "Open in Sinal ↗"
+  },
   "DIRECTORY_DASHBOARD": {
     "HEADER": "Directory Dashboard",
     "BANNER": {
