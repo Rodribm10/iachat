@@ -186,26 +186,6 @@ const systemAdoptionSplit = computed(() => [
   },
 ]);
 
-const systemAdoptionHourTypes = computed(() => [
-  {
-    key: 'panel',
-    label: t('SINAL_REPORTS.SYSTEM_ADOPTION.PANEL'),
-    color: SYSTEM_ADOPTION_COLORS.panel,
-  },
-  {
-    key: 'whatsapp_direct',
-    label: t('SINAL_REPORTS.SYSTEM_ADOPTION.WHATSAPP_DIRECT'),
-    color: SYSTEM_ADOPTION_COLORS.whatsappDirect,
-  },
-]);
-
-const systemAdoptionHourBuckets = computed(() =>
-  (visual.value?.system_adoption?.hours ?? []).map(bucket => ({
-    label: `${bucket.hour}h`,
-    values: { panel: bucket.panel, whatsapp_direct: bucket.whatsapp_direct },
-  }))
-);
-
 const participantSlices = computed(() => [
   {
     name: t('SINAL_REPORTS.VISUAL.PARTICIPANT_CLIENT'),
@@ -470,10 +450,7 @@ const goToAiReports = () => {
       <!-- Adoção do sistema: painel x WhatsApp direto -->
       <SystemAdoptionCard
         :split-items="systemAdoptionSplit"
-        :agents="visual?.system_adoption?.agents ?? []"
-        :whatsapp-direct-count="visual?.system_adoption?.whatsapp_direct ?? 0"
-        :hour-buckets="systemAdoptionHourBuckets"
-        :hour-types="systemAdoptionHourTypes"
+        :heatmap="visual?.system_adoption?.heatmap ?? []"
       />
 
       <!-- Visão mensal -->

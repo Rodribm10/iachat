@@ -102,48 +102,63 @@ RSpec.describe V2::Reports::Sinal::VisualBuilder do
     end
 
     describe 'system_adoption' do
-      it 'counts panel vs WhatsApp-direct replies and ranks agents by panel volume only' do
-        agent_a = create(:user, account: account, name: 'Agente A')
-        agent_b = create(:user, account: account, name: 'Agente B')
+      it 'counts panel vs WhatsApp-direct replies in the period' do
         conversation = create(:conversation, account: account, inbox: inbox)
         incoming!(conversation)
-        panel_reply!(conversation, agent_a)
-        panel_reply!(conversation, agent_a)
-        panel_reply!(conversation, agent_b)
-        whatsapp_direct_reply!(conversation)
-        whatsapp_direct_reply!(conversation)
+        panel_reply!(conversation, create(:user, account: account))
+        panel_reply!(conversation, create(:user, account: account))
         whatsapp_direct_reply!(conversation)
         authorless_reply!(conversation)
 
         result = builder.build[:system_adoption]
 
-        expect(result[:panel]).to eq(3)
-        expect(result[:whatsapp_direct]).to eq(3)
-        expect(result[:agents]).to eq(
-          [
-            { agent_id: agent_a.id, agent_name: 'Agente A', messages_sent: 2 },
-            { agent_id: agent_b.id, agent_name: 'Agente B', messages_sent: 1 }
-          ]
-        )
+        expect(result[:panel]).to eq(2)
+        expect(result[:whatsapp_direct]).to eq(1)
       end
 
-      it 'buckets replies by local hour (0-23) according to timezone_offset, split panel x WhatsApp-direct' do
-        day_start = Time.utc(2026, 8, 24, 0, 0, 0)
-        day_builder = described_class.new(account, { since: day_start, until: day_start + 1.day, timezone_offset: '-3' })
-        conversation = create(:conversation, account: account, inbox: inbox)
-        # 14:00 UTC - 3h = 11:00 local
-        panel_reply!(conversation, create(:user, account: account), created_at: day_start + 14.hours)
-        # 05:00 UTC - 3h = 02:00 local
-        whatsapp_direct_reply!(conversation, created_at: day_start + 5.hours)
+      describe 'heatmap' do
+        it 'has one cell per weekday (0-6) x hour (0-23) combination' do
+          heatmap = builder.build[:system_adoption][:heatmap]
 
-        hours = day_builder.build[:system_adoption][:hours]
+          expect(heatmap.length).to eq(168)
+          expect(heatmap.map { |cell| [cell[:dow], cell[:hour]] }).to eq(
+            (0..6).flat_map { |dow| (0..23).map { |hour| [dow, hour] } }
+          )
+        end
 
-        expect(hours.length).to eq(24)
-        expect(hours.map { |h| h[:hour] }).to eq((0..23).to_a)
-        expect(hours[11]).to eq(hour: 11, panel: 1, whatsapp_direct: 0)
-        expect(hours[2]).to eq(hour: 2, panel: 0, whatsapp_direct: 1)
-        expect(hours.sum { |h| h[:panel] }).to eq(1)
-        expect(hours.sum { |h| h[:whatsapp_direct] }).to eq(1)
+        it 'fills panel-only, WhatsApp-only, mixed and empty cells, respecting the local timezone across a day rollover' do
+          monday_utc = Time.utc(2026, 8, 24, 0, 0, 0) # segunda-feira em UTC
+          day_builder = described_class.new(
+            account, { since: monday_utc - 1.day, until: monday_utc + 1.day, timezone_offset: '-3' }
+          )
+          conversation = create(:conversation, account: account, inbox: inbox)
+
+          # 14:00 UTC segunda -3h = 11:00 local segunda (dow 1) -- so painel
+          panel_reply!(conversation, create(:user, account: account), created_at: monday_utc + 14.hours)
+
+          # 16:00 UTC segunda -3h = 13:00 local segunda (dow 1) -- so WhatsApp direto
+          whatsapp_direct_reply!(conversation, created_at: monday_utc + 16.hours)
+
+          # 18:00 UTC segunda -3h = 15:00 local segunda (dow 1) -- misto
+          panel_reply!(conversation, create(:user, account: account), created_at: monday_utc + 18.hours)
+          whatsapp_direct_reply!(conversation, created_at: monday_utc + 18.hours)
+
+          # 01:00 UTC segunda -3h = 22:00 local DOMINGO anterior (dow 0) --
+          # prova que a matriz segue o fuso na virada do dia, nao so na hora
+          panel_reply!(conversation, create(:user, account: account), created_at: monday_utc + 1.hour)
+
+          heatmap = day_builder.build[:system_adoption][:heatmap]
+          cell_at = lambda do |dow, hour|
+            heatmap.find { |cell| cell[:dow] == dow && cell[:hour] == hour }
+          end
+
+          expect(cell_at.call(1, 11)).to eq(dow: 1, hour: 11, panel: 1, whatsapp_direct: 0)
+          expect(cell_at.call(1, 13)).to eq(dow: 1, hour: 13, panel: 0, whatsapp_direct: 1)
+          expect(cell_at.call(1, 15)).to eq(dow: 1, hour: 15, panel: 1, whatsapp_direct: 1)
+          expect(cell_at.call(0, 22)).to eq(dow: 0, hour: 22, panel: 1, whatsapp_direct: 0)
+          # celula sem nenhuma resposta fica 0/0 -- o front decide pintar neutro
+          expect(cell_at.call(1, 12)).to eq(dow: 1, hour: 12, panel: 0, whatsapp_direct: 0)
+        end
       end
     end
   end

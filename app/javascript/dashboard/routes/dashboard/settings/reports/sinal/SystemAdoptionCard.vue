@@ -1,11 +1,12 @@
 <script setup>
 // "Adoção do sistema": quanto do atendimento humano passa pelo painel do
-// Chatwoot vs. sai direto pelo WhatsApp do celular (fora do sistema) —
-// ranking por atendente (só painel, WhatsApp direto não tem autor) e
-// distribuição por hora do dia.
+// Chatwoot vs. sai direto pelo WhatsApp do celular (fora do sistema) — split
+// total e mapa de calor dia da semana x hora pra cruzar com a escala de
+// plantão (o horário identifica quem está por trás, já que a resposta
+// direta no WhatsApp não tem autor no banco).
 import { computed } from 'vue';
-import StackedBars from './StackedBars.vue';
-import { formatNumber, SYSTEM_ADOPTION_COLORS } from './helpers';
+import AdoptionHeatmap from './AdoptionHeatmap.vue';
+import { formatNumber } from './helpers';
 
 const props = defineProps({
   splitItems: {
@@ -13,14 +14,11 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  agents: {
-    // [{ agent_id, agent_name, messages_sent }] — só respostas pelo painel
+  heatmap: {
+    // [{ dow, hour, panel, whatsapp_direct }] — 168 celulas (7 dias x 24h)
     type: Array,
     default: () => [],
   },
-  whatsappDirectCount: { type: Number, default: 0 },
-  hourBuckets: { type: Array, default: () => [] },
-  hourTypes: { type: Array, default: () => [] },
 });
 
 const total = computed(() =>
@@ -31,13 +29,6 @@ const pct = value => {
   if (!total.value) return '0%';
   return `${Math.round((value / total.value) * 100)}%`;
 };
-
-const maxAgentMessages = computed(() =>
-  Math.max(1, ...props.agents.map(agent => agent.messages_sent))
-);
-
-const agentBarWidth = messagesSent =>
-  `${Math.round((messagesSent / maxAgentMessages.value) * 100)}%`;
 </script>
 
 <template>
@@ -97,125 +88,17 @@ const agentBarWidth = messagesSent =>
         </div>
       </div>
 
-      <div class="mt-4 grid grid-cols-1 xl:grid-cols-[1.3fr_1fr] gap-4">
-        <div
-          class="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-4"
-        >
-          <h4 class="text-[13px] font-semibold text-[var(--text)]">
-            {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.RANKING_TITLE') }}
-          </h4>
-          <p class="mt-0.5 text-[11.5px] text-[var(--muted-2)]">
-            {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.RANKING_SUBTITLE') }}
-          </p>
-
-          <div class="mt-3 max-h-[260px] overflow-y-auto pr-1">
-            <div
-              v-if="!agents.length"
-              class="py-3 text-[12px] text-[var(--muted-2)]"
-            >
-              {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.RANKING_EMPTY') }}
-            </div>
-            <div
-              v-for="agent in agents"
-              :key="agent.agent_id"
-              class="flex items-center justify-between gap-3 py-2 border-b border-[var(--border-soft)] last:border-0"
-            >
-              <div class="min-w-0 flex-1">
-                <div
-                  class="text-[13px] font-semibold text-[var(--text)] truncate"
-                >
-                  {{ agent.agent_name }}
-                </div>
-                <div
-                  class="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-soft)]"
-                >
-                  <div
-                    class="h-full rounded-full"
-                    :style="{
-                      width: agentBarWidth(agent.messages_sent),
-                      backgroundColor: SYSTEM_ADOPTION_COLORS.panel,
-                    }"
-                  />
-                </div>
-              </div>
-              <div class="text-right shrink-0">
-                <div
-                  class="font-display text-[15px] font-bold text-[var(--text)]"
-                >
-                  {{ formatNumber(agent.messages_sent) }}
-                </div>
-                <div class="text-[10px] text-[var(--muted-2)]">
-                  {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.COL_REPLIES') }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            class="mt-3 pt-3 border-t border-dashed border-[var(--border-soft)]"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex min-w-0 items-center gap-2">
-                <span
-                  class="h-2 w-2 shrink-0 rounded-full"
-                  :style="{
-                    backgroundColor: SYSTEM_ADOPTION_COLORS.whatsappDirect,
-                  }"
-                />
-                <div class="min-w-0">
-                  <div class="text-[13px] font-semibold text-[var(--text)]">
-                    {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.NO_AUTHOR_LABEL') }}
-                  </div>
-                  <div class="text-[11px] text-[var(--muted-2)]">
-                    {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.NO_AUTHOR_HINT') }}
-                  </div>
-                </div>
-              </div>
-              <div class="text-right shrink-0">
-                <div
-                  class="font-display text-[15px] font-bold text-[var(--text)]"
-                >
-                  {{ formatNumber(whatsappDirectCount) }}
-                </div>
-                <div class="text-[10px] text-[var(--muted-2)]">
-                  {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.COL_REPLIES') }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          class="rounded-xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-4"
-        >
-          <h4 class="text-[13px] font-semibold text-[var(--text)]">
-            {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.HOURS_TITLE') }}
-          </h4>
-          <p class="mt-0.5 text-[11.5px] text-[var(--muted-2)]">
-            {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.HOURS_SUBTITLE') }}
-          </p>
-          <div class="mt-3">
-            <StackedBars
-              :buckets="hourBuckets"
-              :types="hourTypes"
-              :height="200"
-            />
-          </div>
-          <div
-            class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--muted)]"
-          >
-            <span
-              v-for="type in hourTypes"
-              :key="type.key"
-              class="inline-flex items-center gap-1.5"
-            >
-              <span
-                class="h-2 w-2 rounded-full"
-                :style="{ backgroundColor: type.color }"
-              />
-              {{ type.label }}
-            </span>
-          </div>
+      <div
+        class="mt-4 rounded-xl border border-[var(--border-soft)] bg-[var(--surface-2)] p-4"
+      >
+        <h4 class="text-[13px] font-semibold text-[var(--text)]">
+          {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.HEATMAP_TITLE') }}
+        </h4>
+        <p class="mt-0.5 text-[11.5px] text-[var(--muted-2)]">
+          {{ $t('SINAL_REPORTS.SYSTEM_ADOPTION.HEATMAP_SUBTITLE') }}
+        </p>
+        <div class="mt-3">
+          <AdoptionHeatmap :cells="heatmap" />
         </div>
       </div>
     </template>

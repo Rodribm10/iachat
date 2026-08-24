@@ -79,36 +79,30 @@ class V2::Reports::Sinal::VisualBuilder < V2::Reports::Sinal::BaseBuilder
     {
       panel: panel_human_messages.count,
       whatsapp_direct: whatsapp_direct_messages.count,
-      agents: agent_ranking,
-      hours: hourly_distribution
+      heatmap: adoption_heatmap
     }
   end
 
-  # Ranking por atendente de quem responde pelo painel. A resposta direta no
-  # WhatsApp não tem autor no banco — não dá pra atribuir a uma pessoa, então
-  # fica de fora daqui (o total entra separado em system_adoption[:whatsapp_direct],
-  # e o front rotula esse volume como "sem autor identificado").
-  def agent_ranking
-    sent = panel_human_messages.where.not(sender_id: nil).group(:sender_id).count
-    rows = account.users.filter_map do |user|
-      next unless sent.key?(user.id)
-
-      { agent_id: user.id, agent_name: user.name, messages_sent: sent[user.id] }
+  # Matriz dia da semana (0domingo..6sábado, convenção EXTRACT(dow) do
+  # Postgres — mesma ordem que Date#wday em Ruby e Date#getDay em JS) x hora
+  # do dia (0-23), com as duas contagens em cada célula. Não calcula
+  # percentual aqui: uma célula sem nenhuma resposta (0 e 0) tem que chegar
+  # diferenciável de uma célula com 0% de adoção real (0 e N) — quem decide
+  # o que pinta "sem dado" é o front.
+  def adoption_heatmap
+    panel = dow_hour_counts(panel_human_messages)
+    whatsapp = dow_hour_counts(whatsapp_direct_messages)
+    (0..6).flat_map do |dow|
+      (0..23).map do |hour|
+        key = [dow, hour]
+        { dow: dow, hour: hour, panel: panel[key] || 0, whatsapp_direct: whatsapp[key] || 0 }
+      end
     end
-    rows.sort_by { |row| -row[:messages_sent] }
   end
 
-  # Distribuição por hora do dia (0-23, fuso do timezone_offset) das
-  # respostas humanas, painel x WhatsApp direto — mesmo padrão de conversão
-  # de fuso do inbound_windows.
-  def hourly_distribution
-    panel = hourly_counts(panel_human_messages)
-    whatsapp = hourly_counts(whatsapp_direct_messages)
-    (0..23).map { |hour| { hour: hour, panel: panel[hour] || 0, whatsapp_direct: whatsapp[hour] || 0 } }
-  end
-
-  def hourly_counts(scope)
-    scope.group(Arel.sql("EXTRACT(hour FROM #{local_time_sql})")).count.transform_keys(&:to_i)
+  def dow_hour_counts(scope)
+    counts = scope.group(Arel.sql("EXTRACT(dow FROM #{local_time_sql})"), Arel.sql("EXTRACT(hour FROM #{local_time_sql})")).count
+    counts.transform_keys { |(dow, hour)| [dow.to_i, hour.to_i] }
   end
 
   # ----- contatos -----
