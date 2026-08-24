@@ -3,12 +3,16 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useRouter, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import SinalReportsAPI from 'dashboard/api/sinalReports';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import SinalShell from './SinalShell.vue';
 import HardCard from './HardCard.vue';
 import WordCloud from './WordCloud.vue';
 import AreaCompareChart from './AreaCompareChart.vue';
+import ServiceModeCard from './ServiceModeCard.vue';
+import DonutCard from './DonutCard.vue';
+import MonthlyChart from './MonthlyChart.vue';
 import {
   timeAgo,
   formatMinutes,
@@ -109,6 +113,104 @@ watch(operationRange, fetchOperations);
 
 const up = computed(() => (overview.value?.kpis?.pct_change ?? 0) >= 0);
 
+const { t } = useI18n();
+const visual = computed(() => overview.value?.visual);
+
+const pct = (value, total) => {
+  if (!total) return '0%';
+  return `${Math.round((value / total) * 100)}%`;
+};
+
+const aiAttendedHint = (attended, total) =>
+  t('SINAL_REPORTS.VISUAL.AI_ATTENDED_HINT', {
+    attended: formatNumber(attended || 0),
+    pct: pct(attended || 0, total || 0),
+  });
+
+const serviceModeSlices = computed(() => [
+  {
+    name: t('SINAL_REPORTS.SERVICE_MODE.AI_ONLY'),
+    value: visual.value?.service_modes?.ai_only ?? 0,
+    color: 'var(--accent)',
+  },
+  {
+    name: t('SINAL_REPORTS.SERVICE_MODE.MIXED'),
+    value: visual.value?.service_modes?.mixed ?? 0,
+    color: '#A78BFA',
+  },
+  {
+    name: t('SINAL_REPORTS.SERVICE_MODE.HUMAN_ONLY'),
+    value: visual.value?.service_modes?.human_only ?? 0,
+    color: '#FBBF24',
+  },
+]);
+
+const participantSlices = computed(() => [
+  {
+    name: t('SINAL_REPORTS.VISUAL.PARTICIPANT_CLIENT'),
+    value: visual.value?.participants?.client ?? 0,
+    color: '#60A5FA',
+  },
+  {
+    name: t('SINAL_REPORTS.VISUAL.PARTICIPANT_AI'),
+    value: visual.value?.participants?.ai ?? 0,
+    color: 'var(--accent)',
+  },
+  {
+    name: t('SINAL_REPORTS.VISUAL.PARTICIPANT_HUMAN'),
+    value: visual.value?.participants?.human ?? 0,
+    color: '#FBBF24',
+  },
+  {
+    name: t('SINAL_REPORTS.VISUAL.PARTICIPANT_OTHER'),
+    value: visual.value?.participants?.other ?? 0,
+    color: 'var(--muted-2)',
+  },
+]);
+
+const inboundSlices = computed(() => [
+  {
+    name: t('SINAL_REPORTS.VISUAL.WINDOW_COMMERCIAL'),
+    value: visual.value?.inbound_windows?.commercial ?? 0,
+    color: '#4ADE80',
+  },
+  {
+    name: t('SINAL_REPORTS.VISUAL.WINDOW_AFTER_HOURS'),
+    value: visual.value?.inbound_windows?.after_hours ?? 0,
+    color: '#A78BFA',
+  },
+  {
+    name: t('SINAL_REPORTS.VISUAL.WINDOW_WEEKEND'),
+    value: visual.value?.inbound_windows?.weekend ?? 0,
+    color: '#FBBF24',
+  },
+]);
+
+const formatSlices = computed(() => [
+  {
+    name: t('SINAL_REPORTS.VISUAL.FORMAT_TEXT'),
+    value: visual.value?.formats?.text ?? 0,
+    color: 'var(--accent)',
+  },
+  {
+    name: t('SINAL_REPORTS.VISUAL.FORMAT_AUDIO'),
+    value: visual.value?.formats?.audio ?? 0,
+    color: '#FBBF24',
+  },
+  {
+    name: t('SINAL_REPORTS.VISUAL.FORMAT_MEDIA'),
+    value: visual.value?.formats?.media ?? 0,
+    color: '#F472B6',
+  },
+]);
+
+const sliceTotal = slices => slices.reduce((sum, item) => sum + item.value, 0);
+const inboundOutsideCommercial = computed(
+  () =>
+    (visual.value?.inbound_windows?.after_hours ?? 0) +
+    (visual.value?.inbound_windows?.weekend ?? 0)
+);
+
 const goToAiReports = () => {
   router.push({
     name: 'ai_reports',
@@ -175,7 +277,28 @@ const goToAiReports = () => {
       </div>
 
       <!-- KPIs -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+      <div
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-3.5"
+      >
+        <HardCard
+          icon="i-lucide-user-plus"
+          icon-class="text-emerald-600 dark:text-emerald-400"
+          :label="`${$t('SINAL_REPORTS.VISUAL.KPI_NEW_LEADS')} (${days}d)`"
+          :value="visual?.new_contacts ?? 0"
+          :hint="
+            aiAttendedHint(
+              visual?.new_contacts_ai_attended,
+              visual?.new_contacts
+            )
+          "
+        />
+        <HardCard
+          icon="i-lucide-users-2"
+          icon-class="text-[var(--accent)]"
+          :label="`${$t('SINAL_REPORTS.VISUAL.KPI_CONTACTS')} (${days}d)`"
+          :value="visual?.contacts ?? 0"
+          :hint="aiAttendedHint(visual?.contacts_ai_attended, visual?.contacts)"
+        />
         <HardCard
           icon="i-lucide-inbox"
           icon-class="text-emerald-600 dark:text-emerald-400"
@@ -200,6 +323,129 @@ const goToAiReports = () => {
           :hint="$t('SINAL_REPORTS.OVERVIEW.KPI_AUDIOS_HINT')"
         />
       </div>
+
+      <!-- Panorama visual -->
+      <section
+        class="bg-[var(--surface-2)] border border-[var(--border-soft)] rounded-xl p-[18px]"
+      >
+        <div class="mb-4">
+          <div class="flex items-center gap-2">
+            <h2
+              class="font-display text-[18px] font-semibold text-[var(--text)]"
+            >
+              {{ $t('SINAL_REPORTS.VISUAL.TITLE') }}
+            </h2>
+            <span
+              class="rounded-full bg-[var(--accent-soft)] px-2 py-[3px] text-[10px] font-semibold text-[var(--accent)]"
+            >
+              {{ $t('SINAL_REPORTS.VISUAL.PERIOD_BADGE') }}
+            </span>
+          </div>
+          <p class="mt-1 text-[12.5px] text-[var(--muted)]">
+            {{ $t('SINAL_REPORTS.VISUAL.SUBTITLE') }}
+          </p>
+        </div>
+        <ServiceModeCard
+          :items="serviceModeSlices"
+          :total-conversations="visual?.service_modes?.total ?? 0"
+          :unclassified="visual?.service_modes?.unclassified ?? 0"
+          :contacts="visual?.contacts ?? 0"
+          :contacts-ai-attended="visual?.contacts_ai_attended ?? 0"
+          :new-contacts="visual?.new_contacts ?? 0"
+          :new-contacts-ai-attended="visual?.new_contacts_ai_attended ?? 0"
+        />
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <DonutCard
+            :title="$t('SINAL_REPORTS.VISUAL.PARTICIPANTS_TITLE')"
+            :description="
+              $t('SINAL_REPORTS.VISUAL.PARTICIPANTS_DESC', {
+                total: formatNumber(sliceTotal(participantSlices)),
+              })
+            "
+            :items="participantSlices"
+            :unit="$t('SINAL_REPORTS.VISUAL.UNIT_MESSAGES')"
+          >
+            <template #footer>
+              {{ $t('SINAL_REPORTS.VISUAL.PARTICIPANTS_FOOTER_PREFIX') }}
+              <strong class="font-semibold text-[var(--accent)]">
+                {{
+                  pct(
+                    visual?.participants?.ai ?? 0,
+                    sliceTotal(participantSlices)
+                  )
+                }}
+              </strong>
+              {{ $t('SINAL_REPORTS.VISUAL.PARTICIPANTS_FOOTER_SUFFIX') }}
+            </template>
+          </DonutCard>
+          <DonutCard
+            :title="$t('SINAL_REPORTS.VISUAL.WINDOWS_TITLE')"
+            :description="$t('SINAL_REPORTS.VISUAL.WINDOWS_DESC')"
+            :items="inboundSlices"
+            :unit="$t('SINAL_REPORTS.VISUAL.UNIT_MESSAGES')"
+          >
+            <template #footer>
+              <strong class="font-semibold text-[#A78BFA]">
+                {{ pct(inboundOutsideCommercial, sliceTotal(inboundSlices)) }}
+              </strong>
+              {{ $t('SINAL_REPORTS.VISUAL.WINDOWS_FOOTER') }}
+            </template>
+          </DonutCard>
+          <DonutCard
+            :title="$t('SINAL_REPORTS.VISUAL.FORMATS_TITLE')"
+            :description="
+              $t('SINAL_REPORTS.VISUAL.FORMATS_DESC', {
+                total: formatNumber(sliceTotal(formatSlices)),
+              })
+            "
+            :items="formatSlices"
+            :unit="$t('SINAL_REPORTS.VISUAL.UNIT_MESSAGES')"
+          >
+            <template #footer>
+              {{ $t('SINAL_REPORTS.VISUAL.FORMATS_FOOTER_PREFIX') }}
+              <strong class="font-semibold text-[var(--warn)]">
+                {{ pct(visual?.formats?.audio ?? 0, sliceTotal(formatSlices)) }}
+              </strong>
+              {{ $t('SINAL_REPORTS.VISUAL.FORMATS_FOOTER_SUFFIX') }}
+            </template>
+          </DonutCard>
+        </div>
+      </section>
+
+      <!-- Visão mensal -->
+      <section
+        class="bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl p-[22px]"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+          <div>
+            <h2
+              class="font-display text-[18px] font-semibold text-[var(--text)]"
+            >
+              {{ $t('SINAL_REPORTS.MONTHLY.TITLE') }}
+            </h2>
+            <p class="mt-1 text-[12.5px] text-[var(--muted)]">
+              {{ $t('SINAL_REPORTS.MONTHLY.SUBTITLE') }}
+            </p>
+          </div>
+          <div
+            class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--muted)]"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <span class="h-2 w-2 rounded-full bg-[var(--accent)]" />
+              {{ $t('SINAL_REPORTS.MONTHLY.AI') }}
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="h-2 w-2 rounded-full bg-[#FBBF24]" />
+              {{ $t('SINAL_REPORTS.MONTHLY.HUMAN') }}
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <span class="h-2 w-2 rounded-full bg-[var(--muted)]" />
+              {{ $t('SINAL_REPORTS.MONTHLY.RECEIVED') }}
+            </span>
+          </div>
+        </div>
+        <MonthlyChart :months="visual?.months ?? []" :height="250" />
+      </section>
 
       <!-- Gráfico comparativo -->
       <div

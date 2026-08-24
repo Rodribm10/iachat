@@ -21,6 +21,13 @@ class V2::Reports::Sinal::BaseBuilder
     ActiveSupport::TimeZone[offset]&.name || 'UTC'
   end
 
+  # Postgres não conhece os apelidos do Rails ("Brasilia") — SQL cru com
+  # AT TIME ZONE precisa do identificador IANA ("America/Sao_Paulo").
+  def timezone_identifier
+    offset = params[:timezone_offset].to_f
+    ActiveSupport::TimeZone[offset]&.tzinfo&.identifier || 'UTC'
+  end
+
   # Mensagens "de verdade": sem notas internas e sem activity.
   # Message tem default_scope de ordenação — unscope obrigatório em agregação.
   def messages_scope

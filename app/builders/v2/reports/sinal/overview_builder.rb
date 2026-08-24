@@ -5,7 +5,8 @@ class V2::Reports::Sinal::OverviewBuilder < V2::Reports::Sinal::BaseBuilder
       series: series,
       ia: ia_metrics,
       topics: insight_topics,
-      labels: labels_cloud
+      labels: labels_cloud,
+      visual: V2::Reports::Sinal::VisualBuilder.new(account, params).build
     }
   end
 
