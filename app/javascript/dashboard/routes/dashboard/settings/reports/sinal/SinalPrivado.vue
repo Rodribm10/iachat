@@ -6,44 +6,62 @@ import { useRouter, useRoute } from 'vue-router';
 import SinalReportsAPI from 'dashboard/api/sinalReports';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import SinalShell from './SinalShell.vue';
+import SinalPeriodPicker from './SinalPeriodPicker.vue';
 import Sparkline from './Sparkline.vue';
 import WordCloud from './WordCloud.vue';
-import { timeAgo, formatMinutes, formatNumber, SINAL_PALETTE } from './helpers';
+import {
+  timeAgo,
+  formatMinutes,
+  formatNumber,
+  dateInputValue,
+  computePeriodRange,
+  SINAL_PALETTE,
+} from './helpers';
 
 const router = useRouter();
 const route = useRoute();
 const inboxes = useMapGetter('inboxes/getInboxes');
 
-const PERIODS = [7, 14, 30];
-const days = ref(7);
+const periodPreset = ref('7');
+const periodCustomStart = ref(dateInputValue());
+const periodCustomEnd = ref(dateInputValue());
 const selectedInboxId = ref('all');
 const isLoading = ref(true);
+const isRefreshing = ref(false);
 const privado = ref(null);
 
 const inboxParam = computed(() =>
   selectedInboxId.value === 'all' ? undefined : selectedInboxId.value
 );
 
-const epochRange = computed(() => {
-  const until = Math.floor(Date.now() / 1000);
-  return { since: until - days.value * 86400, until };
-});
+// Recalculada a cada chamada (nunca cacheada) — presets relativos (7/14/30d)
+// sempre usam o instante atual, mesmo com a página aberta há horas.
+const currentRange = () =>
+  computePeriodRange({
+    preset: periodPreset.value,
+    customStart: periodCustomStart.value,
+    customEnd: periodCustomEnd.value,
+  });
 
 const fetchPrivado = async () => {
-  isLoading.value = true;
+  isRefreshing.value = true;
   try {
     const { data } = await SinalReportsAPI.getPrivado({
-      ...epochRange.value,
+      ...currentRange(),
       inboxId: inboxParam.value,
     });
     privado.value = data;
   } finally {
+    isRefreshing.value = false;
     isLoading.value = false;
   }
 };
 
 onMounted(fetchPrivado);
-watch([days, selectedInboxId], fetchPrivado);
+watch(
+  [periodPreset, periodCustomStart, periodCustomEnd, selectedInboxId],
+  fetchPrivado
+);
 
 const pctUp = computed(() => (privado.value?.kpis?.pct_change ?? 0) >= 0);
 const pctChangeLabel = computed(() => {
@@ -118,24 +136,13 @@ const openConversation = row => {
       <div
         class="flex flex-wrap items-center justify-between gap-3 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl p-3.5 sm:p-4"
       >
-        <div
-          class="flex items-center rounded-lg border border-[var(--border-soft)] bg-[var(--surface-2)] p-0.5"
-        >
-          <button
-            v-for="period in PERIODS"
-            :key="period"
-            type="button"
-            class="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors"
-            :class="
-              days === period
-                ? 'bg-[var(--surface)] text-[var(--accent)] shadow-sm'
-                : 'text-[var(--muted)]'
-            "
-            @click="days = period"
-          >
-            {{ $t('SINAL_REPORTS.PRIVADO.PERIOD_SHORT', { days: period }) }}
-          </button>
-        </div>
+        <SinalPeriodPicker
+          v-model:preset="periodPreset"
+          v-model:custom-start="periodCustomStart"
+          v-model:custom-end="periodCustomEnd"
+          :is-loading="isRefreshing"
+          @refresh="fetchPrivado"
+        />
         <select
           v-model="selectedInboxId"
           class="h-9 min-w-[180px] max-w-[320px] rounded-lg bg-[var(--surface-2)] border border-[var(--border-soft)] px-3 text-xs font-semibold text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"

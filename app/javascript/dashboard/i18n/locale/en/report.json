@@ -718,6 +718,9 @@
       "CURRENT": "Current period:",
       "PREVIOUS": "Previous period:"
     },
+    "PERIOD_PICKER": {
+      "REFRESH": "Refresh"
+    },
     "IA": {
       "AI_MESSAGES": "AI Messages",
       "PIX_RESERVATIONS": "PIX / Reservations",

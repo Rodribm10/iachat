@@ -40,7 +40,7 @@ class Api::V2::Accounts::SinalReportsController < Api::V1::Accounts::BaseControl
   def media_builder
     V2::Reports::Sinal::MediaBuilder.new(
       Current.account,
-      params.permit(:granularity, :scope, :type, :direction, :inbox_id, :timezone_offset).to_h.symbolize_keys
+      params.permit(:granularity, :scope, :type, :direction, :inbox_id, :timezone_offset, :since, :until).to_h.symbolize_keys
     )
   end
 

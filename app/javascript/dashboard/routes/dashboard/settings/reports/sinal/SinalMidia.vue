@@ -6,8 +6,14 @@ import { useRouter, useRoute } from 'vue-router';
 import SinalReportsAPI from 'dashboard/api/sinalReports';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import SinalShell from './SinalShell.vue';
+import SinalPeriodPicker from './SinalPeriodPicker.vue';
 import StackedBars from './StackedBars.vue';
-import { formatNumber, fmtDay } from './helpers';
+import {
+  formatNumber,
+  fmtDay,
+  dateInputValue,
+  computePeriodRange,
+} from './helpers';
 
 const { t } = useI18n();
 const router = useRouter();
@@ -41,6 +47,11 @@ const isLoading = ref(true);
 const isLoadingChart = ref(false);
 const isLoadingBreakdown = ref(false);
 const isLoadingDrill = ref(false);
+const isRefreshing = ref(false);
+
+const periodPreset = ref('7');
+const periodCustomStart = ref(dateInputValue());
+const periodCustomEnd = ref(dateInputValue());
 
 const summary = ref({ by_type: {}, stats: {}, range: {} });
 const granularity = ref('day');
@@ -52,8 +63,17 @@ const breakdown = ref({ rows: [] });
 const drillFilter = ref(null);
 const drillMessages = ref([]);
 
+// Recalculada a cada chamada (nunca cacheada) — presets relativos (7/14/30d)
+// sempre usam o instante atual, mesmo com a página aberta há horas.
+const currentRange = () =>
+  computePeriodRange({
+    preset: periodPreset.value,
+    customStart: periodCustomStart.value,
+    customEnd: periodCustomEnd.value,
+  });
+
 const fetchSummary = async () => {
-  const { data } = await SinalReportsAPI.getMediaSummary();
+  const { data } = await SinalReportsAPI.getMediaSummary(currentRange());
   summary.value = data;
 };
 
@@ -61,7 +81,8 @@ const fetchTimeseries = async () => {
   isLoadingChart.value = true;
   try {
     const { data } = await SinalReportsAPI.getMediaTimeseries(
-      granularity.value
+      granularity.value,
+      currentRange()
     );
     timeseries.value = data;
   } finally {
@@ -73,7 +94,8 @@ const fetchBreakdown = async () => {
   isLoadingBreakdown.value = true;
   try {
     const { data } = await SinalReportsAPI.getMediaBreakdown(
-      breakdownScope.value
+      breakdownScope.value,
+      currentRange()
     );
     breakdown.value = data;
   } finally {
@@ -87,10 +109,25 @@ const fetchDrillMessages = async () => {
     const { data } = await SinalReportsAPI.getMediaMessages({
       type: drillFilter.value?.type,
       direction: drillFilter.value?.direction,
+      ...currentRange(),
     });
     drillMessages.value = data.messages || [];
   } finally {
     isLoadingDrill.value = false;
+  }
+};
+
+// Dispara com o botão Atualizar e com qualquer troca no seletor de período.
+// Reabastece tudo que depende do período; se o painel de drill estiver
+// aberto, refaz ele também para não ficar com dado de outro período.
+const refreshAll = async () => {
+  isRefreshing.value = true;
+  try {
+    const tasks = [fetchSummary(), fetchTimeseries(), fetchBreakdown()];
+    if (drillFilter.value) tasks.push(fetchDrillMessages());
+    await Promise.all(tasks);
+  } finally {
+    isRefreshing.value = false;
   }
 };
 
@@ -103,6 +140,7 @@ onMounted(async () => {
   }
 });
 
+watch([periodPreset, periodCustomStart, periodCustomEnd], refreshAll);
 watch(granularity, fetchTimeseries);
 watch(breakdownScope, fetchBreakdown);
 watch(drillFilter, value => {
@@ -221,6 +259,19 @@ const formatMessageDate = iso =>
       <Spinner />
     </div>
     <div v-else class="flex flex-col gap-4">
+      <!-- Seletor de período -->
+      <div
+        class="flex flex-wrap items-center justify-end gap-3 bg-[var(--surface)] border border-[var(--border-soft)] rounded-xl p-3.5 sm:p-4"
+      >
+        <SinalPeriodPicker
+          v-model:preset="periodPreset"
+          v-model:custom-start="periodCustomStart"
+          v-model:custom-end="periodCustomEnd"
+          :is-loading="isRefreshing"
+          @refresh="refreshAll"
+        />
+      </div>
+
       <!-- Cards de inventário -->
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <button

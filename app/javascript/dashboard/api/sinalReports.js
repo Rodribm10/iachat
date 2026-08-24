@@ -41,27 +41,33 @@ class SinalReportsAPI extends ApiClient {
     });
   }
 
-  getMediaSummary() {
+  getMediaSummary({ since, until } = {}) {
     return axios.get(`${this.url}/media_summary`, {
-      params: { timezone_offset: getTimeOffset() },
+      params: { since, until, timezone_offset: getTimeOffset() },
     });
   }
 
-  getMediaTimeseries(granularity) {
+  getMediaTimeseries(granularity, { since, until } = {}) {
     return axios.get(`${this.url}/media_timeseries`, {
-      params: { granularity, timezone_offset: getTimeOffset() },
+      params: { granularity, since, until, timezone_offset: getTimeOffset() },
     });
   }
 
-  getMediaBreakdown(scope) {
+  getMediaBreakdown(scope, { since, until } = {}) {
     return axios.get(`${this.url}/media_breakdown`, {
-      params: { scope, timezone_offset: getTimeOffset() },
+      params: { scope, since, until, timezone_offset: getTimeOffset() },
     });
   }
 
-  getMediaMessages({ type, direction } = {}) {
+  getMediaMessages({ type, direction, since, until } = {}) {
     return axios.get(`${this.url}/media_messages`, {
-      params: { type, direction, timezone_offset: getTimeOffset() },
+      params: {
+        type,
+        direction,
+        since,
+        until,
+        timezone_offset: getTimeOffset(),
+      },
     });
   }
 }

@@ -79,6 +79,7 @@ class V2::Reports::Sinal::MediaBuilder < V2::Reports::Sinal::BaseBuilder
                       .where(account_id: account.id)
                       .where(messages: { private: false, message_type: %i[incoming outgoing] })
     scope = scope.where(messages: { inbox_id: inbox_id }) if inbox_id
+    scope = scope.where(messages: { created_at: range }) if range
     scope
   end
 
@@ -87,6 +88,7 @@ class V2::Reports::Sinal::MediaBuilder < V2::Reports::Sinal::BaseBuilder
                    .joins(conversation: :contact)
                    .where(private: false, content_type: :sticker, message_type: %i[incoming outgoing])
     scope = scope.where(inbox_id: inbox_id) if inbox_id
+    scope = scope.where(created_at: range) if range
     scope
   end
 
@@ -114,7 +116,12 @@ class V2::Reports::Sinal::MediaBuilder < V2::Reports::Sinal::BaseBuilder
     }
   end
 
+  # Com since/until explícitos (picker de período), a janela do gráfico segue
+  # o período escolhido. Sem eles, mantém a janela fixa por granularidade
+  # (comportamento padrão de quando a página carrega sem filtro).
   def window_for(granularity)
+    return range if range
+
     case granularity
     when 'week' then BUCKETS['week'].weeks.ago..Time.current
     when 'month' then BUCKETS['month'].months.ago..Time.current

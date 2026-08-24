@@ -52,6 +52,36 @@ export function monthEndDate(month) {
   return dateInputValue(new Date(year, monthNumber, 0));
 }
 
+export function periodDayBounds(date) {
+  return {
+    since: Math.floor(new Date(`${date}T00:00:00`) / 1000),
+    until: Math.floor(new Date(`${date}T23:59:59`) / 1000),
+  };
+}
+
+// Calcula o range em epoch (segundos) a partir do preset do SinalPeriodPicker.
+// Precisa ser chamada de novo a cada fetch (nunca guardada num computed): para
+// presets relativos (7/14/30 dias) o "agora" tem que ser o instante da
+// chamada, senão o período congela no momento em que a página foi aberta.
+export function computePeriodRange({ preset, customStart, customEnd }) {
+  if (preset === 'today') {
+    return periodDayBounds(dateInputValue());
+  }
+  if (preset === 'custom') {
+    const today = dateInputValue();
+    const first = customStart || today;
+    const last = customEnd || today;
+    const [start, end] = first <= last ? [first, last] : [last, first];
+    return {
+      since: periodDayBounds(start).since,
+      until: periodDayBounds(end).until,
+    };
+  }
+  const until = Math.floor(Date.now() / 1000);
+  const days = Number(preset) || 7;
+  return { since: until - days * 86400, until };
+}
+
 export function formatDateShort(date) {
   return new Date(`${date}T00:00:00`).toLocaleDateString('pt-BR', {
     day: '2-digit',

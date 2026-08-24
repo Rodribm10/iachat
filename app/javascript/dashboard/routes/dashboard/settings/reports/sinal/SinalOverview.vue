@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n';
 import SinalReportsAPI from 'dashboard/api/sinalReports';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import SinalShell from './SinalShell.vue';
+import SinalPeriodPicker from './SinalPeriodPicker.vue';
 import HardCard from './HardCard.vue';
 import WordCloud from './WordCloud.vue';
 import AreaCompareChart from './AreaCompareChart.vue';
@@ -20,16 +21,19 @@ import {
   dateInputValue,
   monthInputValue,
   monthEndDate,
+  computePeriodRange,
 } from './helpers';
 
 const router = useRouter();
 const route = useRoute();
 const inboxes = useMapGetter('inboxes/getInboxes');
 
-const PERIODS = [7, 14, 30];
-const days = ref(7);
+const periodPreset = ref('7');
+const periodCustomStart = ref(dateInputValue());
+const periodCustomEnd = ref(dateInputValue());
 const selectedInboxId = ref('all');
 const isLoading = ref(true);
+const isRefreshing = ref(false);
 const overview = ref(null);
 
 const operationPeriod = ref('today');
@@ -49,9 +53,20 @@ const selectedInbox = computed(() =>
   )
 );
 
-const epochRange = computed(() => {
-  const until = Math.floor(Date.now() / 1000);
-  return { since: until - days.value * 86400, until };
+// Nº de dias do período selecionado, só para os rótulos "(Xd)" da UI.
+// Deriva de estado reativo explícito (preset/datas) — nunca de Date.now() —
+// então não sofre do bug do range congelado.
+const rangeDays = computed(() => {
+  if (periodPreset.value === 'today') return 1;
+  if (periodPreset.value === 'custom') {
+    const { since, until } = computePeriodRange({
+      preset: 'custom',
+      customStart: periodCustomStart.value,
+      customEnd: periodCustomEnd.value,
+    });
+    return Math.max(1, Math.round((until - since) / 86400));
+  }
+  return Number(periodPreset.value) || 7;
 });
 
 const operationRange = computed(() => {
@@ -80,15 +95,25 @@ const operationRange = computed(() => {
   };
 });
 
+// Recalculada a cada chamada (nunca cacheada) — presets relativos (7/14/30d)
+// sempre usam o instante atual, mesmo com a página aberta há horas.
+const currentRange = () =>
+  computePeriodRange({
+    preset: periodPreset.value,
+    customStart: periodCustomStart.value,
+    customEnd: periodCustomEnd.value,
+  });
+
 const fetchOverview = async () => {
-  isLoading.value = true;
+  isRefreshing.value = true;
   try {
     const { data } = await SinalReportsAPI.getOverview({
-      ...epochRange.value,
+      ...currentRange(),
       inboxId: inboxParam.value,
     });
     overview.value = data;
   } finally {
+    isRefreshing.value = false;
     isLoading.value = false;
   }
 };
@@ -105,7 +130,8 @@ onMounted(() => {
   fetchOverview();
   fetchOperations();
 });
-watch([days, selectedInboxId], () => {
+watch([periodPreset, periodCustomStart, periodCustomEnd], fetchOverview);
+watch(selectedInboxId, () => {
   fetchOverview();
   fetchOperations();
 });
@@ -245,23 +271,13 @@ const goToAiReports = () => {
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <div
-            class="flex items-center rounded-lg border border-[var(--border-soft)] bg-[var(--surface-2)] p-0.5"
-          >
-            <button
-              v-for="period in PERIODS"
-              :key="period"
-              class="px-2.5 py-1 rounded-md text-xs font-semibold transition-colors"
-              :class="
-                days === period
-                  ? 'bg-[var(--surface)] text-[var(--accent)] shadow-sm'
-                  : 'text-[var(--muted)]'
-              "
-              @click="days = period"
-            >
-              {{ `${period}d` }}
-            </button>
-          </div>
+          <SinalPeriodPicker
+            v-model:preset="periodPreset"
+            v-model:custom-start="periodCustomStart"
+            v-model:custom-end="periodCustomEnd"
+            :is-loading="isRefreshing"
+            @refresh="fetchOverview"
+          />
           <select
             v-model="selectedInboxId"
             class="h-9 min-w-[180px] max-w-[320px] rounded-lg bg-[var(--surface-2)] border border-[var(--border-soft)] px-3 text-xs font-semibold text-[var(--text)] outline-none focus:border-[var(--accent)] transition-colors"
@@ -283,7 +299,7 @@ const goToAiReports = () => {
         <HardCard
           icon="i-lucide-user-plus"
           icon-class="text-emerald-600 dark:text-emerald-400"
-          :label="`${$t('SINAL_REPORTS.VISUAL.KPI_NEW_LEADS')} (${days}d)`"
+          :label="`${$t('SINAL_REPORTS.VISUAL.KPI_NEW_LEADS')} (${rangeDays}d)`"
           :value="visual?.new_contacts ?? 0"
           :hint="
             aiAttendedHint(
@@ -295,16 +311,20 @@ const goToAiReports = () => {
         <HardCard
           icon="i-lucide-users-2"
           icon-class="text-[var(--accent)]"
-          :label="`${$t('SINAL_REPORTS.VISUAL.KPI_CONTACTS')} (${days}d)`"
+          :label="`${$t('SINAL_REPORTS.VISUAL.KPI_CONTACTS')} (${rangeDays}d)`"
           :value="visual?.contacts ?? 0"
           :hint="aiAttendedHint(visual?.contacts_ai_attended, visual?.contacts)"
         />
         <HardCard
           icon="i-lucide-inbox"
           icon-class="text-emerald-600 dark:text-emerald-400"
-          :label="`${$t('SINAL_REPORTS.OVERVIEW.KPI_RECEIVED')} (${days}d)`"
+          :label="`${$t('SINAL_REPORTS.OVERVIEW.KPI_RECEIVED')} (${rangeDays}d)`"
           :value="overview?.kpis?.received ?? 0"
-          :hint="$t('SINAL_REPORTS.OVERVIEW.KPI_RECEIVED_HINT', { days })"
+          :hint="
+            $t('SINAL_REPORTS.OVERVIEW.KPI_RECEIVED_HINT', {
+              days: rangeDays,
+            })
+          "
           :badge="`${up ? '+' : ''}${overview?.kpis?.pct_change ?? 0}%`"
           :badge-negative="!up"
         />
@@ -634,7 +654,7 @@ const goToAiReports = () => {
                 {{ $t('SINAL_REPORTS.OVERVIEW.IA_TITLE') }}
               </h3>
               <span class="text-[10.5px] text-[var(--muted-2)] font-mono">
-                {{ `${days}d` }}
+                {{ `${rangeDays}d` }}
               </span>
             </div>
             <div class="grid grid-cols-2 gap-2.5">
