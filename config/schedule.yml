@@ -172,3 +172,12 @@ captain_learning_digest_job:
   cron: '30 11 * * 1'
   class: 'Captain::AssistantResponses::LearningDigestJob'
   queue: scheduled_jobs
+
+# Executa a cada 15 minutos.
+# Marca falhas de atendimento (cliente sem resposta, demora crítica,
+# objeção ignorada) nas contas com inbox conectada ao Captain/Hermes.
+# Só etiqueta — nunca envia mensagem. Ver enterprise/app/jobs/captain/quality/flag_service_gaps_job.rb.
+captain_quality_flag_service_gaps_job:
+  cron: '*/15 * * * *'
+  class: 'Captain::Quality::FlagServiceGapsJob'
+  queue: scheduled_jobs
