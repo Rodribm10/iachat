@@ -688,6 +688,17 @@ Rails.application.routes.draw do
               get :inbox_benchmarking
             end
           end
+          resources :sinal_reports, only: [] do
+            collection do
+              get :overview
+              get :operations
+              get :privado
+              get :media_summary
+              get :media_timeseries
+              get :media_breakdown
+              get :media_messages
+            end
+          end
           resource :year_in_review, only: [:show]
           resources :live_reports, only: [] do
             collection do
