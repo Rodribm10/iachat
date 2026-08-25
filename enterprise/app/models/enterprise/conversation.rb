@@ -51,6 +51,22 @@ module Enterprise::Conversation
     current_applied_sla.update!(completed_at: resolved? ? Time.current : nil)
   end
 
+  # "Devolver para pending" é o operador dizendo "a IA volta a responder" — a
+  # UI promete isso, então o sistema tem que cumprir. Sem isto, o status virava
+  # pending e as labels de triagem (triagem_humana, triagem_<motivo>) ficavam
+  # penduradas, mantendo o guard de Captain::Hermes::OutgoingJob acionado para
+  # sempre: a conversa nunca mais recebia resposta da IA.
+  def execute_after_update_commit_callbacks
+    super
+    release_ai_from_human_triage
+  end
+
+  def release_ai_from_human_triage
+    return unless saved_change_to_status? && pending?
+
+    Captain::Hermes::HumanTriageService.release(conversation: self)
+  end
+
   def call_attributes_changed?
     return false if previous_changes['additional_attributes'].blank?
 

@@ -84,6 +84,56 @@ RSpec.describe Conversation, type: :model do
     end
   end
 
+  # Regressao (conv 126 da conta 2, 25/08/2026): handoff as 14:44 aplicou
+  # triagem_humana; a conversa foi devolvida (status pending) as 15:00, o
+  # cliente escreveu as 15:01 e 15:02 e nunca foi respondido — o status mudava
+  # mas as labels de triagem, que bloqueiam Captain::Hermes::OutgoingJob,
+  # ficavam penduradas para sempre.
+  describe 'liberacao da IA ao voltar para pending' do
+    let(:account) { create(:account) }
+    let(:conversation) { create(:conversation, account: account, status: :open) }
+
+    it 'remove as labels de triagem quando a conversa vira pending' do
+      conversation.update_labels(%w[triagem_humana triagem_sem_resposta_segura])
+
+      conversation.update!(status: :pending)
+
+      expect(conversation.reload.label_list).to be_empty
+    end
+
+    it 'nao remove nada quando a conversa vira open' do
+      conversation.update!(status: :pending)
+      conversation.update_labels(%w[triagem_humana])
+
+      conversation.update!(status: :open)
+
+      expect(conversation.reload.label_list).to include('triagem_humana')
+    end
+
+    it 'nao remove nada quando a conversa vira resolved' do
+      conversation.update_labels(%w[triagem_humana])
+
+      conversation.update!(status: :resolved)
+
+      expect(conversation.reload.label_list).to include('triagem_humana')
+    end
+
+    it 'so dispara na transicao para pending, nao em qualquer atualizacao com a conversa ja pending' do
+      conversation.update!(status: :pending)
+      conversation.update_labels(%w[triagem_humana])
+
+      conversation.update!(priority: :urgent)
+
+      expect(conversation.reload.label_list).to include('triagem_humana')
+    end
+
+    it 'nao cria nota quando a conversa pendente nao tem label de triagem' do
+      expect do
+        conversation.update!(status: :pending)
+      end.not_to(change { conversation.messages.count })
+    end
+  end
+
   describe 'sla_policy' do
     let(:account) { create(:account) }
     let(:conversation) { create(:conversation, account: account) }
