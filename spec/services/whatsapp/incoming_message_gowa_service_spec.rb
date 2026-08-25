@@ -65,4 +65,47 @@ RSpec.describe Whatsapp::IncomingMessageGowaService do
       described_class.new(inbox: inbox, params: params).perform
     end.not_to change(Message, :count)
   end
+
+  context 'when a mensagem é um eco (is_from_me), ex: a própria conta inicia a conversa pelo celular' do
+    let(:echo_params) do
+      {
+        'event' => 'message',
+        'payload' => {
+          'id' => '3EB0ECO1',
+          'chat_id' => '5561988887777@s.whatsapp.net',
+          'from' => '5561999999999@s.whatsapp.net',
+          'from_name' => 'Academia Dom Bosco',
+          'sender_display_name' => 'Academia Dom Bosco',
+          'timestamp' => '2026-08-21T12:05:00Z',
+          'is_from_me' => true,
+          'body' => 'Olá! Seja bem-vindo à Academia Dom Bosco!'
+        }
+      }
+    end
+
+    it 'cria o contato do cliente sem usar o nome da própria conta, e com o telefone do cliente' do
+      expect do
+        described_class.new(inbox: inbox, params: echo_params).perform
+      end.to change(Message, :count).by(1)
+
+      message = inbox.messages.order(:id).last
+      contact = message.conversation.contact
+
+      expect(message.message_type).to eq('outgoing')
+      expect(contact.name).not_to eq('Academia Dom Bosco')
+      expect(contact.name).to eq('5561988887777')
+      expect(contact.phone_number).to eq('+5561988887777')
+    end
+
+    it 'não sobrescreve o nome de um contato já existente' do
+      existing_contact = create(:contact, account: account, name: 'Maria Cliente', phone_number: '+5561988887777')
+      create(:contact_inbox, contact: existing_contact, inbox: inbox, source_id: '5561988887777')
+
+      expect do
+        described_class.new(inbox: inbox, params: echo_params).perform
+      end.to change(Message, :count).by(1)
+
+      expect(existing_contact.reload.name).to eq('Maria Cliente')
+    end
+  end
 end

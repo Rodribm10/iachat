@@ -56,10 +56,23 @@ class Whatsapp::IncomingMessageGowaService
       source_id: contact_phone,
       inbox: inbox,
       contact_attributes: {
-        name: payload[:sender_display_name].presence || payload[:from_name].presence || contact_phone,
+        name: contact_name,
         phone_number: "+#{contact_phone}"
       }
     ).perform
+  end
+
+  # No eco (is_from_me), sender_display_name/from_name descrevem quem enviou a mensagem pelo
+  # WhatsApp da própria conta — ou seja, o nome da academia/hotel, não do cliente. Confirmado em
+  # payload real do GOWA: um evento de eco não traz nenhum campo com o nome do CHAT (o cliente),
+  # só do remetente (a própria conta). Isso corrompe a base quando a conta INICIA a conversa pelo
+  # celular (lembrete, campanha) — o primeiro evento daquele contato já é um eco, e ele nasceria
+  # com o nome da própria academia. Por isso cai pro telefone: um contato "556198..." que a
+  # equipe renomeia depois é preferível a toda a base nascer com o nome da própria conta.
+  def contact_name
+    return contact_phone if from_me?
+
+    payload[:sender_display_name].presence || payload[:from_name].presence || contact_phone
   end
 
   def find_or_create_conversation(contact_inbox)
