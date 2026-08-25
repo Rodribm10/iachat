@@ -60,6 +60,19 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     /\b(StandardError|NameError|TypeError|NoMethodError|Errno::)\b/
   ].freeze
 
+  # O gateway Hermes usa estas mensagens como confirmação interna quando uma
+  # segunda entrada redireciona, enfileira ou interrompe um turno em andamento.
+  # Em canais de atendimento elas não são resposta para o cliente e nunca
+  # podem atravessar a fronteira do Chatwoot.
+  INTERNAL_STATUS_PATTERNS = [
+    /\A\s*[↪⏩⚡⏳]?\s*redirected\s+current\s+run\b/i,
+    /\A\s*[↪⏩⚡⏳]?\s*steered\s+into\s+current\s+run\b/i,
+    /\A\s*[↪⏩⚡⏳]?\s*queued\s+for\s+the\s+next\s+turn\b/i,
+    /\A\s*[↪⏩⚡⏳]?\s*interrupting\s+current\s+task\b/i,
+    /\A\s*[↪⏩⚡⏳]?\s*subagent\s+working\b/i,
+    /\A\s*[↪⏩⚡⏳]?\s*compressing\s+context\b/i
+  ].freeze
+
   skip_before_action :verify_authenticity_token, raise: false
   before_action :verify_signature
   before_action :fetch_inbox
@@ -72,8 +85,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     return log_no_conversation_and_ack if conversation.blank?
 
     log_reply(conversation, content)
-    return handle_error_payload(conversation, content) if error_payload?(content)
-    return handle_prompt_leak(conversation, content) if Captain::Guards::PromptLeak.leak?(content)
+    return if handle_blocked_content(conversation, content)
 
     detect_handoff_or_loop(conversation, content)
     deliver_outgoing(conversation, content)
@@ -86,10 +98,45 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
 
   private
 
+  def handle_blocked_content(conversation, content)
+    return handle_error_payload(conversation, content) if error_payload?(content)
+    return handle_internal_status(conversation, content) if internal_status?(content)
+    return handle_prompt_leak(conversation, content) if Captain::Guards::PromptLeak.leak?(content)
+
+    false
+  end
+
   def error_payload?(content)
     return false if content.blank?
 
     ERROR_PAYLOAD_PATTERNS.any? { |re| content.match?(re) }
+  end
+
+  def internal_status?(content)
+    return false if content.blank?
+
+    INTERNAL_STATUS_PATTERNS.any? { |re| content.match?(re) }
+  end
+
+  # Status de concorrência não significa falha do turno: a resposta final pode
+  # chegar logo depois. Por isso bloqueamos o envio e registramos uma nota para
+  # auditoria, sem abrir triagem humana nem cancelar o processamento atual.
+  def handle_internal_status(conversation, content)
+    Rails.logger.warn(
+      "[Hermes::Callback] status interno barrado na conv #{conversation.display_id}: #{content.to_s.squish[0, 200]}"
+    )
+
+    conversation.messages.create!(
+      message_type: :outgoing,
+      private: true,
+      account_id: conversation.account_id,
+      inbox_id: conversation.inbox_id,
+      sender: conversation.inbox.captain_assistant,
+      content: "⚠️ Status interno do Hermes bloqueado; o cliente NÃO recebeu isto:\n\n#{content}",
+      content_attributes: { external_source: 'hermes_internal_status_blocked' }
+    )
+
+    head :ok
   end
 
   # O erro fica registrado como nota interna (visível só para a equipe) e a
