@@ -58,6 +58,49 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
     end
   end
 
+  describe 'quando o Hermes devolve status interno de concorrencia' do
+    status_internos = [
+      "↪ Redirected current run. I'll adjust using your correction.",
+      '⏩ Steered into current run. Your message arrives after the next tool call.',
+      "⏳ Queued for the next turn. I'll respond once the current task finishes.",
+      "⚡ Interrupting current task. I'll respond to your message shortly.",
+      '⏳ Subagent working — your message is queued for when it finishes.',
+      '⏳ Compressing context — your message is queued for when it finishes.'
+    ]
+
+    status_internos.each do |status_interno|
+      it "bloqueia sem entregar ao cliente: #{status_interno[0, 38]}" do
+        expect(Captain::Hermes::DelayedReplyJob).not_to receive(:perform_later)
+
+        post '/webhooks/captain/hermes_callback', params: { inbox_id: inbox.id, content: status_interno }
+
+        expect(response).to have_http_status(:ok)
+        expect(conversation.reload.messages.where(private: false, message_type: :outgoing)).to be_empty
+      end
+    end
+
+    it 'registra nota privada sem abrir triagem e permite a resposta final posterior' do
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: "↪ Redirected current run. I'll adjust using your correction." }
+
+      nota = conversation.reload.messages.where(private: true).find do |mensagem|
+        mensagem.content_attributes.to_h['external_source'] == 'hermes_internal_status_blocked'
+      end
+      expect(nota).to be_present
+      expect(nota.content).to include('Status interno do Hermes bloqueado')
+      expect(nota.content).to include('Redirected current run')
+      expect(conversation.label_list).not_to include('triagem_humana')
+
+      expect(Captain::Hermes::DelayedReplyJob).to receive(:perform_later)
+        .with(conversation.id, 'Claro! Para qual data você deseja reservar?')
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'Claro! Para qual data você deseja reservar?' }
+
+      expect(response).to have_http_status(:ok)
+    end
+  end
+
   # Em 25/07/2026 clientes do Instagram receberam — e leram — mensagens como
   # "HTTP 401: Provided authentication token is expired". Erro técnico do Hermes
   # nunca pode virar resposta ao cliente.
