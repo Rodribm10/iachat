@@ -10,7 +10,8 @@ RSpec.describe Captain::Hermes::OutgoingJob do
     create(:captain_assistant, account: account, engine: 'hermes',
                                hermes_profile_name: 'teste', hermes_webhook_base_url: 'http://hermes.local')
   end
-  let(:conversation) { create(:conversation, inbox: inbox, account: account, status: :open) }
+  # `pending` e o funil da IA — o estado em que o job e agendado de verdade.
+  let(:conversation) { create(:conversation, inbox: inbox, account: account, status: :pending) }
   let(:client) { instance_double(Captain::Hermes::Client, dispatch: true) }
 
   before do
@@ -27,26 +28,77 @@ RSpec.describe Captain::Hermes::OutgoingJob do
     described_class.new.perform(conversation.id, message.id)
   end
 
-  it 'despacha normalmente quando a conversa nao esta em triagem humana' do
+  it 'despacha quando a conversa esta no funil da IA' do
     run_job
 
     expect(client).to have_received(:dispatch)
   end
 
-  it 'nao despacha enquanto a conversa esta em triagem humana' do
-    Captain::Hermes::HumanTriageService.perform(conversation: conversation, reason: 'sem_resposta_segura')
+  # Regra do dono (25/08/2026): dentro do funil da IA nao existe trava. Antes,
+  # uma label de triagem esquecida na conversa amordacava o agente pra sempre —
+  # devolver pra IA nao adiantava, porque ninguem removia a label (conv 126 da
+  # conta 2: handoff 14:44, devolvida 15:00, cliente falou 15:01 e 15:02, silencio).
+  it 'despacha mesmo com label de triagem, se a conversa esta no funil da IA' do
+    conversation.update_labels(%w[triagem_humana triagem_sem_resposta_segura])
+
+    run_job
+
+    expect(client).to have_received(:dispatch)
+  end
+
+  it 'nao despacha quando a conversa saiu do funil da IA' do
+    conversation.update!(status: :open)
 
     run_job
 
     expect(client).not_to have_received(:dispatch)
   end
 
-  # Regressao central deste fix (conv 126 da conta 2, 25/08/2026): handoff as
-  # 14:44 marcou triagem_humana; a conversa foi devolvida (status pending) as
-  # 15:00 mas a label nunca saia sozinha e o guard barrava a IA para sempre.
-  # A partir de Enterprise::Conversation#release_ai_from_human_triage, a
-  # transicao para pending libera as labels e o guard deixa de bloquear.
-  it 'volta a despachar depois que a conversa em triagem humana e devolvida para pending' do
+  # Cenario real do atraso: o job e agendado com inbox.typing_delay, e alguem
+  # resolve a conversa antes dele rodar. A mensagem ja existe, entao nao ha
+  # reabertura — o agente simplesmente cala.
+  it 'nao despacha se a conversa foi resolvida entre o agendamento e a execucao' do
+    message = incoming
+    conversation.update!(status: :resolved)
+
+    described_class.new.perform(conversation.id, message.id)
+
+    expect(client).not_to have_received(:dispatch)
+  end
+
+  # Comportamento desejado do Chatwoot: cliente que volta depois de resolvida
+  # reabre a conversa JA no funil da IA — por isso o agente responde.
+  it 'atende cliente que volta depois da conversa resolvida' do
+    conversation.update!(status: :resolved)
+
+    run_job
+
+    expect(conversation.reload).to be_pending
+    expect(client).to have_received(:dispatch)
+  end
+
+  # Trava intencional: alguem marcou "aqui a IA nao fala" (funcionarios, contatos
+  # que o time prefere atender a mao). Essa vale ate dentro do funil da IA.
+  it 'nao despacha quando a IA foi desligada por marcacao, mesmo no funil da IA' do
+    conversation.update_labels(%w[duda_desligada])
+
+    run_job
+
+    expect(client).not_to have_received(:dispatch)
+  end
+
+  it 'a triagem humana tira a conversa do funil e por isso o agente cala' do
+    Captain::Hermes::HumanTriageService.perform(conversation: conversation, reason: 'sem_resposta_segura')
+
+    expect(conversation.reload).to be_open
+    run_job
+
+    expect(client).not_to have_received(:dispatch)
+  end
+
+  # Devolver pra IA volta a despachar E limpa as labels de triagem (o release
+  # continua valendo — elas sujam filtro e relatorio, so nao bloqueiam mais).
+  it 'volta a despachar quando a conversa e devolvida para o funil da IA' do
     Captain::Hermes::HumanTriageService.perform(conversation: conversation, reason: 'sem_resposta_segura')
     expect(conversation.reload.label_list).to include('triagem_humana')
 

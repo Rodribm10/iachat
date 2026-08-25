@@ -9,7 +9,16 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
 
   retry_on Captain::Hermes::Client::DispatchError, attempts: 3, wait: 5.seconds
 
+  # Labels que a triagem humana aplica. Elas NÃO bloqueiam mais o agente —
+  # servem pra filtro e relatório. Quem manda é o status (ver #perform).
+  # `hermes_placeholder` ficou aqui por compatibilidade: não é aplicada em
+  # lugar nenhum do código, mas pode existir em conversa antiga.
   HUMAN_TRIAGE_LABELS = %w[triagem_humana hermes_placeholder].freeze
+
+  # Trava INTENCIONAL: alguém marcou a conversa dizendo "aqui a IA não fala".
+  # É o caso dos funcionários e de contatos que o time prefere atender à mão.
+  # Diferente das labels de triagem, esta vale mesmo dentro do funil da IA.
+  AI_DISABLED_LABELS = %w[duda_desligada].freeze
 
   def perform(conversation_id, message_id)
     conversation = Conversation.find_by(id: conversation_id)
@@ -17,13 +26,7 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
     return if conversation.blank? || message.blank?
     return unless Captain::Hermes.enabled_for?(conversation.inbox)
 
-    # Conv marcada pra triagem humana = Hermes não responde mais (até admin
-    # remover label). Evita gastar token e gerar loop em msgs claramente fora
-    # de escopo (operadora telefonia, banco, suporte de outro app, etc).
-    if conversation.label_list.intersect?(HUMAN_TRIAGE_LABELS)
-      Rails.logger.info("[Captain::Hermes::OutgoingJob] conv #{conversation.display_id} em triagem humana — pulando dispatch")
-      return
-    end
+    return if skip_dispatch?(conversation)
 
     # Auto-react ANTES do dispatch — gesto chega <1s sem esperar Codex.
     # Não bloqueia fluxo: se falhar, dispatch normal continua.
@@ -41,6 +44,31 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
   end
 
   private
+
+  # A trava é o STATUS, não a label. `pending` é o funil da IA: se a conversa
+  # está lá, foi decisão de quem opera e o agente responde. Se saiu (alguém
+  # assumiu entre o agendamento e a execução — o job roda com typing_delay),
+  # o agente cala.
+  #
+  # Antes isso era decidido por label de triagem, que ficava órfã na conversa e
+  # amordaçava o agente pra sempre: devolver pra IA não adiantava nada, porque
+  # ninguém removia a label. Status é o que a tela mostra e o que o operador
+  # controla — é a fonte de verdade certa.
+  def skip_dispatch?(conversation)
+    unless conversation.pending?
+      log_skip(conversation, "fora do funil da IA (#{conversation.status})")
+      return true
+    end
+
+    return false unless conversation.label_list.intersect?(AI_DISABLED_LABELS)
+
+    log_skip(conversation, 'IA desligada por marcação')
+    true
+  end
+
+  def log_skip(conversation, motivo)
+    Rails.logger.info("[Captain::Hermes::OutgoingJob] conv #{conversation.display_id} #{motivo} — pulando dispatch")
+  end
 
   # Concatena texto de todas as msgs incoming entre a última resposta real
   # (não-reaction) do agente e a msg âncora. Retorna nil se só tem 1 msg
