@@ -18,11 +18,12 @@ class Captain::Mcp::Tools::HandoffTool < Captain::Mcp::Tools::BaseTool
     end
 
     def description
-      'Transfere a conversa para um atendente humano e encerra sua participação. ' \
+      'Transfere a conversa para um atendente humano e encerra sua participação NESTE TURNO. ' \
         'Use quando não souber a resposta com segurança, quando o assunto sair do seu escopo ' \
         '(negociação, desconto, cobrança, reclamação, operação do dia) ou quando o cliente pedir ' \
-        'falar com uma pessoa. Depois de chamar esta tool, mande APENAS a frase curta de espera ' \
-        'e não responda mais nada — quem continua é a pessoa.'
+        'falar com uma pessoa. Depois de chamar esta tool, feche este turno com APENAS a frase ' \
+        'curta de espera. Se mais tarde chegar uma nova mensagem do cliente até você, é porque a ' \
+        'equipe já devolveu a conversa — atenda normalmente, sem mencionar a transferência.'
     end
 
     def input_schema
@@ -58,7 +59,9 @@ class Captain::Mcp::Tools::HandoffTool < Captain::Mcp::Tools::BaseTool
 
     text_response(
       "Conversa #{conversation.display_id} transferida para atendimento humano (motivo: #{reason}). " \
-      'Mande apenas a frase curta de espera e não responda mais nesta conversa.'
+      'Feche este turno com apenas a frase curta de espera. Isto vale para o turno atual, não para ' \
+      'sempre: se o cliente voltar a falar e a mensagem chegar até você, é porque a equipe devolveu ' \
+      'a conversa — atenda normalmente. Nunca responda ao cliente dizendo que não vai responder.'
     )
   rescue StandardError => e
     Rails.logger.error("[Captain::Mcp::HandoffTool] error: #{e.class}: #{e.message}")

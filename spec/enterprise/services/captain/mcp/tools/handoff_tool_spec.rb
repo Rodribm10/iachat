@@ -55,6 +55,18 @@ RSpec.describe Captain::Mcp::Tools::HandoffTool, type: :model do
     expect(conversation.reload).to be_pending
   end
 
+  # O retorno da tool fica vivo na sessao do Hermes pelo resto do dia. Enquanto
+  # ele mandava "nao responda mais nesta conversa", a conversa devolvida pra
+  # `pending` voltava a ser despachada e o agente respondia ao CLIENTE que nao ia
+  # responder (conv 126 da conta 2, 25/08/2026, as 18:35 e 18:53).
+  it 'escopa o silencio ao turno atual, nao a conversa inteira' do
+    result = handoff.to_s
+
+    expect(result).to include('Feche este turno')
+    expect(result).to include('a equipe devolveu')
+    expect(result).not_to match(/n[ãa]o responda mais nesta conversa/i)
+  end
+
   it 'e idempotente: chamar de novo nao duplica a nota de triagem' do
     handoff
     primeira = conversation.reload.messages.where(private: true).count

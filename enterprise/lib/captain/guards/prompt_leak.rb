@@ -12,6 +12,15 @@
 #   tool (`handoff_to_`, `daniela_reservas`), JSON cru ou Liquid não renderizado.
 #   A resposta está DESCREVENDO o atendimento em vez de fazer o atendimento.
 #
+#   REFUSAL — o assistente ANUNCIA ao cliente que não vai responder ("Sem resposta
+#   — a conversa permanece com a equipe humana após a transferência"). Silêncio é
+#   uma decisão do Chatwoot, não do modelo: se a mensagem chegou até ele, é porque
+#   a conversa está no funil da IA. Quando o modelo decide calar mesmo assim, ele
+#   não fica em silêncio — o protocolo do Hermes sempre devolve texto —, então
+#   escreve o relatório da decisão e o cliente lê. Visto na conv 126 da conta 2 em
+#   25/08/2026: a Duda tinha chamado `handoff` às 11:44, a conversa foi devolvida
+#   pra `pending`, e às 18:35 e 18:53 ela respondeu ao cliente que não responderia.
+#
 # Até 22/08/2026 isso vivia dentro de Captain::Conversation::ResponseBuilderJob e
 # portanto só protegia o motor interno do Captain — que não atende ninguém em
 # produção. O caminho real (Hermes) tinha só as guardas de erro técnico, nascidas
@@ -51,7 +60,22 @@ module Captain::Guards::PromptLeak
     /\{%\s*\w+/
   ].freeze
 
-  ALL_PATTERNS = (SYSTEM_PROMPT_PATTERNS + THOUGHT_PATTERNS).freeze
+  # Recusa narrada. Barrar aqui NÃO é cosmético: o callback manda a conversa para
+  # triagem humana, então falso positivo cala a IA e chama gente à toa. Por isso
+  # cada padrão é ancorado no que só existe como relato de bastidor — e "humana"
+  # dito ao cliente já é bastidor por definição. Fora, de propósito:
+  # "após a transferência" (transferência bancária é assunto diário: "após a
+  # transferência, me manda o comprovante") e "conforme o fluxo" (existe fluxo
+  # legítimo de matrícula). Os dois casos reais já são pegos pelos padrões abaixo.
+  REFUSAL_PATTERNS = [
+    /\A\s*(sem|nenhuma)\s+resposta\b/i,
+    /\bn[ãa]o\s+(vou|devo)\s+responder\b/i,
+    /\bn[ãa]o\s+envio\s+(novas\s+)?mensagens\b/i,
+    /\b(permanece|segue|continua|fica)\s+com\s+(a\s+)?(equipe|atendimento)\s+human[ao]\b/i,
+    /\btransferid[ao]\s+para\s+(a\s+)?(equipe|atendimento)\s+human[ao]\b/i
+  ].freeze
+
+  ALL_PATTERNS = (SYSTEM_PROMPT_PATTERNS + THOUGHT_PATTERNS + REFUSAL_PATTERNS).freeze
 
   module_function
 
@@ -70,6 +94,7 @@ module Captain::Guards::PromptLeak
     return nil if normalized.blank?
     return 'system_prompt' if SYSTEM_PROMPT_PATTERNS.any? { |p| normalized.match?(p) }
     return 'pensamento_interno' if THOUGHT_PATTERNS.any? { |p| normalized.match?(p) }
+    return 'recusa_de_resposta' if REFUSAL_PATTERNS.any? { |p| normalized.match?(p) }
 
     nil
   end
