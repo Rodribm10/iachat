@@ -762,10 +762,13 @@
       "WAITING_WITH_AI": "com a IA",
       "WAITING_WITH_HUMAN": "com a equipe",
       "WAITING_OLDEST": "Mais antiga há {time}",
-      "WAITING_RECENT": "até 30 min",
-      "WAITING_SOON": "30 min a 2h",
-      "WAITING_LATE": "mais de 2h",
-      "WAITING_SEE_LIST": "Ver a lista"
+      "WAITING_SEE_LIST": "Ver a lista",
+      "WAITING_B_UNDER_5": "até 5 min",
+      "WAITING_B_5_10": "5–10 min",
+      "WAITING_B_10_20": "10–20 min",
+      "WAITING_B_20_30": "20–30 min",
+      "WAITING_B_30_120": "30 min–2h",
+      "WAITING_B_OVER_120": "+2h"
     },
     "TOTAL": "Total",
     "PRIVADO": {

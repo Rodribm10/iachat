@@ -41,8 +41,21 @@ class V2::Reports::Sinal::OverviewBuilder < V2::Reports::Sinal::BaseBuilder
   # a IA (`pending`, o funil dela) de quem espera uma pessoa (`open`). Sem isso
   # nao da pra saber se o gargalo e a IA ou a equipe — e foi exatamente por isso
   # que a conv 55 da academia ficou horas parada sem ninguem perceber.
-  WAITING_SOON_MINUTES = 30
-  WAITING_LATE_MINUTES = 120
+  # Faixas curtas no comeco de proposito. Em WhatsApp a percepcao de abandono
+  # nasce em minutos, nao em horas: um corte unico de 30min junta quem acabou de
+  # escrever com quem ja desistiu, e a fila parece saudavel ate virar tarde
+  # demais. Os quatro primeiros degraus (5/10/20/30) sao onde ainda da pra
+  # salvar o atendimento; os dois ultimos ja sao diagnostico de falha.
+  #
+  # `over_120` e o unico que pinta vermelho — o resto e leitura, nao alarme.
+  WAITING_BUCKETS = [
+    [:under_5, 0, 5],
+    [:from_5_to_10, 5, 10],
+    [:from_10_to_20, 10, 20],
+    [:from_20_to_30, 20, 30],
+    [:from_30_to_120, 30, 120],
+    [:over_120, 120, nil]
+  ].freeze
 
   def waiting
     rows = conversations_scope.where(status: %i[open pending])
@@ -58,12 +71,14 @@ class V2::Reports::Sinal::OverviewBuilder < V2::Reports::Sinal::BaseBuilder
         ai: rows.count { |status, _| status.to_s == 'pending' },
         human: rows.count { |status, _| status.to_s == 'open' }
       },
-      buckets: {
-        recent: minutes.count { |m| m < WAITING_SOON_MINUTES },
-        soon: minutes.count { |m| m >= WAITING_SOON_MINUTES && m < WAITING_LATE_MINUTES },
-        late: minutes.count { |m| m >= WAITING_LATE_MINUTES }
-      }
+      buckets: waiting_buckets(minutes)
     }
+  end
+
+  def waiting_buckets(minutes)
+    WAITING_BUCKETS.each_with_object({}) do |(key, from, to), acc|
+      acc[key] = minutes.count { |m| m >= from && (to.nil? || m < to) }
+    end
   end
 
   def audio_count

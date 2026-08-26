@@ -145,9 +145,24 @@ const up = computed(() => (overview.value?.kpis?.pct_change ?? 0) >= 0);
 // propósito: "tem alguém pendurado?" só faz sentido no presente.
 const waiting = computed(() => overview.value?.waiting);
 const hasWaiting = computed(() => (waiting.value?.total ?? 0) > 0);
-const hasLate = computed(() => (waiting.value?.buckets?.late ?? 0) > 0);
+const hasLate = computed(() => (waiting.value?.buckets?.over_120 ?? 0) > 0);
 
 const { t } = useI18n();
+
+// Os seis degraus da fila. Curtos no começo porque em WhatsApp o abandono
+// nasce em minutos: um corte único de 30min junta quem acabou de escrever com
+// quem já desistiu. Só o último degrau pinta vermelho — o resto é leitura.
+const waitingBuckets = computed(() => [
+  { key: 'under_5', label: t('SINAL_REPORTS.OVERVIEW.WAITING_B_UNDER_5') },
+  { key: 'from_5_to_10', label: t('SINAL_REPORTS.OVERVIEW.WAITING_B_5_10') },
+  { key: 'from_10_to_20', label: t('SINAL_REPORTS.OVERVIEW.WAITING_B_10_20') },
+  { key: 'from_20_to_30', label: t('SINAL_REPORTS.OVERVIEW.WAITING_B_20_30') },
+  {
+    key: 'from_30_to_120',
+    label: t('SINAL_REPORTS.OVERVIEW.WAITING_B_30_120'),
+  },
+  { key: 'over_120', label: t('SINAL_REPORTS.OVERVIEW.WAITING_B_OVER_120') },
+]);
 const visual = computed(() => overview.value?.visual);
 
 const pct = (value, total) => {
@@ -388,35 +403,43 @@ const goToAiReports = () => {
             </div>
           </div>
 
-          <div class="flex items-center gap-5">
+          <div
+            class="grid flex-1 min-w-[280px] grid-cols-3 sm:grid-cols-6 gap-x-4 gap-y-3"
+          >
             <div
-              v-for="bucket in [
-                {
-                  key: 'recent',
-                  label: $t('SINAL_REPORTS.OVERVIEW.WAITING_RECENT'),
-                  dot: 'bg-[var(--text-3)]',
-                },
-                {
-                  key: 'soon',
-                  label: $t('SINAL_REPORTS.OVERVIEW.WAITING_SOON'),
-                  dot: 'bg-amber-500',
-                },
-                {
-                  key: 'late',
-                  label: $t('SINAL_REPORTS.OVERVIEW.WAITING_LATE'),
-                  dot: 'bg-red-500',
-                },
-              ]"
+              v-for="(bucket, index) in waitingBuckets"
               :key="bucket.key"
-              class="flex items-center gap-2"
+              class="flex flex-col gap-0.5"
             >
-              <span :class="bucket.dot" class="rounded-full size-1.5" />
-              <span class="text-sm tabular-nums text-[var(--text-1)]">
+              <span
+                class="text-lg font-medium tabular-nums"
+                :class="
+                  (waiting?.buckets?.[bucket.key] ?? 0) === 0
+                    ? 'text-[var(--text-3)]'
+                    : index === 5
+                      ? 'text-red-600 dark:text-red-400'
+                      : index === 4
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-[var(--text-1)]'
+                "
+              >
                 {{ waiting?.buckets?.[bucket.key] ?? 0 }}
               </span>
-              <span class="text-xs text-[var(--text-3)]">{{
-                bucket.label
-              }}</span>
+              <span class="text-[11px] text-[var(--text-3)] whitespace-nowrap">
+                {{ bucket.label }}
+              </span>
+              <span
+                class="h-0.5 rounded-full"
+                :class="
+                  (waiting?.buckets?.[bucket.key] ?? 0) === 0
+                    ? 'bg-[var(--border-soft)]'
+                    : index === 5
+                      ? 'bg-red-500'
+                      : index === 4
+                        ? 'bg-amber-500'
+                        : 'bg-[var(--accent)]'
+                "
+              />
             </div>
           </div>
         </div>
