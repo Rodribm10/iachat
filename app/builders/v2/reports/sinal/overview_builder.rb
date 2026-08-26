@@ -2,6 +2,7 @@ class V2::Reports::Sinal::OverviewBuilder < V2::Reports::Sinal::BaseBuilder
   def build
     {
       kpis: kpis,
+      waiting: waiting,
       series: series,
       ia: ia_metrics,
       topics: insight_topics,
@@ -21,6 +22,47 @@ class V2::Reports::Sinal::OverviewBuilder < V2::Reports::Sinal::BaseBuilder
       audios: audio_count,
       prev_received: prev_received,
       pct_change: pct_change(received, prev_received)
+    }
+  end
+
+  # Quem esta esperando resposta AGORA — nao no periodo selecionado. E o unico
+  # bloco da pagina que ignora o filtro de datas de proposito: fila e estado do
+  # instante, e a pergunta que ele responde ("tem alguem pendurado?") so faz
+  # sentido no presente.
+  #
+  # Deriva de `waiting_since` (coluna indexada que o Chatwoot zera sozinho em
+  # toda resposta nao-privada e na resolucao). Nao existe etiqueta por tras:
+  # etiqueta de estado precisa ser escrita E apagada, e o apagar sempre tem um
+  # caminho que nao roda — foi assim que 166 `cliente_aguardando`/`demora_critica`
+  # ficaram penduradas em conversas ja resolvidas. Consulta em tempo de leitura
+  # nao tem esse problema: quem foi respondido some da conta no mesmo segundo.
+  #
+  # `by_owner` e a informacao que nao existia em lugar nenhum: separa quem espera
+  # a IA (`pending`, o funil dela) de quem espera uma pessoa (`open`). Sem isso
+  # nao da pra saber se o gargalo e a IA ou a equipe — e foi exatamente por isso
+  # que a conv 55 da academia ficou horas parada sem ninguem perceber.
+  WAITING_SOON_MINUTES = 30
+  WAITING_LATE_MINUTES = 120
+
+  def waiting
+    rows = conversations_scope.where(status: %i[open pending])
+                              .where.not(waiting_since: nil)
+                              .pluck(:status, :waiting_since)
+    now = Time.current
+    minutes = rows.map { |_status, since| ((now - since) / 60).floor }
+
+    {
+      total: rows.size,
+      oldest_minutes: minutes.max || 0,
+      by_owner: {
+        ai: rows.count { |status, _| status.to_s == 'pending' },
+        human: rows.count { |status, _| status.to_s == 'open' }
+      },
+      buckets: {
+        recent: minutes.count { |m| m < WAITING_SOON_MINUTES },
+        soon: minutes.count { |m| m >= WAITING_SOON_MINUTES && m < WAITING_LATE_MINUTES },
+        late: minutes.count { |m| m >= WAITING_LATE_MINUTES }
+      }
     }
   end
 

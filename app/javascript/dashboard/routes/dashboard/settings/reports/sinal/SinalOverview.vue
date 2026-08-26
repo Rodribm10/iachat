@@ -141,6 +141,12 @@ watch(operationRange, fetchOperations);
 
 const up = computed(() => (overview.value?.kpis?.pct_change ?? 0) >= 0);
 
+// Fila do AGORA — o único bloco da página que ignora o filtro de período, de
+// propósito: "tem alguém pendurado?" só faz sentido no presente.
+const waiting = computed(() => overview.value?.waiting);
+const hasWaiting = computed(() => (waiting.value?.total ?? 0) > 0);
+const hasLate = computed(() => (waiting.value?.buckets?.late ?? 0) > 0);
+
 const { t } = useI18n();
 const visual = computed(() => overview.value?.visual);
 
@@ -306,6 +312,115 @@ const goToAiReports = () => {
           </select>
         </div>
       </div>
+
+      <!-- Fila do momento: quem está esperando resposta agora -->
+      <section
+        class="bg-[var(--surface-2)] border rounded-xl p-[18px]"
+        :class="hasLate ? 'border-amber-500/50' : 'border-[var(--border-soft)]'"
+      >
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <h3 class="text-sm font-medium text-[var(--text-1)]">
+              {{ $t('SINAL_REPORTS.OVERVIEW.WAITING_TITLE') }}
+            </h3>
+            <p class="text-xs text-[var(--text-3)] mt-0.5">
+              {{ $t('SINAL_REPORTS.OVERVIEW.WAITING_SUBTITLE') }}
+            </p>
+          </div>
+          <span
+            v-if="hasWaiting"
+            class="text-xs text-[var(--text-3)] whitespace-nowrap tabular-nums"
+          >
+            {{
+              $t('SINAL_REPORTS.OVERVIEW.WAITING_OLDEST', {
+                time: formatMinutes(waiting?.oldest_minutes ?? 0),
+              })
+            }}
+          </span>
+        </div>
+
+        <div v-if="!hasWaiting" class="flex items-center gap-2">
+          <span
+            class="i-lucide-check-circle-2 size-4 text-emerald-600 dark:text-emerald-400"
+          />
+          <span class="text-sm text-[var(--text-2)]">
+            {{ $t('SINAL_REPORTS.OVERVIEW.WAITING_EMPTY') }}
+          </span>
+          <span class="text-xs text-[var(--text-3)]">
+            {{ $t('SINAL_REPORTS.OVERVIEW.WAITING_EMPTY_HINT') }}
+          </span>
+        </div>
+
+        <div v-else class="flex flex-wrap items-end gap-x-8 gap-y-4">
+          <div>
+            <div class="flex items-baseline gap-2">
+              <span
+                class="text-3xl font-medium tabular-nums"
+                :class="
+                  hasLate
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-[var(--text-1)]'
+                "
+              >
+                {{ waiting?.total ?? 0 }}
+              </span>
+              <span class="text-xs text-[var(--text-3)]">
+                {{
+                  (waiting?.total ?? 0) === 1
+                    ? $t('SINAL_REPORTS.OVERVIEW.WAITING_UNIT_ONE')
+                    : $t('SINAL_REPORTS.OVERVIEW.WAITING_UNIT')
+                }}
+              </span>
+            </div>
+            <!-- Quem detém a conversa: sem isso não dá pra saber se o gargalo
+                 é a IA ou a equipe. -->
+            <div class="flex items-center gap-3 mt-1.5 text-xs">
+              <span class="flex items-center gap-1.5 text-[var(--text-2)]">
+                <span class="i-lucide-sparkles size-3 text-[var(--accent)]" />
+                {{ waiting?.by_owner?.ai ?? 0 }}
+                {{ $t('SINAL_REPORTS.OVERVIEW.WAITING_WITH_AI') }}
+              </span>
+              <span class="flex items-center gap-1.5 text-[var(--text-2)]">
+                <span class="i-lucide-user-round size-3 text-[var(--text-3)]" />
+                {{ waiting?.by_owner?.human ?? 0 }}
+                {{ $t('SINAL_REPORTS.OVERVIEW.WAITING_WITH_HUMAN') }}
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-5">
+            <div
+              v-for="bucket in [
+                {
+                  key: 'recent',
+                  label: $t('SINAL_REPORTS.OVERVIEW.WAITING_RECENT'),
+                  dot: 'bg-[var(--text-3)]',
+                },
+                {
+                  key: 'soon',
+                  label: $t('SINAL_REPORTS.OVERVIEW.WAITING_SOON'),
+                  dot: 'bg-amber-500',
+                },
+                {
+                  key: 'late',
+                  label: $t('SINAL_REPORTS.OVERVIEW.WAITING_LATE'),
+                  dot: 'bg-red-500',
+                },
+              ]"
+              :key="bucket.key"
+              class="flex items-center gap-2"
+            >
+              <span :class="bucket.dot" class="rounded-full size-1.5" />
+              <span class="text-sm tabular-nums text-[var(--text-1)]">
+                {{ waiting?.buckets?.[bucket.key] ?? 0 }}
+              </span>
+              <span class="text-xs text-[var(--text-3)]">{{
+                bucket.label
+              }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- KPIs -->
       <div

@@ -755,7 +755,20 @@
       "IA_AUDIT_LINK": "AI Audit →",
       "TOPICS_TITLE": "Top Topics",
       "TOPICS_SOURCE": "AI-extracted from conversations",
-      "LABELS_TITLE": "Most Applied Labels"
+      "LABELS_TITLE": "Most Applied Labels",
+      "WAITING_TITLE": "Waiting for a reply right now",
+      "WAITING_SUBTITLE": "Current queue — not affected by the selected period",
+      "WAITING_EMPTY": "No one is waiting",
+      "WAITING_EMPTY_HINT": "Every conversation has been answered.",
+      "WAITING_UNIT": "conversations in queue",
+      "WAITING_UNIT_ONE": "conversation in queue",
+      "WAITING_WITH_AI": "with the AI",
+      "WAITING_WITH_HUMAN": "with the team",
+      "WAITING_OLDEST": "Oldest waiting {time}",
+      "WAITING_RECENT": "under 30 min",
+      "WAITING_SOON": "30 min to 2h",
+      "WAITING_LATE": "over 2h",
+      "WAITING_SEE_LIST": "See the list"
     },
     "TOTAL": "Total",
     "PRIVADO": {

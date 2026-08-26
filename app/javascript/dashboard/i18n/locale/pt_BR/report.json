@@ -752,7 +752,20 @@
       "IA_AUDIT_LINK": "Auditoria IA →",
       "TOPICS_TITLE": "Temas Mais Falados",
       "TOPICS_SOURCE": "extraídos por IA das conversas",
-      "LABELS_TITLE": "Etiquetas Mais Aplicadas"
+      "LABELS_TITLE": "Etiquetas Mais Aplicadas",
+      "WAITING_TITLE": "Esperando resposta agora",
+      "WAITING_SUBTITLE": "Fila do momento — não depende do período selecionado",
+      "WAITING_EMPTY": "Ninguém esperando resposta",
+      "WAITING_EMPTY_HINT": "Toda conversa recebeu resposta.",
+      "WAITING_UNIT": "conversas na fila",
+      "WAITING_UNIT_ONE": "conversa na fila",
+      "WAITING_WITH_AI": "com a IA",
+      "WAITING_WITH_HUMAN": "com a equipe",
+      "WAITING_OLDEST": "Mais antiga há {time}",
+      "WAITING_RECENT": "até 30 min",
+      "WAITING_SOON": "30 min a 2h",
+      "WAITING_LATE": "mais de 2h",
+      "WAITING_SEE_LIST": "Ver a lista"
     },
     "TOTAL": "Total",
     "PRIVADO": {
