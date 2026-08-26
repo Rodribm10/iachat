@@ -76,10 +76,16 @@ class Whatsapp::IncomingMessageGowaService
   end
 
   def find_or_create_conversation(contact_inbox)
-    return inbox.conversations.where(contact_id: contact_inbox.contact_id).last if inbox.lock_to_single_conversation
+    if inbox.lock_to_single_conversation
+      return inbox.conversations.where(contact_id: contact_inbox.contact_id).last || create_conversation(contact_inbox)
+    end
 
     contact_inbox.conversations.where.not(status: :resolved).last ||
-      Conversation.create!(contact: contact_inbox.contact, contact_inbox: contact_inbox, inbox: inbox, account: inbox.account, status: :open)
+      create_conversation(contact_inbox)
+  end
+
+  def create_conversation(contact_inbox)
+    Conversation.create!(contact: contact_inbox.contact, contact_inbox: contact_inbox, inbox: inbox, account: inbox.account, status: :open)
   end
 
   def merge_outgoing_echo(conversation)

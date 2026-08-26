@@ -49,6 +49,55 @@ RSpec.describe Whatsapp::IncomingMessageGowaService do
     expect(message.sender.name).to eq('Cliente GOWA')
   end
 
+  it 'cria uma conversa para o primeiro contato quando a inbox mantém uma conversa por contato' do
+    inbox.update!(lock_to_single_conversation: true)
+    params = {
+      'event' => 'message',
+      'payload' => {
+        'id' => '3EB0PRIMEIROCONTATO',
+        'chat_id' => '5561988887777@s.whatsapp.net',
+        'from' => '5561988887777@s.whatsapp.net',
+        'from_name' => 'Primeiro Cliente',
+        'timestamp' => '2026-08-26T16:09:45Z',
+        'is_from_me' => false,
+        'body' => 'Boa tarde'
+      }
+    }
+
+    expect do
+      described_class.new(inbox: inbox, params: params).perform
+    end.to change(Conversation, :count).by(1)
+       .and change(Message, :count).by(1)
+
+    conversation = inbox.conversations.last
+    expect(conversation.contact.name).to eq('Primeiro Cliente')
+    expect(conversation.messages.last.content).to eq('Boa tarde')
+  end
+
+  it 'reutiliza a conversa do contato quando a inbox mantém uma conversa por contato' do
+    inbox.update!(lock_to_single_conversation: true)
+    contact = create(:contact, account: account, name: 'Cliente Existente', phone_number: '+5561988887777')
+    contact_inbox = create(:contact_inbox, contact: contact, inbox: inbox, source_id: '5561988887777')
+    conversation = create(:conversation, account: account, inbox: inbox, contact: contact, contact_inbox: contact_inbox, status: :resolved)
+    params = {
+      'event' => 'message',
+      'payload' => {
+        'id' => '3EB0CONTATOEXISTENTE',
+        'chat_id' => '5561988887777@s.whatsapp.net',
+        'from' => '5561988887777@s.whatsapp.net',
+        'timestamp' => '2026-08-26T16:10:00Z',
+        'is_from_me' => false,
+        'body' => 'Já falei com vocês antes'
+      }
+    }
+
+    expect do
+      described_class.new(inbox: inbox, params: params).perform
+    end.not_to change(Conversation, :count)
+
+    expect(conversation.messages.last.content).to eq('Já falei com vocês antes')
+  end
+
   it 'ignora mensagens de grupos' do
     params = {
       'event' => 'message',
@@ -106,6 +155,19 @@ RSpec.describe Whatsapp::IncomingMessageGowaService do
       end.to change(Message, :count).by(1)
 
       expect(existing_contact.reload.name).to eq('Maria Cliente')
+    end
+
+    it 'cria conversa para o primeiro eco quando a inbox mantém uma conversa por contato' do
+      inbox.update!(lock_to_single_conversation: true)
+
+      expect do
+        described_class.new(inbox: inbox, params: echo_params).perform
+      end.to change(Conversation, :count).by(1)
+         .and change(Message, :count).by(1)
+
+      message = inbox.messages.order(:id).last
+      expect(message.message_type).to eq('outgoing')
+      expect(message.conversation).to be_present
     end
   end
 end
