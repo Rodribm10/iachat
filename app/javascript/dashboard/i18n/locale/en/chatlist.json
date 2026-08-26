@@ -146,5 +146,19 @@
     "MESSAGE_READ": "Read",
     "SENDING": "Sending",
     "UNREAD_COUNT_OVERFLOW": "9+"
+  },
+  "AGGRESSIVE_CONVERSATION_BANNER": {
+    "HEADLINE_ONE": "{name} has been waiting {time}",
+    "HEADLINE_REOPENED_ONE": "{name} reopened the conversation",
+    "HEADLINE_MANY": "{count} waiting for a reply · {time}",
+    "OPEN_ONE": "Open",
+    "OPEN_OLDEST": "Open the oldest",
+    "EXPAND": "See all",
+    "COLLAPSE": "Hide list",
+    "NOW": "just now",
+    "KIND_REOPENED": "reopened",
+    "HIDE_ONE": "Hide",
+    "HIDE_ONE_TITLE": "Hides for now — comes back if still unanswered",
+    "EXPLANATION": "This notice only clears when the conversation is answered. Hiding removes it for now — it returns if it stays unanswered."
   }
 }

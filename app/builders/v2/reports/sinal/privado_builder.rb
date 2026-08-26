@@ -59,8 +59,16 @@ class V2::Reports::Sinal::PrivadoBuilder < V2::Reports::Sinal::BaseBuilder
     { avg: (avg / 60.0).round, median: (median / 60.0).round, samples: samples }
   end
 
+  # `open` E `pending`: quem esta esperando a IA (pending e o funil dela) conta
+  # como nao respondido igual a quem espera uma pessoa. Antes o escopo era so
+  # `open`, e a lista era cega justamente para a falha mais dificil de ver —
+  # conversa parada com a IA nao aparecia em lugar nenhum. Foi assim que a conv
+  # 55 da academia ficou horas sem resposta em 25/08/2026 sem constar de nenhum
+  # relatorio. `waiting_since` (indexado, zerado pelo Chatwoot em toda resposta)
+  # continua sendo a fonte de verdade: quem foi respondido sai da lista sozinho,
+  # sem etiqueta pra manter em dia.
   def unanswered_scope
-    individual_conversations.open.where.not(waiting_since: nil)
+    individual_conversations.where(status: %i[open pending]).where.not(waiting_since: nil)
   end
 
   # rubocop:disable Metrics/AbcSize

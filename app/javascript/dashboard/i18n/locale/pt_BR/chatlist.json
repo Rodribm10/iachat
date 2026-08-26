@@ -146,5 +146,19 @@
     "MESSAGE_READ": "Lida",
     "SENDING": "Enviando",
     "UNREAD_COUNT_OVERFLOW": "9+"
+  },
+  "AGGRESSIVE_CONVERSATION_BANNER": {
+    "HEADLINE_ONE": "{name} espera há {time}",
+    "HEADLINE_REOPENED_ONE": "{name} reabriu a conversa",
+    "HEADLINE_MANY": "{count} esperando resposta · {time}",
+    "OPEN_ONE": "Abrir",
+    "OPEN_OLDEST": "Abrir a mais antiga",
+    "EXPAND": "Ver todas",
+    "COLLAPSE": "Ocultar lista",
+    "NOW": "agora",
+    "KIND_REOPENED": "reabriu",
+    "HIDE_ONE": "Esconder",
+    "HIDE_ONE_TITLE": "Esconde temporariamente — volta se não responder",
+    "EXPLANATION": "Este aviso só some quando a conversa for respondida. Esconder tira da tela por enquanto — volta se continuar sem resposta."
   }
 }
