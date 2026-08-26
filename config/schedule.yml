@@ -181,3 +181,13 @@ captain_quality_flag_service_gaps_job:
   cron: '*/15 * * * *'
   class: 'Captain::Quality::FlagServiceGapsJob'
   queue: scheduled_jobs
+
+# Leva para o Twenty CRM quem demonstrou interesse real (etiquetas lead_novo,
+# quer_experimental, visita_marcada, matriculado) e move o estagio quando a
+# etiqueta avanca. Aluno atual nunca recebe essas etiquetas, entao nao vai pro
+# CRM. Nao passa pelo agente: custo zero em token.
+# Ver enterprise/app/jobs/captain/crm/sync_leads_job.rb.
+captain_crm_sync_leads_job:
+  cron: '*/5 * * * *'
+  class: 'Captain::Crm::SyncLeadsJob'
+  queue: scheduled_jobs
