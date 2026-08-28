@@ -35,6 +35,10 @@ class Captain::Mcp::Server
     params = request['params'] || {}
 
     dispatch(method, rid, params)
+  rescue Captain::Mcp::ToolRegistry::ToolNotFoundError,
+         Captain::Mcp::ToolRegistry::ToolNotAllowedError => e
+    Rails.logger.warn("[Captain::Mcp::Server] tool rejeitada: #{e.message}")
+    error_response(rid, -32_602, e.message)
   rescue StandardError => e
     Rails.logger.error("[Captain::Mcp::Server] error handling #{method}: #{e.class}: #{e.message}")
     error_response(rid, -32_603, "Internal error: #{e.message}")
@@ -45,7 +49,7 @@ class Captain::Mcp::Server
   def dispatch(method, rid, params)
     case method
     when 'initialize'                                  then respond(rid, initialize_result(params))
-    when 'tools/list'                                  then respond(rid, { tools: Captain::Mcp::ToolRegistry.descriptors })
+    when 'tools/list'                                  then respond(rid, { tools: Captain::Mcp::ToolRegistry.descriptors(context: context) })
     when 'tools/call'                                  then respond(rid, tools_call(params))
     when 'ping'                                        then respond(rid, {})
     when 'notifications/initialized', 'notifications/cancelled' then nil

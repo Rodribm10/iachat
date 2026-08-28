@@ -129,6 +129,7 @@ class Api::V1::Accounts::Captain::AssistantsController < Api::V1::Accounts::Base
     if Current.account.feature_enabled?('captain_integration_v2')
       assistant_config_attributes += [:auto_resolve_after, :send_inactivity_resolution_message]
     end
+    assistant_config_attributes << { mcp_tool_allowlist: [] }
 
     # O fork guarda o roteamento pro Hermes no proprio assistant.
     permitted = params.require(:assistant).permit(:name, :description, :orchestrator_prompt,

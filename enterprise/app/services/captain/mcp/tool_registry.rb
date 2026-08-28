@@ -5,9 +5,12 @@
 # (pra `tools/list`) e #call(args, context:) (pra `tools/call`).
 #
 # Hermes consulta tools/list pra saber o que pode chamar e tools/call pra
-# executar. Toda tool aqui está disponível pra qualquer profile do Hermes
-# que se conecte ao MCP server do Captain via `hermes mcp add`.
+# executar. ToolPolicy aplica o allowlist do Captain::Assistant quando o
+# cliente envia assistant_id ou inbox_id no contexto MCP.
 class Captain::Mcp::ToolRegistry
+  class ToolNotFoundError < StandardError; end
+  class ToolNotAllowedError < StandardError; end
+
   TOOLS = [
     Captain::Mcp::Tools::AddLabelTool,
     Captain::Mcp::Tools::HandoffTool,
@@ -35,19 +38,46 @@ class Captain::Mcp::ToolRegistry
   ].freeze
 
   class << self
-    def descriptors
-      TOOLS.map(&:to_mcp_descriptor)
+    def descriptors(context: {})
+      allowed_tools(context: context).map(&:to_mcp_descriptor)
     end
 
     def find(name)
       TOOLS.find { |klass| klass.name == name.to_s }
     end
 
+    def allowed_tool_names(context: {})
+      policy(context).allowed_tool_names
+    end
+
+    def allowed_tools(context: {})
+      allowed_names = allowed_tool_names(context: context)
+      TOOLS.select { |klass| allowed_names.include?(klass.name) }
+    end
+
     def call(name, args, context:)
       klass = find(name)
-      raise ArgumentError, "Tool não registrada: #{name}" if klass.nil?
+      raise ToolNotFoundError, "Tool não registrada: #{name}" if klass.nil?
+
+      unless policy(context).allowed?(klass.name)
+        Rails.logger.warn(
+          "[Captain::Mcp::ToolRegistry] tool bloqueada=#{klass.name} " \
+          "assistant_id=#{context&.dig(:assistant_id) || context&.dig('assistant_id')} " \
+          "inbox_id=#{context&.dig(:inbox_id) || context&.dig('inbox_id')}"
+        )
+        raise ToolNotAllowedError, "Tool indisponível: #{name}"
+      end
 
       klass.new.call(args || {}, context: context || {})
+    end
+
+    private
+
+    def policy(context)
+      Captain::Mcp::ToolPolicy.new(
+        context: context,
+        registered_tool_names: TOOLS.map(&:name)
+      )
     end
   end
 end

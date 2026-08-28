@@ -95,7 +95,12 @@ DB_DUMP=$(docker exec "$CID" bundle exec rails runner "
     secret_via: inbox ? Captain::Hermes.subscription_signing_secret(inbox)&.first(8) : nil,
     ci_unit_id: ci_unit_id,
     inter_ok: inter_ok,
-    pricing_dry_run: pricing_dry_run
+    pricing_dry_run: pricing_dry_run,
+    mcp_tool_allowlist_configured: asst.config.key?('mcp_tool_allowlist'),
+    mcp_tool_allowlist: Array(asst.mcp_tool_allowlist).map(&:to_s),
+    mcp_effective_tools: Captain::Mcp::ToolRegistry.allowed_tool_names(
+      context: { account_id: asst.account_id, assistant_id: asst.id, inbox_id: inbox&.id }.compact
+    )
   }
   puts out.to_json
 " 2>&1 | grep -v 'WARN\|RubyLLM\|ip_lookup' | tail -1)
@@ -165,7 +170,7 @@ if [[ -d "$PROFILE_DIR" ]]; then
   check "webhook_subscriptions.json com chave correta" "$([[ "$SUB_KEY" == "captain-inbox-$SLUG" ]] && echo PASS || echo FAIL)" "$SUB_KEY"
   PORT_OK=$(grep -c "port: $PORT" "$PROFILE_DIR/config.yaml" 2>/dev/null || true)
   check "config.yaml port=$PORT" "$([[ ${PORT_OK:-0} -gt 0 ]] && echo PASS || echo FAIL)"
-  HDR_OK=$(grep -c "X-Captain-Assistant-Id: '${PARENT_ID:-$ASSISTANT_ID}'" "$PROFILE_DIR/config.yaml" 2>/dev/null || true)
+  HDR_OK=$(grep -c "X-Captain-Assistant-Id: '$ASSISTANT_ID'" "$PROFILE_DIR/config.yaml" 2>/dev/null || true)
   check "config.yaml X-Captain-Assistant-Id correto" "$([[ ${HDR_OK:-0} -gt 0 ]] && echo PASS || echo FAIL)"
   MEM_OFF=$(grep -c 'memory_enabled: false' "$PROFILE_DIR/config.yaml" 2>/dev/null || true)
   check "config.yaml memory_enabled: false" "$([[ ${MEM_OFF:-0} -gt 0 ]] && echo PASS || echo WARN)"
@@ -196,13 +201,22 @@ check "webhook_url aponta pra $SLUG" "$([[ "$ACTUAL_URL" == "$EXPECTED_URL" ]] &
 check "subscription_signing_secret retorna do DB" "$([[ -n "$(echo "$DB_DUMP" | jq -r '.secret_via // ""')" && "$(echo "$DB_DUMP" | jq -r '.secret_via // ""')" != 'null' ]] && echo PASS || echo WARN)" "$(echo "$DB_DUMP" | jq -r '.secret_via // "nil"')..."
 
 # ============================================================
-# E. MCP tools list (daemon registra todas)
+# E. MCP tools efetivas do assistente
 # ============================================================
 [[ $JSON_MODE -eq 0 ]] && echo "--- E. MCP tools (no Captain) ---"
-EXPECTED_TOOLS=(generate_pix faq_lookup add_label send_suite_images react_to_message update_contact get_contact_history check_pix_payment reschedule_reservation)
-TOOLS_REGISTRY=$(docker exec "$CID" bundle exec rails runner "puts Captain::Mcp::ToolRegistry::TOOLS.map(&:name).join(',')" 2>&1 | grep -v 'WARN\|RubyLLM\|ip_lookup' | tail -1)
+ALLOWLIST_CONFIGURED=$(echo "$DB_DUMP" | jq -r '.mcp_tool_allowlist_configured')
+if [[ "$ALLOWLIST_CONFIGURED" == 'true' ]]; then
+  mapfile -t EXPECTED_TOOLS < <(echo "$DB_DUMP" | jq -r '.mcp_tool_allowlist[]')
+  CONFIGURED_COUNT=$(echo "$DB_DUMP" | jq '.mcp_tool_allowlist | length')
+  EFFECTIVE_COUNT=$(echo "$DB_DUMP" | jq '.mcp_effective_tools | length')
+  check "MCP allowlist sem ferramentas desconhecidas" "$([[ $CONFIGURED_COUNT -eq $EFFECTIVE_COUNT ]] && echo PASS || echo FAIL)" \
+    "configuradas=$CONFIGURED_COUNT efetivas=$EFFECTIVE_COUNT"
+else
+  EXPECTED_TOOLS=(generate_pix faq_lookup add_label send_suite_images react_to_message update_contact get_contact_history check_pix_payment reschedule_reservation)
+fi
+TOOLS_REGISTRY=$(echo "$DB_DUMP" | jq -r '.mcp_effective_tools | join(",")')
 for tool in "${EXPECTED_TOOLS[@]}"; do
-  check "MCP tool '$tool' registrado" "$([[ "$TOOLS_REGISTRY" == *"$tool"* ]] && echo PASS || echo FAIL)"
+  check "MCP tool '$tool' disponível" "$([[ ",$TOOLS_REGISTRY," == *",$tool,"* ]] && echo PASS || echo FAIL)"
 done
 
 # ============================================================

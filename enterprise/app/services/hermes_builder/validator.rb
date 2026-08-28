@@ -167,7 +167,7 @@ class HermesBuilder::Validator
 
   def check_mcp_tools
     registered = mcp_tool_names
-    EXPECTED_MCP_TOOLS.each do |t|
+    expected_mcp_tools.each do |t|
       add("MCP tool '#{t}' registrado", registered.include?(t) ? 'PASS' : 'FAIL', nil, category: 'mcp')
     end
 
@@ -186,9 +186,23 @@ class HermesBuilder::Validator
   end
 
   def mcp_tool_names
-    ::Captain::Mcp::ToolRegistry::TOOLS.map(&:name)
+    ::Captain::Mcp::ToolRegistry.allowed_tool_names(context: mcp_context)
   rescue StandardError
     []
+  end
+
+  def expected_mcp_tools
+    return EXPECTED_MCP_TOOLS unless @asst.config.key?('mcp_tool_allowlist')
+
+    Array(@asst.mcp_tool_allowlist).map(&:to_s)
+  end
+
+  def mcp_context
+    {
+      account_id: @asst.account_id,
+      assistant_id: @asst.id,
+      inbox_id: @inbox&.id
+    }.compact
   end
 
   def add(label, status, detail = nil, repair_id: nil, category: nil)
