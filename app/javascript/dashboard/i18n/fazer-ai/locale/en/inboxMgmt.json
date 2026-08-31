@@ -276,6 +276,10 @@
         "CONNECT": "Connect WhatsApp",
         "CONNECT_DESC": "Click to generate the connection QR Code.",
         "CONNECT_ERROR": "We could not generate the QR Code. Check the GOWA credentials.",
+        "WAITING": "Waiting for connection",
+        "WAITING_CONNECTION": "The QR Code is active. Complete the connection in WhatsApp.",
+        "QR_EXPIRED": "This QR Code has expired. Generate a new one to try again.",
+        "WEBHOOK_ERROR": "WhatsApp connected, but incoming message delivery could not be configured.",
         "SCAN_QR": "Scan the QR Code with the WhatsApp account you want to connect.",
         "QR_ALT": "WhatsApp connection QR Code"
       },

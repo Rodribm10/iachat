@@ -9,6 +9,7 @@ class Api::V1::Accounts::Inboxes::GowaController < Api::V1::Accounts::BaseContro
   end
 
   def qr
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     login_response = client.start_login(device_id)
     qr_link = login_response.dig('results', 'qr_link')
     return render json: login_response if qr_link.blank?
@@ -16,7 +17,8 @@ class Api::V1::Accounts::Inboxes::GowaController < Api::V1::Accounts::BaseContro
     qr_image = client.download_media(qr_link)
     render json: {
       qrcode: "data:#{qr_image[:content_type].presence || 'image/png'};base64,#{Base64.strict_encode64(qr_image[:body])}",
-      expires_in: login_response.dig('results', 'qr_duration')
+      expires_in: login_response.dig('results', 'qr_duration'),
+      generated_at: Time.current.iso8601
     }
   rescue Gowa::Client::Error => e
     render_provider_error(e)

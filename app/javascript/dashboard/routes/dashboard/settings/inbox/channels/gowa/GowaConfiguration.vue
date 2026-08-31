@@ -5,6 +5,10 @@ import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 
+const POLL_INTERVAL_MS = 5000;
+const DEFAULT_QR_TTL_SECONDS = 60;
+const MAX_QR_TTL_SECONDS = 180;
+
 export default defineComponent({
   components: { NextButton },
   props: {
@@ -17,7 +21,9 @@ export default defineComponent({
     const isConnected = ref(false);
     const qrCode = ref('');
     const statusMessage = ref('');
+    const webhookConfigured = ref(false);
     let pollInterval;
+    let qrExpiryTimer;
 
     const accountId = computed(
       () => store.getters.getCurrentAccountId || props.inbox.account_id
@@ -30,16 +36,55 @@ export default defineComponent({
       pollInterval = null;
     };
 
+    const stopQrExpiryTimer = () => {
+      if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+      qrExpiryTimer = null;
+    };
+
+    const expireQrCode = () => {
+      qrCode.value = '';
+      stopPolling();
+      stopQrExpiryTimer();
+      statusMessage.value = t('INBOX_MGMT.EDIT.GOWA.QR_EXPIRED');
+    };
+
+    const startQrExpiryTimer = expiresIn => {
+      stopQrExpiryTimer();
+      const parsedTtl = Number(expiresIn);
+      const ttl =
+        Number.isFinite(parsedTtl) && parsedTtl > 0
+          ? Math.min(parsedTtl, MAX_QR_TTL_SECONDS)
+          : DEFAULT_QR_TTL_SECONDS;
+      qrExpiryTimer = setTimeout(expireQrCode, ttl * 1000);
+    };
+
+    const ensureWebhook = async () => {
+      if (webhookConfigured.value) return;
+
+      try {
+        await window.axios.put(apiUrl('/update_webhook'));
+        webhookConfigured.value = true;
+      } catch (error) {
+        statusMessage.value =
+          error.response?.data?.error ||
+          t('INBOX_MGMT.EDIT.GOWA.WEBHOOK_ERROR');
+      }
+    };
+
     const fetchStatus = async () => {
       try {
         const { data } = await window.axios.get(apiUrl(''));
         const result = data.results || {};
         isConnected.value =
           result.is_connected === true && result.is_logged_in === true;
-        statusMessage.value = data.message || result.state || '';
+        if (!qrCode.value || isConnected.value) {
+          statusMessage.value = result.state || data.message || '';
+        }
         if (isConnected.value) {
           qrCode.value = '';
           stopPolling();
+          stopQrExpiryTimer();
+          await ensureWebhook();
         }
       } catch (error) {
         statusMessage.value = error.response?.data?.error || error.message;
@@ -47,19 +92,30 @@ export default defineComponent({
     };
 
     const fetchQrCode = async () => {
-      const { data } = await window.axios.get(apiUrl('/qr'));
-      qrCode.value = data.qrcode || '';
-      statusMessage.value = data.message || statusMessage.value;
+      const { data } = await window.axios.get(apiUrl('/qr'), {
+        params: { timestamp: Date.now() },
+      });
+      if (!data.qrcode) {
+        throw new Error(t('INBOX_MGMT.EDIT.GOWA.CONNECT_ERROR'));
+      }
+
+      qrCode.value = data.qrcode;
+      statusMessage.value = t('INBOX_MGMT.EDIT.GOWA.WAITING_CONNECTION');
+      startQrExpiryTimer(data.expires_in);
     };
 
     const startPolling = () => {
       if (pollInterval) return;
-      pollInterval = setInterval(fetchStatus, 5000);
+      pollInterval = setInterval(fetchStatus, POLL_INTERVAL_MS);
     };
 
     const connect = async () => {
+      if (qrCode.value) return;
+
       isLoading.value = true;
       try {
+        stopPolling();
+        stopQrExpiryTimer();
         await fetchQrCode();
         startPolling();
       } catch (error) {
@@ -77,6 +133,9 @@ export default defineComponent({
         await window.axios.post(apiUrl('/disconnect'));
         isConnected.value = false;
         qrCode.value = '';
+        webhookConfigured.value = false;
+        stopPolling();
+        stopQrExpiryTimer();
         useAlert(t('INBOX_MGMT.EDIT.GOWA.DISCONNECT_SUCCESS'));
       } catch (error) {
         useAlert(
@@ -89,7 +148,10 @@ export default defineComponent({
     };
 
     onMounted(fetchStatus);
-    onUnmounted(stopPolling);
+    onUnmounted(() => {
+      stopPolling();
+      stopQrExpiryTimer();
+    });
 
     return {
       connect,
@@ -145,7 +207,12 @@ export default defineComponent({
           <NextButton
             color="blue"
             :is-loading="isLoading"
-            :label="$t('INBOX_MGMT.EDIT.GOWA.CONNECT')"
+            :disabled="Boolean(qrCode)"
+            :label="
+              qrCode
+                ? $t('INBOX_MGMT.EDIT.GOWA.WAITING')
+                : $t('INBOX_MGMT.EDIT.GOWA.CONNECT')
+            "
             @click="connect"
           />
           <p v-if="statusMessage" class="mt-4 text-xs text-n-slate-10">
