@@ -192,7 +192,8 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
       '❌ Non-retryable error (HTTP 401): HTTP 401: token expired',
       '🔐 Authentication failed and could not be refreshed — switching to fallback provider...',
       "Traceback (most recent call last):\n  File \"gateway.py\"",
-      'NoMethodError: undefined method for nil'
+      'NoMethodError: undefined method for nil',
+      'Sorry, I encountered an unexpected error. Try again or use /reset to start a fresh session.'
     ]
 
     erros.each do |erro|
@@ -297,6 +298,58 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
           expect(response).to have_http_status(:ok)
         end
       end
+    end
+  end
+
+  # A IA repetir a resposta quando o CLIENTE repetiu a pergunta e determinismo
+  # correto, nao loop. Em 03/09/2026 a conv 126 da academia foi para triagem
+  # duas vezes seguidas porque o cliente mandou "Ola" duas vezes.
+  describe 'deteccao de loop' do
+    def responde_antes(texto)
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: texto,
+        content_attributes: { external_source: 'hermes_callback' }
+      )
+    end
+
+    def cliente_diz(texto)
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :incoming,
+        content: texto
+      )
+    end
+
+    it 'nao manda para triagem quando o cliente repetiu a propria mensagem' do
+      cliente_diz('Ola')
+      responde_antes('Oi, Rodrigo! Como posso te ajudar?')
+      cliente_diz('Ola')
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'Oi, Rodrigo! Como posso te ajudar?' }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).not_to include('triagem_loop_detectado')
+    end
+
+    it 'ainda manda para triagem quando a IA se repete e o cliente mudou de assunto' do
+      cliente_diz('Quero cancelar meu plano')
+      responde_antes('Boa noite! Como posso te ajudar?')
+      cliente_diz('Ninguem me responde sobre o cancelamento')
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'Boa noite! Como posso te ajudar?' }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).to include('triagem_loop_detectado')
     end
   end
 end

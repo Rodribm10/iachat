@@ -64,6 +64,13 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     # will be interrupted." no WhatsApp.
     /gateway\s+shutting\s+down/i,
     /current\s+task\s+will\s+be\s+interrupted/i,
+    # Erro genérico do runtime do Hermes. Não traz código HTTP nem nome de
+    # exceção, então não casava com nenhum padrão acima e ATRAVESSOU: entre
+    # 28/08 e 03/09/2026, 52 clientes da academia leram no WhatsApp "Sorry, I
+    # encountered an unexpected error. Try again or use /reset to start a
+    # fresh session." — em inglês, numa operação 100% pt-BR.
+    /encountered\s+an\s+unexpected\s+error/i,
+    %r{use\s+/reset\s+to\s+start}i,
     /\bTraceback\b/i,
     /\b(StandardError|NameError|TypeError|NoMethodError|Errno::)\b/
   ].freeze
@@ -237,9 +244,29 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
                        .pick(:content)
     return false if prev.blank?
 
+    # Resposta igual para uma pergunta igual é determinismo correto, não loop.
+    # Só é loop quando a IA se repete APESAR de o cliente ter dito outra coisa.
+    # Sem esta guarda, um cliente que manda "Ola" duas vezes recebe a mesma
+    # saudação — a única resposta certa — e cai em triagem humana na hora, o
+    # que BLOQUEIA a IA nas próximas mensagens (guard no OutgoingJob).
+    # Visto na conv 126 da academia em 03/09/2026.
+    return false if client_repeated_itself?(conversation)
+
     return true if similarity(content, prev) >= LOOP_SIMILARITY_THRESHOLD
 
     repeated_question?(content, prev)
+  end
+
+  # As duas últimas mensagens do cliente dizem a mesma coisa?
+  def client_repeated_itself?(conversation)
+    last_two = conversation.messages
+                           .where(message_type: :incoming)
+                           .reorder(created_at: :desc)
+                           .limit(2)
+                           .pluck(:content)
+    return false if last_two.size < 2 || last_two.any?(&:blank?)
+
+    similarity(last_two[0], last_two[1]) >= LOOP_SIMILARITY_THRESHOLD
   end
 
   def similarity(text_a, text_b)
