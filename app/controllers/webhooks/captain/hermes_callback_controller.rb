@@ -34,18 +34,24 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     /^\s*aguarde\s+um\s+instante/i
   ].freeze
 
-  # Loop detection: 2 sinais.
-  # 1. Jaccard de tokens >= 0.50 → resposta praticamente igual.
-  # 2. A mesma PERGUNTA reformulada — comparada pergunta contra pergunta, não
-  #    pelo corpo inteiro. Contar palavras em comum no texto todo dava falso
-  #    positivo em venda normal: "Dá pra fazer uma aula experimental. Quer que
-  #    eu veja um horário?" seguido de "Vem fazer a experimental. Consigo te
-  #    encaixar terça ou quinta?" compartilha o assunto, mas a segunda AVANÇA.
-  #    Visto na conv 18 da academia em 23/08/2026 — o cliente disse "to em
-  #    dúvida", a IA convidou com dia marcado e a conversa foi para triagem
-  #    humana como se ela tivesse travado.
-  LOOP_SIMILARITY_THRESHOLD = 0.50
-  LOOP_QUESTION_SIMILARITY = 0.55
+  # Loop detection.
+  #
+  # A triagem existe para quando a IA NÃO SABE responder — e disso ela já
+  # avisa sozinha, pela frase-âncora de handoff ou chamando a tool `handoff`.
+  # Comparar o TEXTO de duas respostas para adivinhar que ela travou não mede
+  # isso: num atendimento, parecido é o normal. Saudação responde saudação,
+  # pergunta de preço responde preço. Com o limiar em duas respostas parecidas,
+  # 633 conversas foram para triagem — e a triagem BLOQUEIA a IA nas mensagens
+  # seguintes (guard no OutgoingJob), então cada falso positivo mata uma
+  # conversa. Caso real: conv 126 da academia em 03/09/2026, o cliente mandou
+  # "Ola" e depois "Boa noite Duda", a IA cumprimentou de volta as duas vezes
+  # e foi barrada nas duas.
+  #
+  # Loop de verdade é a IA REPETINDO A MESMA resposta e sem sair do lugar. Por
+  # isso agora exigimos LOOP_REPEAT_THRESHOLD respostas seguidas praticamente
+  # idênticas — não duas vagamente parecidas.
+  LOOP_SIMILARITY_THRESHOLD = 0.85
+  LOOP_REPEAT_THRESHOLD = 3
 
   # Quando o Hermes falha (token expirado, provider fora do ar), ele às vezes
   # devolve o PRÓPRIO erro técnico no lugar da resposta. Sem esta trava isso vai
@@ -230,43 +236,21 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     HANDOFF_PATTERNS.any? { |re| content.match?(re) }
   end
 
-  # Detecta loop: a resposta atual do Hermes é muito parecida com a anterior
-  # outgoing dele na mesma conv (Jaccard de tokens >= 0.50). Sinaliza que o
-  # agente está repetindo pergunta/resposta sem progredir — geralmente
-  # cliente fora do escopo (operadora telefonia, banco, suporte de outro
-  # app, etc) OU fluxo travado.
+  # A IA repetiu a MESMA resposta nas últimas LOOP_REPEAT_THRESHOLD vezes?
+  # Só isso conta como travada. Duas respostas parecidas são conversa normal.
   def looped_response?(conversation, content)
-    prev = conversation.messages
-                       .where(message_type: :outgoing)
-                       .where("#{Message.content_attribute_sql('external_source')} = ?", 'hermes_callback')
-                       .reorder(created_at: :desc)
-                       .limit(1)
-                       .pick(:content)
-    return false if prev.blank?
+    anteriores = conversation.messages
+                             .where(message_type: :outgoing)
+                             .where("#{Message.content_attribute_sql('external_source')} = ?", 'hermes_callback')
+                             .reorder(created_at: :desc)
+                             .limit(LOOP_REPEAT_THRESHOLD - 1)
+                             .pluck(:content)
+    return false if anteriores.size < LOOP_REPEAT_THRESHOLD - 1
+    return false if anteriores.any?(&:blank?) || content.blank?
 
-    # Resposta igual para uma pergunta igual é determinismo correto, não loop.
-    # Só é loop quando a IA se repete APESAR de o cliente ter dito outra coisa.
-    # Sem esta guarda, um cliente que manda "Ola" duas vezes recebe a mesma
-    # saudação — a única resposta certa — e cai em triagem humana na hora, o
-    # que BLOQUEIA a IA nas próximas mensagens (guard no OutgoingJob).
-    # Visto na conv 126 da academia em 03/09/2026.
-    return false if client_repeated_itself?(conversation)
-
-    return true if similarity(content, prev) >= LOOP_SIMILARITY_THRESHOLD
-
-    repeated_question?(content, prev)
-  end
-
-  # As duas últimas mensagens do cliente dizem a mesma coisa?
-  def client_repeated_itself?(conversation)
-    last_two = conversation.messages
-                           .where(message_type: :incoming)
-                           .reorder(created_at: :desc)
-                           .limit(2)
-                           .pluck(:content)
-    return false if last_two.size < 2 || last_two.any?(&:blank?)
-
-    similarity(last_two[0], last_two[1]) >= LOOP_SIMILARITY_THRESHOLD
+    ([content] + anteriores).each_cons(2).all? do |atual, anterior|
+      similarity(atual, anterior) >= LOOP_SIMILARITY_THRESHOLD
+    end
   end
 
   def similarity(text_a, text_b)
@@ -277,27 +261,6 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     intersection = (set_a & set_b).size
     union = (set_a | set_b).size
     intersection.to_f / union
-  end
-
-  # Mesma pergunta reformulada. Compara a pergunta de uma com a pergunta da
-  # outra: repetir o assunto é normal numa conversa de venda, repetir o PEDIDO
-  # é que indica que o agente travou.
-  def repeated_question?(text_a, text_b)
-    question_a = last_inquisitive_sentence(text_a)
-    question_b = last_inquisitive_sentence(text_b)
-    return false if question_a.blank? || question_b.blank?
-
-    similarity(question_a, question_b) >= LOOP_QUESTION_SIMILARITY
-  end
-
-  def last_inquisitive_sentence(text)
-    text.to_s.split(/(?<=[.?!])\s+|\n+/).reverse.find { |sentence| inquisitive?(sentence) }
-  end
-
-  INQUISITIVE_REGEX = /(\?|\bme\s+confirm|\bvoce\s+(prefere|quer)|\bqual\s+(prefere|deseja|seria)|\bquer\s+(que|saber|ver|um|uma))/i
-
-  def inquisitive?(text)
-    INQUISITIVE_REGEX.match?(ActiveSupport::Inflector.transliterate(text.to_s))
   end
 
   def tokenize(text)

@@ -301,9 +301,10 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
     end
   end
 
-  # A IA repetir a resposta quando o CLIENTE repetiu a pergunta e determinismo
-  # correto, nao loop. Em 03/09/2026 a conv 126 da academia foi para triagem
-  # duas vezes seguidas porque o cliente mandou "Ola" duas vezes.
+  # A triagem existe para quando a IA nao sabe responder. Duas respostas
+  # parecidas nao provam isso: saudacao responde saudacao. Em 03/09/2026 a
+  # conv 126 da academia caiu na triagem duas vezes so por cumprimentar de
+  # volta — e a triagem BLOQUEIA a IA nas mensagens seguintes.
   describe 'deteccao de loop' do
     def responde_antes(texto)
       create(
@@ -317,39 +318,46 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
       )
     end
 
-    def cliente_diz(texto)
-      create(
-        :message,
-        conversation: conversation,
-        account: account,
-        inbox: inbox,
-        message_type: :incoming,
-        content: texto
-      )
-    end
-
-    it 'nao manda para triagem quando o cliente repetiu a propria mensagem' do
-      cliente_diz('Ola')
-      responde_antes('Oi, Rodrigo! Como posso te ajudar?')
-      cliente_diz('Ola')
+    it 'nao manda para triagem quando a IA apenas cumprimenta de volta (caso conv 126)' do
+      responde_antes('Boa noite, Rodrigo! 😊 Como posso te ajudar?')
 
       post '/webhooks/captain/hermes_callback',
-           params: { inbox_id: inbox.id, content: 'Oi, Rodrigo! Como posso te ajudar?' }
+           params: { inbox_id: inbox.id, content: 'Boa noite, Rodrigo! 😊 Aqui é a Duda da Academia Dom Bosco. Como posso te ajudar?' }
 
       expect(response).to have_http_status(:ok)
       expect(conversation.reload.label_list).not_to include('triagem_loop_detectado')
     end
 
-    it 'ainda manda para triagem quando a IA se repete e o cliente mudou de assunto' do
-      cliente_diz('Quero cancelar meu plano')
-      responde_antes('Boa noite! Como posso te ajudar?')
-      cliente_diz('Ninguem me responde sobre o cancelamento')
+    it 'nao manda para triagem com apenas duas respostas identicas' do
+      responde_antes('Claro! Voce quer saber de valores, horarios ou das aulas?')
 
       post '/webhooks/captain/hermes_callback',
-           params: { inbox_id: inbox.id, content: 'Boa noite! Como posso te ajudar?' }
+           params: { inbox_id: inbox.id, content: 'Claro! Voce quer saber de valores, horarios ou das aulas?' }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).not_to include('triagem_loop_detectado')
+    end
+
+    it 'manda para triagem quando a IA repete a mesma resposta pela terceira vez' do
+      responde_antes('Claro! Voce quer saber de valores, horarios ou das aulas?')
+      responde_antes('Claro! Voce quer saber de valores, horarios ou das aulas?')
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'Claro! Voce quer saber de valores, horarios ou das aulas?' }
 
       expect(response).to have_http_status(:ok)
       expect(conversation.reload.label_list).to include('triagem_loop_detectado')
+    end
+
+    it 'nao manda para triagem quando a terceira resposta avanca o atendimento' do
+      responde_antes('Claro! Voce quer saber de valores, horarios ou das aulas?')
+      responde_antes('Claro! Voce quer saber de valores, horarios ou das aulas?')
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'O plano anual sai por 12x de R$ 149,90 e inclui musculacao.' }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).not_to include('triagem_loop_detectado')
     end
   end
 end
