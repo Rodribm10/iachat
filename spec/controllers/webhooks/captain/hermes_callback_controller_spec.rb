@@ -156,6 +156,26 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
       expect(response).to have_http_status(:ok)
       expect(conversation.reload.label_list).to include('triagem_humana')
     end
+
+    it 'nao trata pedido de fotos como repeticao da tabela de valores' do
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: 'Stilo, Alexa e Hidromassagem têm valores diferentes. Quer que eu já reserve?',
+        content_attributes: { external_source: 'hermes_callback' }
+      )
+
+      resposta = 'Tem sim. Quer ver fotos da Stilo, Alexa ou Hidromassagem?'
+      expect(Captain::Hermes::DelayedReplyJob).to receive(:perform_later).with(conversation.id, resposta)
+
+      post '/webhooks/captain/hermes_callback', params: { inbox_id: inbox.id, content: resposta }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).not_to include('triagem_humana')
+    end
   end
 
   describe 'quando o Hermes devolve status interno de concorrencia' do
