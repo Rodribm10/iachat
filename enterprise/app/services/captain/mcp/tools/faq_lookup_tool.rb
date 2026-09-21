@@ -18,6 +18,7 @@ class Captain::Mcp::Tools::FaqLookupTool < Captain::Mcp::Tools::BaseTool
       'Busca semântica em FAQs/documentação aprovada pelas gerentes do hotel. ' \
         'Use quando o cliente perguntar algo que NÃO está na sua skill ' \
         '(ex: política de pets, horários especiais, convênios, regras pontuais). ' \
+        'Não use para cotação: perguntas de preço usam a tabela oficial. ' \
         'Retorna até 5 perguntas/respostas mais próximas semanticamente da query. ' \
         'Se não encontrar nada relevante, prefira transferir pro humano em vez ' \
         'de inventar.'
@@ -46,6 +47,8 @@ class Captain::Mcp::Tools::FaqLookupTool < Captain::Mcp::Tools::BaseTool
     account = resolve_account(context)
     return error_response('Account não encontrada no contexto MCP.') if account.blank?
 
+    return Captain::Mcp::Tools::GetAssistantPricingTool.new.call({}, context: context) if pricing_question?(query)
+
     assistant = resolve_assistant(context, account)
     result = ::Captain::Tools::SearchReplyDocumentationService.new(
       account: account,
@@ -59,6 +62,12 @@ class Captain::Mcp::Tools::FaqLookupTool < Captain::Mcp::Tools::BaseTool
   end
 
   private
+
+  def pricing_question?(query)
+    return false if query.match?(/promo[cç][aã]o|desconto|cupom|cortesia|feriado|v[eé]spera/i)
+
+    query.match?(/\b(pre[cç]os?|valores?|tabela|quanto\s+(custa|[ée]|fica)|valor)\b/i)
+  end
 
   def resolve_account(context)
     account_id = context[:account_id]
