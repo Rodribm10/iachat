@@ -1,7 +1,7 @@
 # Tool MCP: retorna tabela de preços de um assistente existente.
 #
-# Caso de uso: Construtor copia tabela durante criação de novo agente
-# (mesma marca → mesma tabela).
+# Caso de uso: cotação no atendimento e cópia de tabela durante criação de
+# novo agente. No atendimento, a unidade é resolvida pelo contexto MCP.
 #
 # Estratégia de leitura (em ordem de tentativa):
 #  1. Se assistant tem unit vinculada e Captain::Mcp::PricingTables
@@ -16,10 +16,11 @@ class Captain::Mcp::Tools::GetAssistantPricingTool < Captain::Mcp::Tools::BaseTo
     end
 
     def description
-      'Retorna a tabela de preços de um assistente existente em markdown. ' \
-        'Use quando o usuário (na criação de novo agente) decidir copiar ' \
-        'a tabela de outro assistente. Retorna estrutura categórias × períodos ' \
-        'com regras de pessoa extra.'
+      'Fonte oficial de preços da unidade. Use sempre que o cliente perguntar ' \
+        'valor, preço, tabela, pernoite, diária ou permanência; não use FAQ ' \
+        'para cotação. Retorna categorias, períodos, dias da semana e regra ' \
+        'de pessoa extra. No atendimento, omita assistant_id para usar a ' \
+        'unidade do contexto MCP.'
     end
 
     def input_schema
@@ -28,17 +29,17 @@ class Captain::Mcp::Tools::GetAssistantPricingTool < Captain::Mcp::Tools::BaseTo
         properties: {
           assistant_id: {
             type: 'integer',
-            description: 'ID do assistente fonte. Pegue via list_assistants.'
+            description: 'Opcional. ID do assistente fonte; omita no atendimento ' \
+                         'para usar o assistente da conversa atual.'
           }
-        },
-        required: ['assistant_id']
+        }
       }
     end
   end
 
-  def call(args, context:) # rubocop:disable Lint/UnusedMethodArgument
-    assistant = Captain::Assistant.find_by(id: args['assistant_id'])
-    return error_response("Assistente #{args['assistant_id']} não encontrado.") if assistant.blank?
+  def call(args, context:)
+    assistant = resolve_assistant(args, context)
+    return error_response('Assistente não encontrado no contexto MCP.') if assistant.blank?
 
     text_response(extract_pricing_markdown(assistant))
   rescue StandardError => e
@@ -47,6 +48,14 @@ class Captain::Mcp::Tools::GetAssistantPricingTool < Captain::Mcp::Tools::BaseTo
   end
 
   private
+
+  def resolve_assistant(args, context)
+    context = context.with_indifferent_access
+    assistant_id = args['assistant_id'].presence || context[:assistant_id]
+    return Captain::Assistant.find_by(id: assistant_id) if assistant_id.present?
+
+    CaptainInbox.find_by(inbox_id: context[:inbox_id])&.captain_assistant
+  end
 
   def extract_pricing_markdown(assistant)
     structured = structured_pricing_for(assistant)
