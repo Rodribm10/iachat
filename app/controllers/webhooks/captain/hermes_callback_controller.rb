@@ -33,6 +33,16 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   #    repetiu pergunta sobre o mesmo tópico.
   LOOP_SIMILARITY_THRESHOLD = 0.50
   LOOP_TOPIC_KEYWORD_OVERLAP = 3
+  # Uma confirmação curta não escolhe uma das opções que a atendente acabou de
+  # oferecer. Nesse caso, uma única pergunta de esclarecimento é legítima;
+  # transferir já na primeira tentativa faz a conversa morrer antes de o
+  # cliente conseguir responder "valores", "localização" ou "reserva".
+  # A segunda repetição semelhante continua sendo loop real e vai para humano.
+  AMBIGUOUS_ACKNOWLEDGEMENT_REGEX = /
+    \A\s*
+    (?:isso(?:\s+mesmo)?|sim|s|ok(?:ay)?|claro|pode(?:\s+ser)?|quero|por\s+favor|pfv|ta)
+    \s*[!?.…]*\z
+  /ix
   LOOP_STOPWORDS = %w[
     voce voces para por pra como mas isso esse essa estou esta este aqui ali
     eles elas tem ter tinha tendo era ser sou foi fui agora ainda ja muito mais
@@ -87,7 +97,8 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     log_reply(conversation, content)
     return if handle_blocked_content(conversation, content)
 
-    detect_handoff_or_loop(conversation, content)
+    return head :ok if detect_handoff_or_loop(conversation, content)
+
     deliver_outgoing(conversation, content)
     head :ok
   rescue StandardError => e
@@ -191,13 +202,17 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
 
   # Hermes mandou frase-âncora de handoff: entrega ao cliente normalmente,
   # mas marca conv pra triagem humana — próximas msgs não disparam Hermes
-  # de novo (guard em OutgoingJob). OU: detectou loop (mesma resposta /
-  # pergunta reformulada) e escala.
+  # de novo (guard em OutgoingJob). Loop real também escala, mas a resposta
+  # repetida não é entregue ao cliente.
   def detect_handoff_or_loop(conversation, content)
     if handoff_response?(content)
       mark_for_human_triage(conversation, reason: 'sem_resposta_segura')
+      false
     elsif looped_response?(conversation, content)
       mark_for_human_triage(conversation, reason: 'loop_detectado')
+      true
+    else
+      false
     end
   end
 
@@ -221,17 +236,47 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   # cliente fora do escopo (operadora telefonia, banco, suporte de outro
   # app, etc) OU fluxo travado.
   def looped_response?(conversation, content)
-    prev = conversation.messages
-                       .where(message_type: :outgoing)
-                       .where("#{Message.content_attribute_sql('external_source')} = ?", 'hermes_callback')
-                       .reorder(created_at: :desc)
-                       .limit(1)
-                       .pick(:content)
+    previous_responses = recent_hermes_responses(conversation)
+    prev = previous_responses.first
     return false if prev.blank?
 
-    return true if similarity(content, prev) >= LOOP_SIMILARITY_THRESHOLD
+    return false if one_clarification_after_ambiguous_acknowledgement?(conversation, content, previous_responses)
 
-    repeated_question?(content, prev)
+    loop_like_response?(content, prev)
+  end
+
+  def recent_hermes_responses(conversation)
+    conversation.messages
+                .where(message_type: :outgoing)
+                .where("#{Message.content_attribute_sql('external_source')} = ?", 'hermes_callback')
+                .reorder(created_at: :desc)
+                .limit(3)
+                .pluck(:content)
+  end
+
+  # "Isso" ou "sim" depois de uma lista não contém a escolha necessária. A
+  # primeira reformulação da pergunta deve chegar ao cliente; se ela repetir a
+  # mesma pergunta depois de outra confirmação vaga, o contador abaixo deixa a
+  # proteção normal de loop assumir a conversa.
+  def one_clarification_after_ambiguous_acknowledgement?(conversation, content, previous_responses)
+    return false unless ambiguous_acknowledgement?(conversation)
+
+    previous_responses.count { |response| loop_like_response?(content, response) } == 1
+  end
+
+  def loop_like_response?(content, previous_response)
+    return true if similarity(content, previous_response) >= LOOP_SIMILARITY_THRESHOLD
+
+    repeated_question?(content, previous_response)
+  end
+
+  def ambiguous_acknowledgement?(conversation)
+    last_customer_message = conversation.messages
+                                        .where(message_type: :incoming)
+                                        .reorder(created_at: :desc)
+                                        .pick(:content)
+    normalized = ActiveSupport::Inflector.transliterate(last_customer_message.to_s.downcase)
+    AMBIGUOUS_ACKNOWLEDGEMENT_REGEX.match?(normalized)
   end
 
   def similarity(text_a, text_b)

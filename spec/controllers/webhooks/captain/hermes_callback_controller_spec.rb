@@ -56,6 +56,106 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
              params: { inbox_id: inbox.id, content: 'um momento - vou verificar ....' }
       end.not_to(change { conversation.messages.where(private: true).count })
     end
+
+    it 'permite um esclarecimento depois de uma confirmacao vaga' do
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: 'Claro. Você quer informações sobre valores, localização, suítes/fotos ou reserva?',
+        content_attributes: { external_source: 'hermes_callback' },
+        created_at: 2.minutes.ago
+      )
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :incoming,
+        content: 'Isso',
+        created_at: 1.minute.from_now
+      )
+
+      resposta = 'Qual informação você deseja: valores, localização, suítes/fotos ou reserva?'
+      expect(Captain::Hermes::DelayedReplyJob).to receive(:perform_later).with(conversation.id, resposta)
+
+      post '/webhooks/captain/hermes_callback', params: { inbox_id: inbox.id, content: resposta }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).not_to include('triagem_humana')
+    end
+
+    it 'escala e nao entrega a segunda repeticao depois de duas confirmacoes vagas' do
+      primeira_pergunta = 'Claro. Você quer informações sobre valores, localização, suítes/fotos ou reserva?'
+      primeira_repeticao = 'Qual informação você deseja: valores, localização, suítes/fotos ou reserva?'
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: primeira_pergunta,
+        content_attributes: { external_source: 'hermes_callback' },
+        created_at: 4.minutes.ago
+      )
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :incoming,
+        content: 'Isso',
+        created_at: 3.minutes.ago
+      )
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: primeira_repeticao,
+        content_attributes: { external_source: 'hermes_callback' },
+        created_at: 2.minutes.ago
+      )
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :incoming,
+        content: 'Isso',
+        created_at: 1.minute.from_now
+      )
+
+      expect(Captain::Hermes::DelayedReplyJob).not_to receive(:perform_later)
+
+      post '/webhooks/captain/hermes_callback', params: { inbox_id: inbox.id, content: primeira_repeticao }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).to include('triagem_humana')
+    end
+
+    it 'escala e nao entrega uma repeticao real' do
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: 'Qual o melhor horário para a sua reserva?',
+        content_attributes: { external_source: 'hermes_callback' }
+      )
+
+      expect(Captain::Hermes::DelayedReplyJob).not_to receive(:perform_later)
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: 'Qual o melhor horário para sua reserva?' }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).to include('triagem_humana')
+    end
   end
 
   describe 'quando o Hermes devolve status interno de concorrencia' do
