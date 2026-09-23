@@ -91,6 +91,16 @@ RSpec.describe Captain::Hermes::KnownFactReplyService do
     end
   end
 
+  it 'pede a unidade ao consultar promocao de quinta no atendimento do site' do
+    vincular_assistente(profile: 'site_atendente')
+
+    result = described_class.new(conversation: conversation, content: 'Tem alguma promoção para noite de quinta feira?').call
+
+    expect(result).to be_exclusive
+    expect(result.content).to include('Qual unidade')
+    expect(result.content).to include('QNN01', 'Setor O', 'Samambaia', 'Recanto das Emas')
+  end
+
   describe 'precos estruturados' do
     let(:brand) { create(:captain_brand, account: account) }
     let(:unit) { create(:captain_unit, account: account, brand: brand, name: 'QNN01') }

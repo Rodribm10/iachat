@@ -46,4 +46,11 @@ RSpec.describe Captain::Hermes::OutgoingJob, type: :job do
 
     described_class.perform_now(conversation.id, message.id)
   end
+
+  it 'ignora mensagem sem texto e sem anexo' do
+    message.update!(content: '  ')
+    expect(Captain::Hermes::Client).not_to receive(:new)
+
+    described_class.perform_now(conversation.id, message.id)
+  end
 end

@@ -44,7 +44,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   # A segunda repetição semelhante continua sendo loop real e vai para humano.
   AMBIGUOUS_ACKNOWLEDGEMENT_REGEX = /
     \A\s*
-    (?:isso(?:\s+mesmo)?|sim|s|ok(?:ay)?|claro|pode(?:\s+ser)?|quero|por\s+favor|pfv|ta)
+    (?:isso(?:\s+mesmo)?|sim|s|ok(?:ay)?|claro|pode(?:\s+ser)?|quero|por\s+favor|pfv|ta|opa|oi|ola|eai|e\s+ai)
     \s*[!?.…]*\z
   /ix
   # Quando o Hermes falha (token expirado, provider fora do ar), ele às vezes
@@ -295,7 +295,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
                 .pluck(:content)
                 .count do |content|
       normalized = ActiveSupport::Inflector.transliterate(content.to_s.downcase)
-      AMBIGUOUS_ACKNOWLEDGEMENT_REGEX.match?(normalized)
+      ambiguous_short_reply?(normalized)
     end
   end
 
@@ -311,7 +311,12 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
                                         .reorder(created_at: :desc)
                                         .pick(:content)
     normalized = ActiveSupport::Inflector.transliterate(last_customer_message.to_s.downcase)
-    AMBIGUOUS_ACKNOWLEDGEMENT_REGEX.match?(normalized)
+    ambiguous_short_reply?(normalized)
+  end
+
+  def ambiguous_short_reply?(normalized)
+    AMBIGUOUS_ACKNOWLEDGEMENT_REGEX.match?(normalized) ||
+      normalized.match?(/\A\s*(?:\?+|\p{Emoji_Presentation}+|\p{Extended_Pictographic}+)\s*\z/)
   end
 
   def similarity(text_a, text_b)

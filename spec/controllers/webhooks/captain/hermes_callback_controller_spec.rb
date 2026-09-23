@@ -108,6 +108,34 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
       expect(conversation.reload.label_list).not_to include('triagem_humana')
     end
 
+    it 'entrega a resposta apos uma saudacao curta sem marcar loop' do
+      create(:message, conversation: conversation, account: account, inbox: inbox,
+                       message_type: :outgoing, content: 'Oi! Como posso te ajudar?',
+                       content_attributes: { external_source: 'hermes_callback' })
+      create(:message, conversation: conversation, account: account, inbox: inbox,
+                       message_type: :incoming, content: 'Opa')
+
+      expect(Captain::Hermes::DelayedReplyJob).to receive(:perform_later).with(conversation.id, 'Oi! Como posso te ajudar?')
+      post '/webhooks/captain/hermes_callback', params: { inbox_id: inbox.id, content: 'Oi! Como posso te ajudar?' }
+
+      expect(conversation.reload.label_list).not_to include('triagem_humana')
+    end
+
+    ['😅😅', '???'].each do |entrada_curta|
+      it "permite um esclarecimento depois de #{entrada_curta}" do
+        create(:message, conversation: conversation, account: account, inbox: inbox,
+                         message_type: :outgoing, content: 'Qual unidade você procura?',
+                         content_attributes: { external_source: 'hermes_callback' })
+        create(:message, conversation: conversation, account: account, inbox: inbox,
+                         message_type: :incoming, content: entrada_curta)
+
+        expect(Captain::Hermes::DelayedReplyJob).to receive(:perform_later).with(conversation.id, 'Qual unidade você procura?')
+        post '/webhooks/captain/hermes_callback', params: { inbox_id: inbox.id, content: 'Qual unidade você procura?' }
+
+        expect(conversation.reload.label_list).not_to include('triagem_humana')
+      end
+    end
+
     it 'escala e nao entrega a segunda repeticao depois de duas confirmacoes vagas' do
       primeira_pergunta = 'Claro. Você quer informações sobre valores, localização, suítes/fotos ou reserva?'
       primeira_repeticao = 'Qual informação você deseja: valores, localização, suítes/fotos ou reserva?'
