@@ -1,10 +1,11 @@
 namespace :captain do
-  desc 'Sincroniza prompts (Captain::Assistant#orchestrator_prompt e Captain::Scenario#instruction) com arquivos em db/seed_prompts/_modelos/'
+  desc 'Sincroniza prompts e tabelas estruturadas versionadas do Captain'
   task sync_prompts: :environment do
     next if ENV['SKIP_CAPTAIN_PROMPT_SYNC'] == 'true'
     next unless defined?(Captain::Assistant) && defined?(Captain::Scenario)
 
     CaptainPromptSync.new.call
+    Captain::PricingConfigSync.new.call
   end
 end
 
@@ -72,7 +73,10 @@ class CaptainPromptSync
 
       scenario.update_columns(instruction: content, updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
       assistant_name = scenario.assistant&.name
-      Rails.logger.info "[captain:sync_prompts] Synced scenario (all units) → #{assistant_name} / #{scenario_title} (id=#{scenario.id}, #{content.size} chars)"
+      Rails.logger.info(
+        "[captain:sync_prompts] Synced scenario (all units) → #{assistant_name} / " \
+        "#{scenario_title} (id=#{scenario.id}, #{content.size} chars)"
+      )
     end
   end
 
@@ -89,7 +93,10 @@ class CaptainPromptSync
       next if scenario.instruction == content
 
       scenario.update_columns(instruction: content, updated_at: Time.current) # rubocop:disable Rails/SkipsModelValidations
-      Rails.logger.info "[captain:sync_prompts] Synced scenario (unit-scoped) → #{assistant_name} / #{scenario_title} (id=#{scenario.id}, #{content.size} chars)"
+      Rails.logger.info(
+        "[captain:sync_prompts] Synced scenario (unit-scoped) → #{assistant_name} / " \
+        "#{scenario_title} (id=#{scenario.id}, #{content.size} chars)"
+      )
     end
   end
 end

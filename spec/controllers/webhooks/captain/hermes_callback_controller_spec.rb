@@ -34,6 +34,27 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
   end
 
   describe 'POST /webhooks/captain/hermes_callback' do
+    it 'substitui handoff indevido pela localizacao oficial quando a resposta existe' do
+      assistant.update!(
+        engine: 'hermes',
+        hermes_profile_name: 'juliana_qnn1',
+        hermes_webhook_base_url: 'http://hermes.test'
+      )
+      conversation.messages.incoming.last.update!(content: 'Pode me mandar a localização por favor?')
+
+      expect(Captain::Hermes::DelayedReplyJob).to receive(:perform_later).with(
+        conversation.id,
+        a_string_including('https://maps.app.goo.gl/bogrUpmGoiDhUgeR8'),
+        'hermes_known_fact_location'
+      )
+
+      post '/webhooks/captain/hermes_callback',
+           params: { inbox_id: inbox.id, content: '⏳ Um momento — vou verificar.' }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).not_to include('triagem_humana')
+    end
+
     it 'marca triagem humana com nota interna de motivo real quando Hermes pede verificacao humana' do
       post '/webhooks/captain/hermes_callback',
            params: { inbox_id: inbox.id, content: 'um momento - vou verificar ....' }
