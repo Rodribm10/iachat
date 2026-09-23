@@ -1,4 +1,16 @@
 class Whatsapp::Providers::Wuzapi::PayloadParser
+  # Chaves que carregam conteúdo de verdade enviado por uma pessoa.
+  CONTENT_KEYS = %i[
+    conversation
+    extendedTextMessage
+    imageMessage
+    audioMessage
+    videoMessage
+    documentMessage
+    documentWithCaptionMessage
+    stickerMessage
+  ].freeze
+
   attr_reader :params
 
   def initialize(params)
@@ -48,6 +60,7 @@ class Whatsapp::Providers::Wuzapi::PayloadParser
   def message_type
     return :chat_presence if webhook_event_type == 'ChatPresence'
     return :ignore if ignorable_webhook_event_type?
+    return :ignore if protocol_only?
 
     # Info: Type contains the general classification (text, image, etc)
     type = raw_info_type.to_s.downcase
@@ -71,6 +84,19 @@ class Whatsapp::Providers::Wuzapi::PayloadParser
 
   def presence_state
     params.dig(:event, :State)
+  end
+
+  # O WuzAPI rotula eventos de protocolo do WhatsApp (protocolMessage,
+  # messageContextInfo, reactionMessage, chaves de sessão) como Info.Type = "text".
+  # Sem esse filtro eles viram mensagem do contato com content nil, e a IA
+  # responde no vazio ("sua mensagem chegou em branco").
+  def protocol_only?
+    return false if params.dig(:event, :Text).present?
+
+    msg = unwrap_ephemeral_message(params.dig(:event, :Message))
+    return false unless msg.is_a?(Hash)
+
+    CONTENT_KEYS.none? { |key| msg[key].present? }
   end
 
   include Whatsapp::Wuzapi::PayloadParserExtension
