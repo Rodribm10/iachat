@@ -340,7 +340,7 @@ cat > "$PROFILES_DIR/$SLUG/webhook_subscriptions.json" <<JSON
     "events": [],
     "secret": "$SECRET",
     "prompt": "[ctx: cid={conversation_internal_id} aid={account_id} contact={contact_id} name=\"{contact_first_name}\" full_name=\"{contact_name}\" cpf_ok={contact_cpf_present} email_ok={contact_email_present} reservas={contact_total_reservas}]\nCliente acabou de dizer no WhatsApp: \"{message}\"\n\nResponda como $NAME, brevemente, em português brasileiro. Use a skill $SKILL_NAME pra preços, regras e fluxo. Nunca se apresente. Nunca diga que é IA.",
-    "skills": [],
+    "skills": ["$SKILL_NAME"],
     "deliver": "http_callback",
     "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
     "deliver_extra": {

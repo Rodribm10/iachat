@@ -176,6 +176,46 @@ RSpec.describe 'Webhooks::Captain::HermesCallbackController', type: :request do
       expect(response).to have_http_status(:ok)
       expect(conversation.reload.label_list).not_to include('triagem_humana')
     end
+
+    it 'nao trata confirmacao de categoria e valor como loop por vocabulario compartilhado' do
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: 'A pernoite na Hidromassagem custa R$ 250, com entrada a partir das 19h. Qual horário pretende entrar?',
+        content_attributes: { external_source: 'hermes_callback' }
+      )
+
+      resposta = 'Sim, esse valor de R$ 250 é da suíte Hidromassagem, para a pernoite com entrada a partir das 19h.'
+      expect(Captain::Hermes::DelayedReplyJob).to receive(:perform_later).with(conversation.id, resposta)
+
+      post '/webhooks/captain/hermes_callback', params: { inbox_id: inbox.id, content: resposta }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).not_to include('triagem_humana')
+    end
+
+    it 'continua escalando uma resposta declarativa praticamente identica' do
+      resposta = 'A pernoite na Hidromassagem custa R$ 250 e começa às 19h.'
+      create(
+        :message,
+        conversation: conversation,
+        account: account,
+        inbox: inbox,
+        message_type: :outgoing,
+        content: resposta,
+        content_attributes: { external_source: 'hermes_callback' }
+      )
+
+      expect(Captain::Hermes::DelayedReplyJob).not_to receive(:perform_later)
+
+      post '/webhooks/captain/hermes_callback', params: { inbox_id: inbox.id, content: resposta }
+
+      expect(response).to have_http_status(:ok)
+      expect(conversation.reload.label_list).to include('triagem_humana')
+    end
   end
 
   describe 'quando o Hermes devolve status interno de concorrencia' do
