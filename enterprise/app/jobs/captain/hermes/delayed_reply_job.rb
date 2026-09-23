@@ -23,7 +23,7 @@ class Captain::Hermes::DelayedReplyJob < ApplicationJob
     'max_seconds' => 8.0
   }.freeze
 
-  def perform(conversation_id, content)
+  def perform(conversation_id, content, external_source = 'hermes_callback')
     conversation = Conversation.find_by(id: conversation_id)
     if conversation.blank?
       Rails.logger.warn("[Captain::Hermes::DelayedReplyJob] conv #{conversation_id} not found")
@@ -37,7 +37,7 @@ class Captain::Hermes::DelayedReplyJob < ApplicationJob
       sleep(delay)
     end
 
-    create_outgoing_message(conversation, content)
+    create_outgoing_message(conversation, content, external_source)
 
     # NÃO mandamos typing_off explícito — WhatsApp cancela o indicador
     # automaticamente quando a msg chega no celular. Mandar paused agora
@@ -69,7 +69,7 @@ class Captain::Hermes::DelayedReplyJob < ApplicationJob
     Rails.logger.warn("[Captain::Hermes::DelayedReplyJob] toggle_typing_status #{status} failed: #{e.class} - #{e.message}")
   end
 
-  def create_outgoing_message(conversation, content)
+  def create_outgoing_message(conversation, content, external_source)
     assistant = conversation.inbox.captain_assistant
     sender = assistant.presence || User.find_by(id: conversation.assignee_id)
 
@@ -79,7 +79,7 @@ class Captain::Hermes::DelayedReplyJob < ApplicationJob
       inbox_id: conversation.inbox_id,
       sender: sender,
       content: content,
-      content_attributes: { external_source: 'hermes_callback' }
+      content_attributes: { external_source: external_source }
     )
   end
 end

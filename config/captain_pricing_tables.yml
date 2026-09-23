@@ -1,0 +1,84 @@
+# Tabelas estruturadas que ainda nao existiam no Captain::Pricing*.
+# Sincronizadas idempotentemente por `captain:sync_prompts` antes do app subir.
+# Nao use IDs: a ligacao e pelo hermes_profile_name e pelo captain_unit do assistant.
+profiles:
+  camila_samambaia:
+    categories:
+      standard:
+        aliases: [standard, comum]
+        amounts:
+          2h: { mon_wed: 40, thu_sun: 50 }
+          3h: { mon_wed: 50, thu_sun: 65 }
+          4h: { mon_wed: 60, thu_sun: 80 }
+          pernoite_promo: { mon_wed: 100, thu_sun: 150 }
+          pernoite_integral: { mon_wed: 100, thu_sun: 150 }
+          diaria: 170
+      master:
+        aliases: [master, suite master, suíte master]
+        amounts:
+          2h: 60
+          3h: 75
+          4h: 85
+          pernoite_promo: { mon_wed: 130, thu_sun: 160 }
+          pernoite_integral: { mon_wed: 130, thu_sun: 160 }
+          diaria: 190
+      pole_dance:
+        aliases: [pole dance, pole, suite pole dance, suíte pole dance]
+        amounts:
+          2h: 65
+          3h: 70
+          4h: 80
+          pernoite_promo: 160
+          pernoite_integral: 160
+          diaria: 190
+      hidromassagem:
+        aliases: [hidro, hidromassagem, banheira, spa, jacuzzi]
+        amounts:
+          2h: 110
+          3h: 120
+          4h: 150
+          pernoite_promo: 250
+          diaria: 300
+
+  prime_ade:
+    categories:
+      stilo:
+        aliases: [stilo, estilo]
+        amounts:
+          1h: { mon_wed: 50, thu_sun: 50 }
+          2h: { mon_wed: 60, thu_sun: 70 }
+          3h: { mon_wed: 70, thu_sun: 80 }
+          4h: { mon_wed: 75, thu_sun: 85 }
+          pernoite_promo: { mon_wed: 130, thu_sun: 150 }
+          pernoite_integral: { mon_wed: 150, thu_sun: 170 }
+          diaria: { mon_wed: 160, thu_sun: 180 }
+      alexa:
+        aliases: [alexa]
+        amounts:
+          1h: { mon_wed: 50, thu_sun: 60 }
+          2h: { mon_wed: 65, thu_sun: 75 }
+          3h: { mon_wed: 75, thu_sun: 85 }
+          4h: { mon_wed: 80, thu_sun: 90 }
+          pernoite_promo: { mon_wed: 140, thu_sun: 160 }
+          pernoite_integral: { mon_wed: 160, thu_sun: 180 }
+          diaria: { mon_wed: 170, thu_sun: 200 }
+      hidromassagem:
+        aliases: [hidro, hidromassagem, banheira, spa, jacuzzi, ofuro]
+        amounts:
+          1h: { mon_wed: 130, thu_sun: 140 }
+          2h: { mon_wed: 150, thu_sun: 160 }
+          3h: { mon_wed: 170, thu_sun: 180 }
+          4h: { mon_wed: 190, thu_sun: 200 }
+          pernoite_promo: { mon_wed: 260, thu_sun: 280 }
+          pernoite_integral: { mon_wed: 280, thu_sun: 300 }
+          diaria: { mon_wed: 350, thu_sun: 370 }
+      tematica:
+        aliases: [tematica, temática, suite tematica, suíte temática]
+        amounts:
+          1h: { mon_wed: 55, thu_sun: 65 }
+          2h: { mon_wed: 70, thu_sun: 80 }
+          3h: { mon_wed: 80, thu_sun: 90 }
+          4h: { mon_wed: 85, thu_sun: 95 }
+          pernoite_promo: { mon_wed: 150, thu_sun: 170 }
+          pernoite_integral: { mon_wed: 170, thu_sun: 190 }
+          diaria: { mon_wed: 180, thu_sun: 210 }

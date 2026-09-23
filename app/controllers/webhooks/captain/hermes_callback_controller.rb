@@ -88,6 +88,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     return log_no_conversation_and_ack if conversation.blank?
 
     log_reply(conversation, content)
+    return if enforce_known_fact(conversation)
     return if handle_blocked_content(conversation, content)
 
     return head :ok if detect_handoff_or_loop(conversation, content)
@@ -101,6 +102,32 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   end
 
   private
+
+  def enforce_known_fact(conversation)
+    incoming = conversation.messages.where(message_type: :incoming).reorder(created_at: :desc).first
+    return false if incoming.blank?
+
+    known_fact = Captain::Hermes::KnownFactReplyService.new(
+      conversation: conversation,
+      content: incoming.content
+    ).call
+    return false unless known_fact&.exclusive?
+
+    unless known_fact_already_delivered?(conversation, incoming, known_fact)
+      Rails.logger.warn(
+        "[Hermes::Callback] callback substituido por fato #{known_fact.kind} na conv #{conversation.display_id}"
+      )
+      deliver_outgoing(conversation, known_fact.content, known_fact.external_source)
+    end
+    head :ok
+  end
+
+  def known_fact_already_delivered?(conversation, incoming, known_fact)
+    conversation.messages
+                .where(message_type: :outgoing)
+                .where('created_at > ?', incoming.created_at)
+                .exists?(["#{Message.content_attribute_sql('external_source')} = ?", known_fact.external_source])
+  end
 
   def handle_blocked_content(conversation, content)
     return handle_error_payload(conversation, content) if error_payload?(content)
@@ -209,11 +236,13 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     end
   end
 
-  def deliver_outgoing(conversation, content)
+  def deliver_outgoing(conversation, content, external_source = 'hermes_callback')
     if defined?(Captain::Hermes::DelayedReplyJob)
-      Captain::Hermes::DelayedReplyJob.perform_later(conversation.id, content)
+      args = [conversation.id, content]
+      args << external_source unless external_source == 'hermes_callback'
+      Captain::Hermes::DelayedReplyJob.perform_later(*args)
     else
-      create_outgoing_message(conversation, content)
+      create_outgoing_message(conversation, content, external_source)
     end
   end
 
@@ -253,8 +282,21 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   # proteção normal de loop assumir a conversa.
   def one_clarification_after_ambiguous_acknowledgement?(conversation, content, previous_responses)
     return false unless ambiguous_acknowledgement?(conversation)
+    return false if recent_ambiguous_acknowledgements(conversation) > 1
 
     previous_responses.count { |response| loop_like_response?(content, response) } == 1
+  end
+
+  def recent_ambiguous_acknowledgements(conversation)
+    conversation.messages
+                .where(message_type: :incoming)
+                .reorder(created_at: :desc)
+                .limit(3)
+                .pluck(:content)
+                .count do |content|
+      normalized = ActiveSupport::Inflector.transliterate(content.to_s.downcase)
+      AMBIGUOUS_ACKNOWLEDGEMENT_REGEX.match?(normalized)
+    end
   end
 
   def loop_like_response?(content, previous_response)
@@ -407,7 +449,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
     )
   end
 
-  def create_outgoing_message(conversation, content)
+  def create_outgoing_message(conversation, content, external_source = 'hermes_callback')
     assistant = conversation.inbox.captain_assistant
     sender = assistant.presence || User.find_by(id: conversation.assignee_id)
 
@@ -418,7 +460,7 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
       sender: sender,
       content: content,
       content_attributes: {
-        external_source: 'hermes_callback'
+        external_source: external_source
       }
     )
   end

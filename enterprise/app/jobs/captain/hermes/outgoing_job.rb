@@ -34,6 +34,7 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
     # cancela jobs pendentes e enfileira só o último — aqui pegamos o
     # texto agrupado pra Hermes ver o pensamento completo do cliente.
     combined = combined_incoming_content(conversation, message)
+    return if respond_with_known_fact(conversation, message, combined)
 
     Captain::Hermes::Client.new(conversation.inbox).dispatch(
       message: message, conversation: conversation, content_override: combined
@@ -41,6 +42,22 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
   end
 
   private
+
+  def respond_with_known_fact(conversation, message, combined)
+    known_fact = Captain::Hermes::KnownFactReplyService.new(
+      conversation: conversation,
+      content: combined.presence || message.content
+    ).call
+    return false unless known_fact&.exclusive?
+
+    Rails.logger.info(
+      "[Captain::Hermes::KnownFact] conv #{conversation.display_id} respondeu #{known_fact.kind} sem LLM"
+    )
+    Captain::Hermes::DelayedReplyJob.perform_later(
+      conversation.id, known_fact.content, known_fact.external_source
+    )
+    true
+  end
 
   # Concatena texto de todas as msgs incoming entre a última resposta real
   # (não-reaction) do agente e a msg âncora. Retorna nil se só tem 1 msg

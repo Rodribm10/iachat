@@ -45,6 +45,7 @@ class HermesBuilder::Validator
     @unit = asst.captain_unit
 
     check_db
+    check_known_facts
     check_pricing
     check_routing
     check_humanization
@@ -104,6 +105,20 @@ class HermesBuilder::Validator
 
     check_pricing_dry_run(cats)
     check_inter_creds
+  end
+
+  def check_known_facts
+    locations = ::Captain::Hermes::KnownFactsCatalog.profile(@slug).fetch('locations', [])
+    valid = locations.any? && locations.all? do |location|
+      location['name'].present? && location['url'].to_s.start_with?('https://')
+    end
+    status = if valid
+               'PASS'
+             else
+               @inbox.present? ? 'FAIL' : 'WARN'
+             end
+    add('Fatos fixos de localização', status,
+        "#{locations.size} links HTTPS versionados", category: 'knowledge')
   end
 
   def check_pricing_dry_run(cats)

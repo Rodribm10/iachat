@@ -1,0 +1,95 @@
+# Fatos publicos que nao devem depender de prompt, FAQ, memoria ou decisao do LLM.
+# A chave e o hermes_profile_name do Captain::Assistant.
+#
+# Regras:
+# - links precisam ser HTTPS e abrir sem autenticacao;
+# - aliases servem apenas para escolher a unidade em perfis multiunidade;
+# - perfis de uma unica unidade sempre devolvem a unica localizacao;
+# - precos continuam vindo das tabelas estruturadas Captain::Pricing*, nunca daqui.
+profiles:
+  juliana_qnn1:
+    locations:
+      - name: Hotel 1001 Noites - QNN01
+        aliases: [qnn, qnn01, qnn1, midhaus, ceilandia, ceilândia]
+        url: https://maps.app.goo.gl/bogrUpmGoiDhUgeR8
+
+  padova_setor_o:
+    locations:
+      - name: Hotel 1001 Noites - Setor O
+        aliases: [setor o, padova, p norte, ceilandia, ceilândia]
+        url: https://maps.app.goo.gl/SsEYFGAAP6izp48V9
+
+  camila_samambaia:
+    locations:
+      - name: Hotel 1001 Noites - Samambaia
+        aliases: [samambaia, samambaia ade]
+        url: https://maps.app.goo.gl/cF7XQoQRCa8N7FQ77
+
+  recanto_emas:
+    locations:
+      - name: Hotel 1001 Noites - Recanto das Emas
+        aliases: [recanto, recanto das emas]
+        url: https://www.google.com/maps/search/?api=1&query=Hotel%201001%20Noites%20Recanto%20das%20Emas
+
+  bianca_h:
+    locations:
+      - name: Hotel 1001 Noites Prime - Águas Lindas
+        aliases: [aguas lindas, águas lindas, prime al, prime aguas lindas, prime águas lindas]
+        url: https://maps.app.goo.gl/ZGjNQQUELwWeFwAw5
+
+  lara_h:
+    locations:
+      - name: Hotel 1001 Noites Prime - Ceilândia
+        aliases: [prime ceilandia, prime ceilândia, prime vl, ceilandia, ceilândia]
+        url: https://www.google.com/maps/dir//1001+prime+ceilandia
+
+  prime_ade:
+    locations:
+      - name: Hotel 1001 Noites Prime - Águas Claras
+        aliases: [aguas claras, águas claras, prime ade, ade, pistao sul, pistão sul]
+        url: https://maps.app.goo.gl/LnmHRaZexmmfW6Si7
+
+  nina:
+    locations:
+      - name: Hotel 1001 Noites Express - Águas Lindas
+        aliases: [express, express aguas lindas, express águas lindas, aguas lindas, águas lindas]
+        url: https://www.google.com/maps/search/?api=1&query=Hotel%201001%20Noites%20Express%20Aguas%20Lindas
+
+  valentina:
+    locations:
+      - name: Dolce Amore Motel - Ponta Negra
+        aliases: [dolce amore, ponta negra, natal]
+        url: https://maps.app.goo.gl/i9BvpZAPagjnnFv69
+
+  isabela_instagram: &hoteis_1001_locations
+    locations:
+      - name: QNN01
+        aliases: [qnn, qnn01, qnn1, midhaus, ceilandia, ceilândia]
+        url: https://maps.app.goo.gl/bogrUpmGoiDhUgeR8
+      - name: Setor O
+        aliases: [setor o, padova, p norte, ceilandia, ceilândia]
+        url: https://maps.app.goo.gl/SsEYFGAAP6izp48V9
+      - name: Samambaia
+        aliases: [samambaia, samambaia ade]
+        url: https://maps.app.goo.gl/cF7XQoQRCa8N7FQ77
+      - name: Recanto das Emas
+        aliases: [recanto, recanto das emas]
+        url: https://www.google.com/maps/search/?api=1&query=Hotel%201001%20Noites%20Recanto%20das%20Emas
+
+  site_atendente:
+    <<: *hoteis_1001_locations
+
+  lia_anuncios:
+    <<: *hoteis_1001_locations
+
+  primeinstagram:
+    locations:
+      - name: Prime Águas Lindas
+        aliases: [aguas lindas, águas lindas, prime al, prime aguas lindas, prime águas lindas]
+        url: https://maps.app.goo.gl/ZGjNQQUELwWeFwAw5
+      - name: Prime Ceilândia
+        aliases: [prime ceilandia, prime ceilândia, prime vl, ceilandia, ceilândia]
+        url: https://www.google.com/maps/dir//1001+prime+ceilandia
+      - name: Prime Águas Claras
+        aliases: [aguas claras, águas claras, prime ade, ade, pistao sul, pistão sul]
+        url: https://maps.app.goo.gl/LnmHRaZexmmfW6Si7
