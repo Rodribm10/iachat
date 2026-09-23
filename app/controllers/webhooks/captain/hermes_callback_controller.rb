@@ -28,11 +28,14 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   ].freeze
 
   # Loop detection: 2 sinais.
-  # 1. Jaccard de tokens >= 0.50 → resposta praticamente igual.
+  # 1. Jaccard de tokens >= 0.90 → resposta praticamente idêntica.
   # 2. A mesma PERGUNTA reformulada. Comparar o texto inteiro fazia uma
   #    continuação legítima sobre o mesmo catálogo (Stilo, Alexa, Hidromassagem)
   #    parecer uma repetição.
-  LOOP_SIMILARITY_THRESHOLD = 0.50
+  # 0.50 era agressivo demais para hotelaria: respostas corretas sobre a mesma
+  # reserva reutilizam categoria, data, duração, preço e CTA. Isso marcou como
+  # loop avanços reais como "trocar para Luxo" e "mudar para 2 horas".
+  LOOP_SIMILARITY_THRESHOLD = 0.90
   LOOP_QUESTION_SIMILARITY = 0.55
   # Uma confirmação curta não escolhe uma das opções que a atendente acabou de
   # oferecer. Nesse caso, uma única pergunta de esclarecimento é legítima;
@@ -306,13 +309,19 @@ class Webhooks::Captain::HermesCallbackController < ApplicationController
   end
 
   def mark_for_human_triage(conversation, reason: nil)
-    reason_label = "triagem_#{reason}" if reason.present?
-    current = conversation.label_list
-    already_triaged = current.include?('triagem_humana')
-    labels = (current + %w[triagem_humana] + [reason_label]).compact.uniq
-    conversation.update!(status: :open) unless conversation.open?
-    conversation.update_labels(labels)
-    Captain::Hermes::HumanTriageNoteService.new(conversation: conversation, reason: reason).perform unless already_triaged
+    # Callbacks concorrentes do mesmo erro chegavam no mesmo instante e todos
+    # liam a conversa antes de a primeira triagem ser gravada. O lock garante
+    # uma única nota/etiqueta por conversa, inclusive para erro técnico.
+    conversation.with_lock do
+      conversation.reload
+      reason_label = "triagem_#{reason}" if reason.present?
+      current = conversation.label_list
+      already_triaged = current.include?('triagem_humana')
+      labels = (current + %w[triagem_humana] + [reason_label]).compact.uniq
+      conversation.update!(status: :open) unless conversation.open?
+      conversation.update_labels(labels)
+      Captain::Hermes::HumanTriageNoteService.new(conversation: conversation, reason: reason).perform unless already_triaged
+    end
     Rails.logger.info("[Hermes::Callback] conv #{conversation.display_id} → triagem_humana (#{reason})")
   end
 
