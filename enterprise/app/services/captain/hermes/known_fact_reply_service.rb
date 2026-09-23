@@ -9,7 +9,7 @@ class Captain::Hermes::KnownFactReplyService
   end
 
   def call
-    location_reply || pricing_reply
+    location_reply || promotion_clarification || pricing_reply
   end
 
   private
@@ -23,6 +23,22 @@ class Captain::Hermes::KnownFactReplyService
 
   def pricing_reply
     Captain::Hermes::PricingFactReplyService.new(conversation: @conversation, content: @content).call
+  end
+
+  def promotion_clarification
+    return unless %w[site_atendente lia_anuncios].include?(assistant&.hermes_profile_name)
+
+    normalized = ActiveSupport::Inflector.transliterate(@content.downcase)
+    return unless normalized.match?(/\b(promocao|promo|desconto)\b/)
+    return if Captain::Hermes::KnownFactsCatalog.profile(assistant.hermes_profile_name).fetch('locations').any? do |location|
+      location.fetch('aliases').any? { |alias_name| normalized.include?(ActiveSupport::Inflector.transliterate(alias_name.downcase)) }
+    end
+
+    Captain::Hermes::KnownFactReply.new(
+      kind: :promotion_clarification,
+      content: 'Qual unidade você procura: QNN01, Setor O, Samambaia ou Recanto das Emas? Assim confiro a promoção correta para a data.',
+      exclusive: true
+    )
   end
 
   def assistant

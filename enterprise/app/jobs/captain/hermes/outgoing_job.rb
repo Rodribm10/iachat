@@ -16,6 +16,7 @@ class Captain::Hermes::OutgoingJob < ApplicationJob
     message = Message.find_by(id: message_id)
     return if conversation.blank? || message.blank?
     return unless Captain::Hermes.enabled_for?(conversation.inbox)
+    return if message.content.blank? && !message.attachments.exists?
 
     # Conv marcada pra triagem humana = Hermes não responde mais (até admin
     # remover label). Evita gastar token e gerar loop em msgs claramente fora
